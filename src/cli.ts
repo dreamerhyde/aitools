@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { setupBasicCommands } from './cli/basic-commands.js';
 import { setupHooksCommand } from './cli/hooks-command.js';
 import { setupPsCommand } from './cli/ps-command.js';
+import { setupGitCommand } from './cli/git-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 
@@ -20,6 +21,7 @@ program
 // Setup all commands using the extracted modules
 setupHooksCommand(program);
 setupPsCommand(program);
+setupGitCommand(program);
 setupBasicCommands(program);
 
 // Help command with examples

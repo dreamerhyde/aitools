@@ -8,11 +8,11 @@ Vibe Coding is the flow state achieved when pair programming with AI assistants 
 
 ## ✓ Key Features
 
-- **Process Management**: Smart detection and cleanup of stuck hooks and runaway processes
-- **Code Health Monitoring**: Identify files needing refactoring with AI-ready prompts
-- **System Optimization**: Real-time CPU/memory monitoring with automatic issue resolution
-- **Clean CLI Design**: Professional interface without emoji, following international standards
-- **Auto-Updates**: Stay current with automatic version checking (Claude Code style)
+-   **Process Management**: Smart detection and cleanup of stuck hooks and runaway processes
+-   **Code Health Monitoring**: Identify files needing refactoring with AI-ready prompts
+-   **System Optimization**: Real-time CPU/memory monitoring with automatic issue resolution
+-   **Clean CLI Design**: Professional interface without emoji, following international standards
+-   **Auto-Updates**: Stay current with automatic version checking (Claude Code style)
 
 ## Installation
 
@@ -30,6 +30,7 @@ bun run build
 ```
 
 Use either `aitools` or the shorter `ai` alias:
+
 ```bash
 aitools status   # Full command
 ai status        # Short alias
@@ -67,9 +68,9 @@ ai hooks -k                    # Terminate all hooks
 ai hooks clean                 # Clean abnormal hooks only
 
 # Terminate processes
-ai kill -p 1234               # Kill by PID
-ai kill --pattern node        # Kill by pattern match
-ai kill -i                    # Interactive selection
+ai kill -p 1234                # Kill by PID
+ai kill --pattern node         # Kill by pattern match
+ai kill -i                     # Interactive selection
 ```
 
 ### Code Health Analysis
@@ -77,9 +78,9 @@ ai kill -i                    # Interactive selection
 ```bash
 # Check code quality
 ai check                       # Analyze files >500 lines
-ai check -t 300               # Custom threshold (300 lines)
-ai check -p ./src             # Specific directory
-ai check --ignore "*.test.ts" # Additional ignore patterns
+ai check -t 300                # Custom threshold (300 lines)
+ai check -p ./src              # Specific directory
+ai check --ignore "*.test.ts"  # Additional ignore patterns
 
 # Output includes:
 # - Health score (0-100)
@@ -93,7 +94,30 @@ ai check --ignore "*.test.ts" # Additional ignore patterns
 # Automatic issue resolution
 ai fix                        # Standard fix for common issues
 ai fix --aggressive           # More thorough cleanup
-ai fix --dry-run             # Preview without executing
+ai fix --dry-run              # Preview without executing
+```
+
+### Git Statistics
+
+```bash
+# View git changes and statistics
+ai git                        # Show changes since last commit
+ai diff                       # Same as 'ai git' (alias)
+ai g                          # Short alias
+ai d                          # Shortest alias
+
+# Shows:
+# - Last commit info (hash, author, date, message)
+# - Total changes overview:
+#   • Files changed with inline breakdown (modified, added, new, deleted)
+#   • Total lines added/deleted with counts from ALL files
+#   • Visual progress bar showing add/delete ratio
+# - Files grouped by change type:
+#   • Modified Files - with stage indicators (● staged, ○ unstaged)
+#   • New Files - includes both added and untracked with line counts
+#   • Deleted Files - with deletion counts
+#   • Renamed Files - if any
+# - Summary with action hints (ready to commit, need staging)
 ```
 
 ### Self-Management
@@ -111,17 +135,19 @@ ai config --enable-updates   # Enable automatic update checks
 The `ai check` command provides comprehensive code analysis:
 
 ### Supported Languages
-- JavaScript/TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`)
-- Python (`.py`)
-- Go (`.go`)
-- Java (`.java`)
-- C#/NET (`.cs`)
-- C/C++ (`.c`, `.cpp`)
-- Rust (`.rs`)
-- Swift (`.swift`)
-- Kotlin (`.kt`)
+
+-   JavaScript/TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`)
+-   Python (`.py`)
+-   Go (`.go`)
+-   Java (`.java`)
+-   C#/NET (`.cs`)
+-   C/C++ (`.c`, `.cpp`)
+-   Rust (`.rs`)
+-   Swift (`.swift`)
+-   Kotlin (`.kt`)
 
 ### Automatic Exclusions
+
 ```
 node_modules/     # JavaScript dependencies
 __pycache__/      # Python cache
@@ -134,6 +160,7 @@ Pods/, Carthage/  # iOS dependencies
 ```
 
 ### Example Output
+
 ```
 Overall Health Score
 ────────────────────────
@@ -145,7 +172,7 @@ Files Needing Attention
 ────────────────────────
   ● app/components/analytics.tsx
      Lines: 785    Size: 37.6KB   Complexity: 31
-     
+
 → Copy-Paste Ready AI Prompt:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [Complete refactoring prompt ready to paste to AI]
@@ -155,6 +182,7 @@ Files Needing Attention
 ## Common Workflows
 
 ### When Claude Code gets stuck
+
 ```bash
 ai status          # Check system health
 ai hooks           # View problematic hooks
@@ -162,6 +190,7 @@ ai fix             # Auto-fix issues
 ```
 
 ### Maintain code quality for AI collaboration
+
 ```bash
 ai check           # Identify large files
 # Copy the generated prompt
@@ -169,12 +198,14 @@ ai check           # Identify large files
 ```
 
 ### Clean up after intense coding session
+
 ```bash
 ai ps clean -y     # Remove all abnormal processes
 ai hooks clean -y  # Clean stuck hooks
 ```
 
 ### Debug high CPU usage
+
 ```bash
 ai monitor         # Find resource hogs
 ai ps --cpu 20     # List high CPU processes
@@ -183,20 +214,22 @@ ai kill -i         # Select and terminate
 
 ## Process Status Indicators
 
-- `●` Red circle: Critical/abnormal process (sleeping with high CPU)
-- `○` Yellow circle: Warning state (high resource usage)
-- `○` Gray circle: Normal idle process
-- `●` Green circle: Normal active process
+-   `●` Red circle: Critical/abnormal process (sleeping with high CPU)
+-   `○` Yellow circle: Warning state (high resource usage)
+-   `○` Gray circle: Normal idle process
+-   `●` Green circle: Normal active process
 
 ## Advanced Usage
 
 ### Custom Monitoring
+
 ```bash
 ai monitor -c 15 -m 5          # CPU >15%, Memory >5%
 ai monitor --cpu-threshold 10  # Custom CPU threshold
 ```
 
 ### Process Filtering
+
 ```bash
 ai ps --sort memory            # Sort by memory usage
 ai ps --sort time              # Sort by runtime
@@ -204,6 +237,7 @@ ai ps --limit 20               # Limit output rows
 ```
 
 ### Code Health Options
+
 ```bash
 ai check --format detailed     # Detailed analysis
 ai check --format json        # JSON output for automation
@@ -227,11 +261,11 @@ bun run lint                # ESLint checking
 
 ## Architecture
 
-- **Runtime**: Bun for fast execution
-- **Language**: TypeScript with strict typing
-- **CLI Framework**: Commander.js
-- **UI Components**: Chalk (colors), Table (formatting), Ora (spinners)
-- **Platform**: Optimized for macOS with fallback support
+-   **Runtime**: Bun for fast execution
+-   **Language**: TypeScript with strict typing
+-   **CLI Framework**: Commander.js
+-   **UI Components**: Chalk (colors), Table (formatting), Ora (spinners)
+-   **Platform**: Optimized for macOS with fallback support
 
 ## Project Structure
 
@@ -255,11 +289,12 @@ src/
 Contributions welcome! This tool evolves with the AI development ecosystem.
 
 ### Guidelines
-- Follow existing code style
-- Maintain English documentation
-- No emoji in code or output
-- Test with multiple AI tools
-- Update README for new features
+
+-   Follow existing code style
+-   Maintain English documentation
+-   No emoji in code or output
+-   Test with multiple AI tools
+-   Update README for new features
 
 ## License
 
