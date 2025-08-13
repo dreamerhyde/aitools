@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { relative, basename, extname } from 'path';
+import { relative, extname } from 'path';
 
 interface FileHealth {
   path: string;
@@ -22,7 +22,7 @@ export class HealthDisplay {
   private readonly CRITICAL_THRESHOLD = 1000;
   private readonly COMPLEXITY_THRESHOLD = 10;
 
-  displayReport(report: HealthReport, format: string, threshold: number): void {
+  displayReport(report: HealthReport, _format: string, _threshold: number): void {
     console.log();
     
     // Health Score with cleaner format

@@ -61,7 +61,7 @@ export function setupBasicCommands(program: Command): void {
     .description('Show system status and AI development environment health')
     .action(async () => {
       try {
-        const monitor = new MonitorCommand();
+        
         const spinner = UIHelper.createSpinner('Checking system health...');
         spinner.start();
         
