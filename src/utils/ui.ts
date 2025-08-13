@@ -88,17 +88,53 @@ export class UIHelper {
 
     // Process rows
     formattedProcesses.forEach(proc => {
+      // Detect abnormal processes
+      const isClaudeHook = proc.command.includes('.claude/hooks/');
+      const isSleepingWithCPU = proc.status === 'sleeping' && proc.cpu > 1;
+      
+      // For Claude hooks, be more strict - any CPU usage while sleeping is abnormal
+      const isAbnormal = isClaudeHook ? 
+        (isSleepingWithCPU || proc.cpu >= 5) : 
+        (proc.status === 'sleeping' && proc.cpu >= 5);
+      
+      // Critical: high CPU or multiple issues
+      const isCritical = isClaudeHook ? 
+        (isSleepingWithCPU && proc.cpu >= 5) : 
+        (proc.status === 'sleeping' && proc.cpu >= 10);
+      
+      // Color coding for CPU
+      let cpuColor;
+      if (isCritical) {
+        cpuColor = chalk.red.bold(proc.cpu.toFixed(1)); // Critical: sleeping but high CPU
+      } else if (isAbnormal) {
+        cpuColor = chalk.yellow(proc.cpu.toFixed(1)); // Warning: sleeping but moderate CPU
+      } else if (proc.cpu >= 50) {
+        cpuColor = chalk.red(proc.cpu.toFixed(1));
+      } else if (proc.cpu >= 20) {
+        cpuColor = chalk.yellow(proc.cpu.toFixed(1));
+      } else {
+        cpuColor = chalk.green(proc.cpu.toFixed(1));
+      }
+      
+      // Override status icon for abnormal processes
+      let statusIcon = this.getStatusIcon(proc.status);
+      if (isCritical) {
+        statusIcon = chalk.red('●'); // Red solid circle for critical abnormal processes
+      } else if (isAbnormal) {
+        statusIcon = chalk.yellow('●'); // Yellow solid circle for warning abnormal processes
+      }
+      
       data.push([
         chalk.white(proc.pid.toString()),
-        proc.cpu >= 50 ? chalk.red(proc.cpu.toFixed(1)) : 
-          proc.cpu >= 20 ? chalk.yellow(proc.cpu.toFixed(1)) : 
-          chalk.green(proc.cpu.toFixed(1)),
+        cpuColor,
         proc.memory >= 50 ? chalk.red(proc.memory.toFixed(1)) :
           proc.memory >= 20 ? chalk.yellow(proc.memory.toFixed(1)) :
           chalk.green(proc.memory.toFixed(1)),
         chalk.gray(proc.formattedTime),
-        this.getStatusIcon(proc.status),
-        chalk.gray(this.truncateCommand(proc.command, availableCommandWidth - 2))
+        statusIcon,
+        isCritical ? chalk.red(this.truncateCommand(proc.command, availableCommandWidth - 2)) :
+          isAbnormal ? chalk.yellow(this.truncateCommand(proc.command, availableCommandWidth - 2)) :
+          chalk.gray(this.truncateCommand(proc.command, availableCommandWidth - 2))
       ]);
     });
 
@@ -206,13 +242,13 @@ export class UIHelper {
   private static getStatusIcon(status: ProcessInfo['status']): string {
     switch (status) {
       case 'running':
-        return chalk.green('●');  // Green solid - Running
+        return chalk.green('●');  // Green solid - Running (active)
       case 'sleeping':
-        return chalk.gray('○');   // Gray hollow - Sleeping (most common normal state)
+        return chalk.gray('○');   // Gray hollow - Sleeping (idle, normal)
       case 'zombie':
-        return chalk.red('●');    // Red solid - Zombie process (needs attention)
+        return chalk.red('●');    // Red solid - Zombie process (critical)
       case 'stopped':
-        return chalk.white('●');  // White solid - Stopped
+        return chalk.yellow('○'); // Yellow hollow - Stopped (paused)
       default:
         return chalk.gray('?');
     }

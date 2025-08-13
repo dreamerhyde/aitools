@@ -67,7 +67,7 @@ export class MonitorCommand {
         { value: 'kill', label: '🔪 Terminate selected processes' },
         { value: 'kill-all', label: '💥 Terminate all suspicious processes' },
         { value: 'ignore', label: '⏭️  Ignore for now' },
-        { value: 'details', label: '🔍 View detailed information' }
+        { value: 'details', label: ' View detailed information' }
       ]
     });
 
@@ -138,7 +138,7 @@ export class MonitorCommand {
 
   private async killAllProcesses(processes: ProcessInfo[]): Promise<void> {
     const confirmKill = await confirm({
-      message: `⚠️  Are you sure you want to terminate all ${processes.length} suspicious processes?`
+      message: `  Are you sure you want to terminate all ${processes.length} suspicious processes?`
     });
 
     if (confirmKill) {

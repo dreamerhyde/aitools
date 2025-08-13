@@ -1,184 +1,272 @@
 # AI Tools CLI
 
-> Essential toolkit for Vibe Coding - Keep your AI-assisted development flow smooth by managing processes, debugging stuck operations, and optimizing your coding environment when using Claude Code, GitHub Copilot, Cursor, and other AI tools
+> Essential toolkit for Vibe Coding - Keep your AI-assisted development flow smooth by managing processes, monitoring code health, and maintaining optimal performance when pair programming with AI assistants.
 
-## 🎵 What is Vibe Coding?
+## What is Vibe Coding?
 
-Vibe Coding is the state of flow when you're pair programming with AI - ideas flowing seamlessly from thought to implementation. But nothing kills the vibe faster than stuck processes, frozen hooks, or mysterious CPU spikes. That's where `aitools` comes in.
+Vibe Coding is the flow state achieved when pair programming with AI assistants - where ideas transform seamlessly into code. But nothing disrupts this flow faster than stuck processes, bloated code files, or frozen development hooks. AI Tools ensures your vibe stays uninterrupted.
 
-## ✨ Features
+## ✓ Key Features
 
-- 🎵 **Keep Your Vibe**: Don't let technical issues interrupt your coding flow
-- 🤖 **AI Development Focused**: Optimized for managing processes spawned by AI coding assistants
-- 🔍 **Smart Detection**: Automatically identifies stuck hooks, long-running processes, and performance issues
-- 💻 **Clean Interface**: Modern CLI with readable time formats and dynamic column sizing
-- ⚡ **Quick Fixes**: One-command resolution for common development environment issues
-- 📊 **System Health**: Real-time monitoring of CPU, memory, and process states
-- 🎯 **Precise Control**: Interactive mode for selective process management
+- **Process Management**: Smart detection and cleanup of stuck hooks and runaway processes
+- **Code Health Monitoring**: Identify files needing refactoring with AI-ready prompts
+- **System Optimization**: Real-time CPU/memory monitoring with automatic issue resolution
+- **Clean CLI Design**: Professional interface without emoji, following international standards
+- **Auto-Updates**: Stay current with automatic version checking (Claude Code style)
 
-## 🚀 Installation
+## Installation
 
 ```bash
-# Global installation with bun
+# Install globally with npm/bun
+npm install -g aitools
+# or
 bun install -g aitools
 
-# Or run directly with bunx
-bunx aitools
-
-# Local development
+# Clone for development
 git clone https://github.com/yourusername/aitools.git
 cd aitools
 bun install
 bun run build
 ```
 
-After installation, you can use either `aitools` or the shorter `ai` alias:
+Use either `aitools` or the shorter `ai` alias:
 ```bash
 aitools status   # Full command
-ai status        # Short alias - same thing!
+ai status        # Short alias
 ```
 
-## 📖 Usage
+## Core Commands
 
-### Core Commands
-
-Both `aitools` and `ai` work identically - use whichever feels better!
+### System Health & Monitoring
 
 ```bash
-# 🔍 Check system health
-ai status                          # Quick overview of AI development environment
+# Quick system overview
+ai status                       # Check AI development environment health
 
-# 🪝 Manage AI development hooks
-ai hooks                           # View all active hooks
-ai hooks -i                        # Interactive hook management
-ai hooks -k                        # Kill all detected hooks
-
-# ⚡ Fix common issues automatically
-ai fix                             # Standard fix for stuck processes
-ai fix --aggressive                # More aggressive cleanup
-
-# 📊 Monitor system performance
-ai monitor                         # One-time system check
-ai monitor -w                      # Continuous monitoring mode
-ai monitor -i                      # Interactive process selection
-
-# 🔎 View processes
-ai processes                       # All system processes
-ai processes --hooks               # Only hook-related processes
-ai processes --cpu 10              # Processes using >10% CPU
-
-# 🔪 Terminate processes
-ai kill -p 1234                   # Kill by PID
-ai kill --hooks                   # Kill all hook processes
-ai kill -i                        # Interactive selection
+# Monitor processes and performance
+ai monitor                      # One-time system check
+ai monitor -w                   # Continuous monitoring
+ai monitor -i                   # Interactive process selection
+ai monitor --auto-kill          # Auto-terminate suspicious processes
 ```
 
-### Common Workflows
+### Process Management
 
-#### 🎵 Keep the vibe going when things get stuck:
 ```bash
-# Quick vibe check and fix
-ai status      # Check what's killing your vibe
-ai fix         # Auto-fix to get back in the flow
+# View processes with subcommands
+ai ps                          # List all processes
+ai ps --hooks                  # Show only hook-related processes
+ai ps --cpu 10                 # Filter by CPU usage >10%
+ai ps clean                    # Clean critical abnormal processes (red circles)
+ai ps clean -y                 # Skip confirmation
+
+# Manage hooks specifically
+ai hooks                       # View all active hooks
+ai hooks -i                    # Interactive hook management
+ai hooks -k                    # Terminate all hooks
+ai hooks clean                 # Clean abnormal hooks only
+
+# Terminate processes
+ai kill -p 1234               # Kill by PID
+ai kill --pattern node        # Kill by pattern match
+ai kill -i                    # Interactive selection
 ```
 
-#### When Claude Code or Cursor gets stuck:
+### Code Health Analysis
+
 ```bash
-# Quick diagnosis and fix
-ai hooks       # See what's hanging
-ai fix         # Auto-fix common issues
+# Check code quality
+ai check                       # Analyze files >500 lines
+ai check -t 300               # Custom threshold (300 lines)
+ai check -p ./src             # Specific directory
+ai check --ignore "*.test.ts" # Additional ignore patterns
+
+# Output includes:
+# - Health score (0-100)
+# - Files needing attention
+# - Copy-paste ready AI prompts for refactoring
 ```
 
-#### Managing runaway development servers:
+### Quick Fixes
+
 ```bash
-# Find and kill stuck dev servers
-ai processes --cpu 20    # Find high CPU processes
-ai kill -i               # Interactively select what to kill
+# Automatic issue resolution
+ai fix                        # Standard fix for common issues
+ai fix --aggressive           # More thorough cleanup
+ai fix --dry-run             # Preview without executing
 ```
 
-#### Clean up after intense vibe coding session:
+### Self-Management
+
 ```bash
-# Remove all AI tool hooks
-ai hooks -k              # Kill all hooks at once
+# Updates and configuration
+ai upgrade                    # Upgrade to latest version
+ai upgrade --check           # Check for updates only
+ai config --disable-updates  # Disable automatic update checks
+ai config --enable-updates   # Enable automatic update checks
 ```
 
-## 🎯 Use Cases
+## Code Health Feature
 
-### For Claude Code Users
-- Resolve stuck hooks when Claude Code becomes unresponsive
-- Clean up orphaned processes after closing the browser
-- Monitor resource usage during long coding sessions
+The `ai check` command provides comprehensive code analysis:
 
-### For Cursor/Copilot Users
-- Manage background processes spawned by AI assistants
-- Debug performance issues caused by language servers
-- Clean up after crashed development environments
+### Supported Languages
+- JavaScript/TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`)
+- Python (`.py`)
+- Go (`.go`)
+- Java (`.java`)
+- C#/NET (`.cs`)
+- C/C++ (`.c`, `.cpp`)
+- Rust (`.rs`)
+- Swift (`.swift`)
+- Kotlin (`.kt`)
 
-### For General AI Development
-- Monitor system health during AI-assisted coding
-- Quickly identify and resolve process bottlenecks
-- Maintain optimal performance across multiple AI tools
+### Automatic Exclusions
+```
+node_modules/     # JavaScript dependencies
+__pycache__/      # Python cache
+venv/, .venv/     # Python virtual environments
+vendor/           # Go dependencies
+target/           # Rust/Java build
+bin/, obj/        # C# build
+Pods/, Carthage/  # iOS dependencies
+.git/, .idea/     # Version control and IDE
+```
 
-## 🔧 Advanced Options
+### Example Output
+```
+Overall Health Score
+────────────────────────
+  Score: 72/100
+  Files analyzed: 118
+  Files needing attention: 5
 
-### Process Monitoring
+Files Needing Attention
+────────────────────────
+  ● app/components/analytics.tsx
+     Lines: 785    Size: 37.6KB   Complexity: 31
+     
+→ Copy-Paste Ready AI Prompt:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Complete refactoring prompt ready to paste to AI]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+## Common Workflows
+
+### When Claude Code gets stuck
 ```bash
-# Custom CPU threshold
-aitools monitor -c 15             # Alert on >15% CPU usage
+ai status          # Check system health
+ai hooks           # View problematic hooks
+ai fix             # Auto-fix issues
+```
 
-# Memory monitoring
-aitools monitor -m 5              # Alert on >5% memory usage
+### Maintain code quality for AI collaboration
+```bash
+ai check           # Identify large files
+# Copy the generated prompt
+# Paste to Claude/ChatGPT/Copilot for refactoring
+```
 
-# Auto-kill mode
-aitools monitor -a                # Automatically kill suspicious processes
+### Clean up after intense coding session
+```bash
+ai ps clean -y     # Remove all abnormal processes
+ai hooks clean -y  # Clean stuck hooks
+```
+
+### Debug high CPU usage
+```bash
+ai monitor         # Find resource hogs
+ai ps --cpu 20     # List high CPU processes
+ai kill -i         # Select and terminate
+```
+
+## Process Status Indicators
+
+- `●` Red circle: Critical/abnormal process (sleeping with high CPU)
+- `○` Yellow circle: Warning state (high resource usage)
+- `○` Gray circle: Normal idle process
+- `●` Green circle: Normal active process
+
+## Advanced Usage
+
+### Custom Monitoring
+```bash
+ai monitor -c 15 -m 5          # CPU >15%, Memory >5%
+ai monitor --cpu-threshold 10  # Custom CPU threshold
 ```
 
 ### Process Filtering
 ```bash
-# Sort by different metrics
-aitools processes --sort memory   # Sort by memory usage
-aitools processes --sort time     # Sort by runtime
-
-# Limit output
-aitools processes --limit 20      # Show only top 20 processes
+ai ps --sort memory            # Sort by memory usage
+ai ps --sort time              # Sort by runtime
+ai ps --limit 20               # Limit output rows
 ```
 
-## 📝 Configuration
+### Code Health Options
+```bash
+ai check --format detailed     # Detailed analysis
+ai check --format json        # JSON output for automation
+```
 
-The tool uses sensible defaults but can be customized:
-
-- **CPU Threshold**: 5% (adjustable via `-c` flag)
-- **Memory Threshold**: 1% (adjustable via `-m` flag)
-- **Long-running**: 5 minutes (processes running longer are flagged)
-
-## 🏗️ Architecture
-
-Built with:
-- **Bun** - Fast JavaScript runtime and bundler
-- **TypeScript** - Type-safe development
-- **Commander.js** - CLI framework
-- **Chalk & Ora** - Beautiful terminal output
-
-Optimized for macOS with platform-specific process management.
-
-## 🤝 Contributing
-
-Contributions are welcome! This tool is designed to evolve with the AI development ecosystem.
+## Development
 
 ```bash
-# Development setup
+# Setup
 bun install
-bun run dev [command]      # Run in development mode
-bun run build             # Build for production
-bun run typecheck         # Type checking
+
+# Development commands
+bun run dev [command]         # Run in development mode
+bun run build                # Build distribution
+bun run typecheck           # TypeScript checking
+bun run lint                # ESLint checking
+
+# Testing
+./dist/cli.js [command]      # Test built version
 ```
 
-## 📄 License
+## Architecture
+
+- **Runtime**: Bun for fast execution
+- **Language**: TypeScript with strict typing
+- **CLI Framework**: Commander.js
+- **UI Components**: Chalk (colors), Table (formatting), Ora (spinners)
+- **Platform**: Optimized for macOS with fallback support
+
+## Project Structure
+
+```
+src/
+├── cli.ts                   # Main entry point
+├── cli/                     # Command modules
+│   ├── ps-command.ts       # Process commands
+│   ├── hooks-command.ts    # Hook management
+│   └── basic-commands.ts   # Core utilities
+├── commands/                # Command implementations
+├── utils/                   # Shared utilities
+│   ├── process-monitor.ts  # Process detection
+│   ├── ui.ts              # UI helpers
+│   └── health-display.ts  # Code health formatting
+└── types/                   # TypeScript definitions
+```
+
+## Contributing
+
+Contributions welcome! This tool evolves with the AI development ecosystem.
+
+### Guidelines
+- Follow existing code style
+- Maintain English documentation
+- No emoji in code or output
+- Test with multiple AI tools
+- Update README for new features
+
+## License
 
 MIT
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-Created for the Vibe Coding community - developers who live in the flow state with their AI pair programmers. May your vibes stay high and your processes stay responsive.
+Created for developers who live in the flow state with AI pair programmers. Keep your vibe high and your processes responsive.
 
-> "Don't let stuck processes kill your vibe" - Every developer using AI tools
+> "Clean code, clear mind, continuous vibe" - The AI Tools Philosophy

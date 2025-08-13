@@ -70,10 +70,61 @@ export class ProcessMonitor {
     const processes = await this.getAllProcesses();
     const systemStats = await this.getSystemStats();
     
-    const suspiciousProcesses = processes.filter(proc => 
-      proc.isHook && (proc.cpu > this.options.cpuThreshold || 
-      this.isLongRunning(proc.startTime))
-    );
+    // Detect duplicate processes (same command running multiple times)
+    const commandCounts = new Map<string, number>();
+    processes.forEach(proc => {
+      const baseCommand = proc.command.split(' ')[0]; // Get base command
+      commandCounts.set(baseCommand, (commandCounts.get(baseCommand) || 0) + 1);
+    });
+    
+    // Detect abnormal processes: sleeping but consuming CPU (zombie-like behavior)
+    const suspiciousProcesses = processes.filter(proc => {
+      // Hook processes that are suspicious
+      if (proc.isHook) {
+        // Restart/quick scripts shouldn't run long
+        const isRestartScript = proc.command.includes('restart') || 
+                               proc.command.includes('reload') || 
+                               proc.command.includes('refresh');
+        
+        // Claude hooks are especially suspicious
+        const isClaudeHook = proc.command.includes('.claude/hooks/');
+        
+        // Multiple instances of same hook
+        const baseCommand = proc.command.split(' ')[0];
+        const hasDuplicates = (commandCounts.get(baseCommand) || 0) > 1;
+        
+        // Any Claude hook using CPU while sleeping is abnormal
+        if (isClaudeHook && proc.status === 'sleeping' && proc.cpu > 1) {
+          return true;
+        }
+        
+        // Restart scripts running for more than 1 minute
+        if (isRestartScript && this.parseElapsedSeconds(proc.startTime) > 60) {
+          return true;
+        }
+        
+        // Multiple instances of the same hook
+        if (isClaudeHook && hasDuplicates) {
+          return true;
+        }
+        
+        // General: sleeping but using significant CPU
+        if (proc.status === 'sleeping' && proc.cpu >= 5) {
+          return true;
+        }
+        
+        // Long running hooks
+        if (this.isLongRunning(proc.startTime)) {
+          return true;
+        }
+        
+        // High CPU hooks
+        if (proc.cpu > this.options.cpuThreshold) {
+          return true;
+        }
+      }
+      return false;
+    });
     
     const highCpuProcesses = processes.filter(proc => 
       proc.cpu > this.options.cpuThreshold && !proc.isHook
@@ -82,7 +133,7 @@ export class ProcessMonitor {
     const longRunningBash = processes.filter(proc =>
       proc.command.includes('bash') && 
       this.isLongRunning(proc.startTime) &&
-      proc.cpu > 0
+      (proc.cpu > 0 || proc.status === 'sleeping') // Include sleeping bash with any CPU usage
     );
     
     return {
@@ -139,6 +190,10 @@ export class ProcessMonitor {
   }
 
   private isLongRunning(etime: string): boolean {
+    return this.parseElapsedSeconds(etime) > this.options.timeThreshold;
+  }
+  
+  private parseElapsedSeconds(etime: string): number {
     // Parse etime format (could be MM:SS or HH:MM:SS or DD-HH:MM:SS)
     const parts = etime.split(/[-:]/);
     let totalSeconds = 0;
@@ -155,7 +210,7 @@ export class ProcessMonitor {
                     parseInt(parts[2]) * 60 + parseInt(parts[3]);
     }
     
-    return totalSeconds > this.options.timeThreshold;
+    return totalSeconds;
   }
 
   private parseMemoryInfo(vmStat: string): { total: string; free: string; active: string } {

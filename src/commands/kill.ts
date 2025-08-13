@@ -138,7 +138,7 @@ export class KillCommand {
         message: 'Hook processes detected. How would you like to handle them?',
         options: [
           { value: 'kill', label: '🔪 Immediately terminate all Hooks' },
-          { value: 'analyze', label: '🔍 Analyze before deciding' },
+          { value: 'analyze', label: ' Analyze before deciding' },
           { value: 'cancel', label: '❌ Cancel operation' }
         ]
       });
@@ -157,7 +157,7 @@ export class KillCommand {
 
   private async executeKillWithConfirmation(processes: any[]): Promise<void> {
     const shouldKill = await confirm({
-      message: `⚠️  Are you sure you want to terminate ${processes.length} processes? This operation cannot be undone.`
+      message: `  Are you sure you want to terminate ${processes.length} processes? This operation cannot be undone.`
     });
 
     if (shouldKill) {
@@ -203,7 +203,7 @@ export class KillCommand {
   }
 
   private async analyzeHookProcesses(processes: any[]): Promise<void> {
-    console.log('\n🔍 Hook Process Analysis:');
+    console.log('\n Hook Process Analysis:');
     console.log('═'.repeat(60));
 
     processes.forEach((proc, index) => {
@@ -219,7 +219,7 @@ export class KillCommand {
       if (proc.status === 'zombie') issues.push('Zombie process');
       
       if (issues.length > 0) {
-        console.log(`   ⚠️  Issues: ${issues.join(', ')}`);
+        console.log(`     Issues: ${issues.join(', ')}`);
       }
     });
 
