@@ -1,0 +1,43 @@
+{
+  "name": "aitools",
+  "version": "1.0.0",
+  "description": "Essential CLI toolkit for Vibe Coding - keep your AI-assisted development flow smooth by managing processes and optimizing your coding environment",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "bin": {
+    "aitools": "./dist/cli.js",
+    "ai": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node",
+    "dev": "bun src/cli.ts",
+    "start": "bun dist/cli.js",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": ["cli", "vibe-coding", "ai-development", "claude-code", "copilot", "cursor", "process-management", "development-tools", "debugging", "flow-state"],
+  "author": "Albert Liu",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@types/inquirer": "^9.0.9",
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "inquirer": "^12.9.1",
+    "ora": "^7.0.1",
+    "table": "^6.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "bun-types": "latest",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "bun@1.0.0"
+}
