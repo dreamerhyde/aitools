@@ -16,13 +16,26 @@ Vibe Coding is the flow state achieved when pair programming with AI assistants 
 
 ## Installation
 
+### Quick Start (Recommended)
 ```bash
-# Install globally with npm/bun
-npm install -g aitools
-# or
-bun install -g aitools
+# Run directly without installation (auto-updates)
+bunx @dreamerhyde/aitools status
 
-# Clone for development
+# Or use the short alias
+bunx @dreamerhyde/aitools ai status
+```
+
+### Global Installation
+```bash
+# Using Bun (Fastest)
+bun install -g @dreamerhyde/aitools
+
+# Using npm
+npm install -g @dreamerhyde/aitools
+```
+
+### Development
+```bash
 git clone https://github.com/dreamerhyde/aitools.git
 cd aitools
 bun install
