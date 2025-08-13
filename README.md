@@ -23,7 +23,7 @@ npm install -g aitools
 bun install -g aitools
 
 # Clone for development
-git clone https://github.com/yourusername/aitools.git
+git clone https://github.com/dreamerhyde/aitools.git
 cd aitools
 bun install
 bun run build
