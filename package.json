@@ -14,7 +14,11 @@
     "start": "bun dist/cli.js",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "release": "./scripts/release.sh",
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major"
   },
   "keywords": ["cli", "vibe-coding", "ai-development", "claude-code", "copilot", "cursor", "process-management", "development-tools", "debugging", "flow-state"],
   "author": "Albert Liu",
