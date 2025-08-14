@@ -33,13 +33,22 @@ export class GitStatsCommand {
   async execute(): Promise<void> {
     UIHelper.showHeader();
     console.log(chalk.bold.cyan('Git Change Statistics'));
-    console.log(chalk.gray('Analyzing changes since last commit...'));
-    console.log('─'.repeat(50));
-    console.log();
-
+    
     try {
       // Check if in a git repository
       await this.checkGitRepo();
+      
+      // Get current branch
+      const { stdout: branch } = await execAsync('git branch --show-current');
+      const currentBranch = branch.trim();
+      const branchColor = currentBranch === 'main' || currentBranch === 'master' 
+        ? chalk.green 
+        : chalk.yellow;
+      
+      console.log(chalk.gray('Branch: ') + branchColor.bold(currentBranch));
+      console.log(chalk.gray('Analyzing changes since last commit...'));
+      console.log('─'.repeat(50));
+      console.log();
       
       const stats = await this.collectStats();
       await this.displayStats(stats);
