@@ -1,6 +1,6 @@
 {
   "name": "@dreamerhyde/aitools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Essential CLI toolkit for Vibe Coding - keep your AI-assisted development flow smooth by managing processes and optimizing your coding environment",
   "type": "module",
   "main": "./dist/cli.js",
@@ -20,7 +20,18 @@
     "release:minor": "./scripts/release.sh minor",
     "release:major": "./scripts/release.sh major"
   },
-  "keywords": ["cli", "vibe-coding", "ai-development", "claude-code", "copilot", "cursor", "process-management", "development-tools", "debugging", "flow-state"],
+  "keywords": [
+    "cli",
+    "vibe-coding",
+    "ai-development",
+    "claude-code",
+    "copilot",
+    "cursor",
+    "process-management",
+    "development-tools",
+    "debugging",
+    "flow-state"
+  ],
   "author": "Albert Liu",
   "license": "MIT",
   "dependencies": {
