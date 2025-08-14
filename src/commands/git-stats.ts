@@ -247,9 +247,9 @@ export class GitStatsCommand {
     // Show breakdown inline with total
     const parts = [];
     if (stats.modified.length > 0) parts.push(`${stats.modified.length} modified`);
+    if (stats.deleted.length > 0) parts.push(`${stats.deleted.length} deleted`);
     if (stats.added.length > 0) parts.push(`${stats.added.length} added`);
     if (stats.untracked.length > 0) parts.push(`${stats.untracked.length} new`);
-    if (stats.deleted.length > 0) parts.push(`${stats.deleted.length} deleted`);
     if (stats.renamed.length > 0) parts.push(`${stats.renamed.length} renamed`);
     
     if (parts.length > 0) {
@@ -273,12 +273,48 @@ export class GitStatsCommand {
 
     // Modified Files
     if (stats.modified.length > 0) {
-      console.log(chalk.bold.yellow('Modified Files'));
+      // Calculate section totals
+      const modifiedInsertions = stats.modified.reduce((sum, f) => sum + f.insertions, 0);
+      const modifiedDeletions = stats.modified.reduce((sum, f) => sum + f.deletions, 0);
+      
+      console.log(chalk.bold.yellow('Modified Files') + chalk.gray(` (${chalk.green('+' + modifiedInsertions)} ${chalk.red('-' + modifiedDeletions)})`));
       console.log('─'.repeat(50));
+      
+      // Find the longest path for alignment
+      const maxPathLength = Math.min(
+        Math.max(...stats.modified.map(f => f.path.length)),
+        50
+      );
+      
       stats.modified.forEach(file => {
         const stageIcon = file.staged ? chalk.green('●') : chalk.gray('○');
-        const changes = `+${file.insertions} -${file.deletions}`;
-        console.log(`  ${stageIcon} ${file.path.padEnd(40)} ${chalk.gray(changes)}`);
+        const filePath = file.path.padEnd(maxPathLength + 2);
+        const insertStr = ('+' + file.insertions).padStart(5);
+        const deleteStr = ('-' + file.deletions).padStart(5);
+        console.log(`  ${stageIcon} ${filePath} ${chalk.green(insertStr)} ${chalk.red(deleteStr)}`);
+      });
+      console.log();
+    }
+
+    // Deleted Files
+    if (stats.deleted.length > 0) {
+      // Calculate section totals
+      const deletedLines = stats.deleted.reduce((sum, f) => sum + f.deletions, 0);
+      
+      console.log(chalk.bold.red('Deleted Files') + chalk.gray(` (${chalk.red('-' + deletedLines)})`));
+      console.log('─'.repeat(50));
+      
+      // Find the longest path for alignment
+      const maxPathLength = Math.min(
+        Math.max(...stats.deleted.map(f => f.path.length)),
+        50
+      );
+      
+      stats.deleted.forEach(file => {
+        const stageIcon = file.staged ? chalk.green('●') : chalk.gray('○');
+        const filePath = file.path.padEnd(maxPathLength + 2);
+        const deleteStr = ('-' + file.deletions).padStart(5);
+        console.log(`  ${stageIcon} ${filePath} ${chalk.red(deleteStr)}`);
       });
       console.log();
     }
@@ -293,8 +329,22 @@ export class GitStatsCommand {
     }))];
     
     if (allNewFiles.length > 0) {
-      console.log(chalk.bold.green('New Files'));
+      // Calculate section totals
+      let newFilesLines = stats.added.reduce((sum, f) => sum + f.insertions, 0);
+      // Add untracked file lines
+      for (const path of stats.untracked) {
+        const lines = await this.getFileLineCount(path);
+        newFilesLines += lines;
+      }
+      
+      console.log(chalk.bold.green('New Files') + chalk.gray(` (${chalk.green('+' + newFilesLines)})`));
       console.log('─'.repeat(50));
+      
+      // Find the longest path for alignment
+      const maxPathLength = Math.min(
+        Math.max(...allNewFiles.map(f => f.path.length)),
+        50
+      );
       
       // Show all files
       for (const file of allNewFiles) {
@@ -302,30 +352,22 @@ export class GitStatsCommand {
           console.log(`  ${chalk.gray('○')} ${chalk.green(file)}`);
         } else {
           const stageIcon = file.staged ? chalk.green('●') : chalk.gray('○');
+          const filePath = file.path.padEnd(maxPathLength + 2);
           let lineInfo = '';
           if (file.status === 'added' && file.insertions > 0) {
-            lineInfo = chalk.gray(`+${file.insertions}`);
+            const insertStr = ('+' + file.insertions).padStart(5);
+            lineInfo = chalk.green(insertStr);
           } else if (file.status === 'untracked') {
             // Get line count for untracked files
             const lines = await this.getFileLineCount(file.path);
             if (lines > 0) {
-              lineInfo = chalk.gray(`+${lines}`);
+              const insertStr = ('+' + lines).padStart(5);
+              lineInfo = chalk.green(insertStr);
             }
           }
-          console.log(`  ${stageIcon} ${chalk.green(file.path)} ${lineInfo}`);
+          console.log(`  ${stageIcon} ${filePath} ${lineInfo}`);
         }
       }
-      console.log();
-    }
-
-    // Deleted Files
-    if (stats.deleted.length > 0) {
-      console.log(chalk.bold.red('Deleted Files'));
-      console.log('─'.repeat(50));
-      stats.deleted.forEach(file => {
-        const stageIcon = file.staged ? chalk.green('●') : chalk.gray('○');
-        console.log(`  ${stageIcon} ${chalk.red(file.path)} ${chalk.gray(`-${file.deletions}`)}`);
-      });
       console.log();
     }
 
