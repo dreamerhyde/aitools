@@ -2,7 +2,6 @@ import chalk from 'chalk';
 import { UIHelper } from '../utils/ui.js';
 import { JSONLParser } from '../utils/jsonl-parser.js';
 import { UsageAnalyzer } from '../utils/usage-analyzer.js';
-import { MockDataGenerator } from '../utils/mock-data-generator.js';
 import { DetailedUsageDisplay } from './claude-usage-detailed.js';
 import { AllDaysUsageDisplay } from './claude-usage-all-days.js';
 import { 
@@ -40,29 +39,11 @@ export class ClaudeUsageCommand {
       }
 
       if (messages.length === 0) {
-        UIHelper.showWarning('No usage data found.');
+        UIHelper.showWarning('No Claude Code usage data found.');
         console.log();
-        const { generateSample } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'generateSample',
-          message: 'Would you like to generate sample data for demonstration?',
-          default: true
-        }]);
-        
-        if (generateSample) {
-          const sampleFile = await MockDataGenerator.generateSampleLogs();
-          console.log(chalk.green(`✓ Generated sample data at: ${sampleFile}`));
-          console.log(chalk.gray('Running analysis on sample data...'));
-          console.log();
-          
-          // Re-parse with sample data
-          const sampleMessages = await this.parser.parseAllLogs();
-          if (sampleMessages.length > 0) {
-            messages.push(...sampleMessages);
-          }
-        } else {
-          return;
-        }
+        console.log(chalk.gray('Make sure you have been using Claude Code and logs are being generated.'));
+        console.log(chalk.gray('Logs are typically located in: ~/.claude/projects/*/logs/'));
+        return;
       }
 
       // Interactive mode selection if no specific mode provided
