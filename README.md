@@ -2,7 +2,7 @@
 
 > Essential toolkit for Vibe Coding - Keep your AI-assisted development flow smooth by managing processes, monitoring code health, and maintaining optimal performance when pair programming with AI assistants.
 
-![AI Cost Analytics](./docs/images/ai-cost.png)
+![AI Cost Analytics](https://raw.githubusercontent.com/dreamerhyde/aitools/main/docs/images/ai-cost.png)
 
 ## Why AI Tools?
 
