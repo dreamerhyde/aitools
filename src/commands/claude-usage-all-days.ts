@@ -151,7 +151,7 @@ export class AllDaysUsageDisplay {
     // Show today with change from yesterday  
     console.log(chalk.gray('Recent Usage:'));
     if (todayUsage) {
-      let todayLine = `  Today (${today}): ${chalk.cyan(`$${todayUsage.totalCost.toFixed(2)}`)}`;
+      let todayLine = `  Today (${today}): ${chalk.green(`$${todayUsage.totalCost.toFixed(2)}`)}`;
       
       // Add diff if yesterday exists (git diff style)
       if (yesterdayUsage) {
@@ -160,13 +160,13 @@ export class AllDaysUsageDisplay {
           (change / yesterdayUsage.totalCost * 100).toFixed(1) : '∞';
         
         if (change > 0) {
-          // Increase - red (bad)
-          todayLine += ` ${chalk.red(`+$${change.toFixed(2)}`)} ${chalk.gray(`(+${changePercent}%)`)}`
+          // Increase
+          todayLine += chalk.dim(` (+$${change.toFixed(2)} | +${changePercent}%)`);
         } else if (change < 0) {
-          // Decrease - green (good)
-          todayLine += ` ${chalk.green(`-$${Math.abs(change).toFixed(2)}`)} ${chalk.gray(`(${changePercent}%)`)}`
+          // Decrease
+          todayLine += chalk.dim(` (-$${Math.abs(change).toFixed(2)} | ${changePercent}%)`);
         } else {
-          todayLine += chalk.gray(` (no change)`);
+          todayLine += chalk.dim(` (no change)`);
         }
       }
       console.log(todayLine);
@@ -180,12 +180,6 @@ export class AllDaysUsageDisplay {
       console.log(chalk.gray(`  Yesterday (${yesterday}): No usage`));
     }
     
-    console.log();
-    console.log(chalk.gray('Token Breakdown:'));
-    console.log(`  Input: ${this.formatNumber(totals.input)}`);
-    console.log(`  Output: ${this.formatNumber(totals.output)}`);
-    console.log(`  Cache Creation: ${this.formatNumber(totals.cacheCreate)}`);
-    console.log(`  Cache Read: ${this.formatNumber(totals.cacheRead)}`);
   }
 
   private static formatModelNameShort(model: string): string {
