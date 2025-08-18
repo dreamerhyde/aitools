@@ -309,9 +309,9 @@ export class DetailedUsageDisplay {
     // Print legend
     console.log();
     console.log(chalk.gray('Legend: ') + 
-      chalk.green('█ Low') + ' ' +
-      chalk.yellow('█ Medium') + ' ' +
-      chalk.red('█ High'));
+      chalk.green('■') + ' Low  ' +
+      chalk.yellow('■') + ' Medium  ' +
+      chalk.red('■') + ' High');
     
     // Clear any remaining spinner artifacts
     if (process.stdout.isTTY) {
