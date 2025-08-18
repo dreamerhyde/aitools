@@ -2,17 +2,29 @@
 
 > Essential toolkit for Vibe Coding - Keep your AI-assisted development flow smooth by managing processes, monitoring code health, and maintaining optimal performance when pair programming with AI assistants.
 
-## What is Vibe Coding?
+![AI Cost Analytics](./docs/images/ai-cost.png)
 
-Vibe Coding is the flow state achieved when pair programming with AI assistants - where ideas transform seamlessly into code. But nothing disrupts this flow faster than stuck processes, bloated code files, or frozen development hooks. AI Tools ensures your vibe stays uninterrupted.
+## Why AI Tools?
+
+When you're in the flow with Claude Code, GitHub Copilot, or Cursor, the last thing you need is:
+
+- **Stuck hooks** - Your AI assistant freezes because git hooks are hanging
+- **Zombie processes** - Old Claude Code sessions eating up CPU and memory
+- **Mystery costs** - No idea how much you're spending on Claude API calls
+- **Bloated files** - AI assistants struggle with files over 500 lines
+- **Lost context** - Switching between terminal commands breaks your flow
+
+AI Tools solves these problems instantly with simple commands like `ai fix`, `ai cost`, and `ai hooks clean`. Keep coding, let AI Tools handle the housekeeping.
 
 ## ✓ Key Features
 
 -   **Process Management**: Smart detection and cleanup of stuck hooks and runaway processes
 -   **Code Health Monitoring**: Identify files needing refactoring with AI-ready prompts
+-   **Claude Code Analytics**: Track usage, costs, and token consumption with visual charts
 -   **System Optimization**: Real-time CPU/memory monitoring with automatic issue resolution
+-   **Shell Completion**: Tab completion support for all commands and options
 -   **Clean CLI Design**: Professional interface without emoji, following international standards
--   **Auto-Updates**: Stay current with automatic version checking (Claude Code style)
+-   **Auto-Updates**: Stay current with automatic version checking
 
 ## Installation
 
@@ -32,6 +44,21 @@ bun install -g @dreamerhyde/aitools
 
 # Using npm
 npm install -g @dreamerhyde/aitools
+
+# After installation, you can use either command:
+aitools status   # Full command
+ai status        # Short alias (recommended)
+```
+
+### Shell Completion (Optional)
+```bash
+# Install tab completion for your shell
+ai completion --install         # Auto-detect and install
+
+# Or manually for specific shells
+ai completion --shell bash --install
+ai completion --shell zsh --install
+ai completion --shell fish --install
 ```
 
 ### Development
@@ -42,26 +69,13 @@ bun install
 bun run build
 ```
 
-Use either `aitools` or the shorter `ai` alias:
-
-```bash
-aitools status   # Full command
-ai status        # Short alias
-```
-
 ## Core Commands
 
-### System Health & Monitoring
+### System Health
 
 ```bash
 # Quick system overview
 ai status                       # Check AI development environment health
-
-# Monitor processes and performance
-ai monitor                      # One-time system check
-ai monitor -w                   # Continuous monitoring
-ai monitor -i                   # Interactive process selection
-ai monitor --auto-kill          # Auto-terminate suspicious processes
 ```
 
 ### Process Management
@@ -108,6 +122,21 @@ ai check --ignore "*.test.ts"  # Additional ignore patterns
 ai fix                        # Standard fix for common issues
 ai fix --aggressive           # More thorough cleanup
 ai fix --dry-run              # Preview without executing
+```
+
+### Claude Code Usage Analytics
+
+```bash
+# View Claude Code usage and costs
+ai cost                       # Show 30-day chart and 7-day summary
+ai cost detail                # Show detailed daily table for all days
+
+# Features:
+# - Visual cost chart for last 30 days
+# - Daily/monthly cost tracking
+# - Token usage statistics
+# - Automatic cost calculation with latest pricing
+# - Today vs yesterday comparison
 ```
 
 ### Git Statistics
@@ -220,7 +249,6 @@ ai hooks clean -y  # Clean stuck hooks
 ### Debug high CPU usage
 
 ```bash
-ai monitor         # Find resource hogs
 ai ps --cpu 20     # List high CPU processes
 ai kill -i         # Select and terminate
 ```
@@ -233,13 +261,6 @@ ai kill -i         # Select and terminate
 -   `●` Green circle: Normal active process
 
 ## Advanced Usage
-
-### Custom Monitoring
-
-```bash
-ai monitor -c 15 -m 5          # CPU >15%, Memory >5%
-ai monitor --cpu-threshold 10  # Custom CPU threshold
-```
 
 ### Process Filtering
 

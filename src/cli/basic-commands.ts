@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { MonitorCommand } from '../commands/monitor.js';
 import { KillCommand } from '../commands/kill.js';
 import { HealthCommand } from '../commands/health.js';
 import { UpgradeCommand } from '../commands/upgrade.js';
@@ -8,29 +7,6 @@ import { UIHelper } from '../utils/ui.js';
 import { AutoUpdateChecker } from '../utils/auto-update.js';
 
 export function setupBasicCommands(program: Command): void {
-  // Monitor command - System-wide monitoring
-  program
-    .command('monitor')
-    .alias('m')
-    .description('Monitor system for performance issues and stuck processes')
-    .option('-i, --interactive', 'Interactive mode to select processes to terminate')
-    .option('-c, --cpu-threshold <number>', 'CPU usage threshold (%)', '5.0')
-    .option('-m, --memory-threshold <number>', 'Memory usage threshold (%)', '1.0')
-    .option('-a, --auto-kill', 'Automatically kill suspicious processes')
-    .option('-w, --watch', 'Continuous monitoring mode')
-    .action(async (options) => {
-      try {
-        const monitor = new MonitorCommand({
-          cpuThreshold: parseFloat(options.cpuThreshold),
-          memoryThreshold: parseFloat(options.memoryThreshold)
-        });
-        
-        await monitor.execute(options);
-      } catch (error) {
-        UIHelper.showError(`Monitor command failed: ${error}`);
-        process.exit(1);
-      }
-    });
 
   // Kill command - Process termination
   program

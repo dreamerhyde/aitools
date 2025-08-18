@@ -58,5 +58,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "packageManager": "bun@1.0.0"
+  "packageManager": "bun@1.0.0",
+  "files": [
+    "dist/",
+    "docs/images/",
+    "README.md",
+    "LICENSE"
+  ]
 }
