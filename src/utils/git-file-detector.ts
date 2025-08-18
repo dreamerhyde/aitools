@@ -32,7 +32,7 @@ export function isGeneratedFile(filePath: string): boolean {
   });
 }
 
-export function categorizeFileChanges(files: any[], getFileLineCount?: (path: string) => Promise<number>) {
+export function categorizeFileChanges(files: any[]) {
   let codeInsertions = 0, generatedInsertions = 0;
   let codeDeletions = 0, generatedDeletions = 0;
   

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { GitStats, GitStatsSummary } from './git-types.js';
+import { GitStats } from './git-types.js';
 import { isGeneratedFile, categorizeFileChanges } from './git-file-detector.js';
 
 export class GitDisplayFormatter {

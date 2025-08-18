@@ -11,6 +11,13 @@ export class UIHelper {
     });
   }
 
+  static showSpinner(text: string) {
+    return ora({
+      text: chalk.cyan(text),
+      spinner: 'dots12'
+    }).start();
+  }
+
   static showHeader() {
     console.log();
     console.log(chalk.bold.cyan('▪ AI Tools CLI'));
