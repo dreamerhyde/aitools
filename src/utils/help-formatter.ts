@@ -25,14 +25,14 @@ export class HelpFormatter {
       
       commands.forEach((cmd, index) => {
         const isLast = false; // Never make commands the last item since we add help manually
-        const prefix = isLast ? '└─' : '├─';
+        const prefix = chalk.dim(isLast ? '└─' : '├─');
         
         // Build command with aliases
         const cmdName = cmd.name();
         const aliases = cmd.aliases();
         
         // Build colored left part
-        let leftColored = `${prefix} ${chalk.cyan(cmdName)}`;
+        let leftColored = `${prefix} ${chalk.blue(cmdName)}`;
         if (aliases && aliases.length > 0) {
           leftColored += chalk.gray(` (${aliases.join(', ')})`);
         }
@@ -61,8 +61,8 @@ export class HelpFormatter {
         if (subcommands && subcommands.length > 0) {
           subcommands.forEach((sub, subIndex) => {
             const isLastSub = subIndex === subcommands.length - 1;
-            const subPrefix = isLast ? '   ' : '│  ';
-            const subBranch = isLastSub ? '└─' : '├─';
+            const subPrefix = chalk.dim(isLast ? '   ' : '│  ');
+            const subBranch = chalk.dim(isLastSub ? '└─' : '├─');
             
             const subName = sub.name();
             const subLeftColored = `${subPrefix}${subBranch} ${chalk.yellow(subName)}`;
@@ -95,8 +95,8 @@ export class HelpFormatter {
         if (importantOptions.length > 0 && subcommands.length === 0) {
           importantOptions.forEach((opt, optIndex) => {
             const isLastOpt = optIndex === importantOptions.length - 1;
-            const optPrefix = isLast ? '   ' : '│  ';
-            const optBranch = isLastOpt ? '└─' : '├─';
+            const optPrefix = chalk.dim(isLast ? '   ' : '│  ');
+            const optBranch = chalk.dim(isLastOpt ? '└─' : '├─');
             
             // Extract flags
             const flagParts = opt.flags.split(/,\s*/);
@@ -135,7 +135,7 @@ export class HelpFormatter {
       });
       
       // Add help command
-      const helpLeftColored = `└─ ${chalk.cyan('help')}`;
+      const helpLeftColored = `${chalk.dim('└─')} ${chalk.blue('help')}`;
       const helpLeftPlain = this.stripAnsi(helpLeftColored);
       const helpVisibleLength = helpLeftPlain.length;
       const helpSpaceNeeded = descStartCol - helpVisibleLength;
@@ -149,7 +149,7 @@ export class HelpFormatter {
       
       output.push(`${helpLeftColored}${helpLeader}${chalk.gray('Show command help')}`);
       
-      const subHelpLeftColored = `   └─ ${chalk.yellow('<command>')}`;
+      const subHelpLeftColored = `   ${chalk.dim('└─')} ${chalk.yellow('<command>')}`;
       const subHelpLeftPlain = this.stripAnsi(subHelpLeftColored);
       const subHelpVisibleLength = subHelpLeftPlain.length;
       const subHelpSpaceNeeded = descStartCol - subHelpVisibleLength;

@@ -171,9 +171,9 @@ export class TreeCommand {
         const isLastEntry = i === filteredEntries.length - 1;
         const entryPath = path.join(dirPath, entry.name);
 
-        // Determine the tree characters with very dim color (gray)
-        const connector = chalk.gray(isLastEntry ? '└── ' : '├── ');
-        const extension = chalk.gray(isLastEntry ? '    ' : '│   ');
+        // Determine the tree characters with very subtle appearance
+        const connector = chalk.dim(isLastEntry ? '└── ' : '├── ');
+        const extension = chalk.dim(isLastEntry ? '    ' : '│   ');
 
         // Format entry name
         let displayName = entry.name;
