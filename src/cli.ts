@@ -7,6 +7,8 @@ import { setupPsCommand } from './cli/ps-command.js';
 import { setupGitCommand } from './cli/git-command.js';
 import { setupUsageCommand } from './cli/usage-command.js';
 import { setupCompletionCommand } from './cli/completion-command.js';
+import { setupCheckCommand } from './cli/check-command.js';
+import { setupTreeCommand } from './cli/tree-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
@@ -30,6 +32,8 @@ setupPsCommand(program);
 setupGitCommand(program);
 setupUsageCommand(program);
 setupCompletionCommand(program);
+setupCheckCommand(program);
+setupTreeCommand(program);
 setupBasicCommands(program);
 
 // Help command with examples

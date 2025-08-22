@@ -1,4 +1,5 @@
 import { glob } from 'glob';
+import { GitignoreHelper } from './gitignore-helper.js';
 
 export class FileScanner {
   private readonly FILE_PATTERNS = [
@@ -39,6 +40,8 @@ export class FileScanner {
   ];
 
   async findCodeFiles(searchPath: string, customIgnore: string[] = []): Promise<string[]> {
+    // Use GitignoreHelper to respect .gitignore
+    const gitignoreHelper = new GitignoreHelper(searchPath);
     const ignorePatterns = [...this.DEFAULT_IGNORE, ...customIgnore];
     const allFiles: string[] = [];
     
@@ -51,7 +54,8 @@ export class FileScanner {
       allFiles.push(...files);
     }
     
-    return allFiles;
+    // Filter out gitignored files
+    return gitignoreHelper.filterFiles(allFiles);
   }
 
   getFilePatterns(): string[] {
