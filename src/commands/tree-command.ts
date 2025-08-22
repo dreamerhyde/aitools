@@ -71,7 +71,7 @@ export class TreeCommand {
       await this.buildTree(targetPath, '', true, options.filesOnly || false, options.maxDepth || Infinity);
 
       // Show summary
-      this.showSummary();
+      this.showSummary(options.filesOnly || false);
 
     } catch (error) {
       if (error instanceof Error) {
@@ -171,9 +171,9 @@ export class TreeCommand {
         const isLastEntry = i === filteredEntries.length - 1;
         const entryPath = path.join(dirPath, entry.name);
 
-        // Determine the tree characters with dim color
-        const connector = chalk.dim(isLastEntry ? '└── ' : '├── ');
-        const extension = chalk.dim(isLastEntry ? '    ' : '│   ');
+        // Determine the tree characters with very dim color (gray)
+        const connector = chalk.gray(isLastEntry ? '└── ' : '├── ');
+        const extension = chalk.gray(isLastEntry ? '    ' : '│   ');
 
         // Format entry name
         let displayName = entry.name;
@@ -184,13 +184,25 @@ export class TreeCommand {
           this.stats.files++;
           // Color files based on extension
           const ext = path.extname(entry.name).toLowerCase();
-          if (['.js', '.ts', '.jsx', '.tsx'].includes(ext)) {
+          
+          // Source code files - slightly brighter
+          if (['.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs'].includes(ext)) {
             displayName = chalk.yellow(displayName);
-          } else if (['.json', '.xml', '.yaml', '.yml'].includes(ext)) {
+          } 
+          // Config files - green
+          else if (['.json', '.yaml', '.yml', '.toml', '.xml'].includes(ext)) {
             displayName = chalk.green(displayName);
-          } else if (['.md', '.txt', '.log'].includes(ext)) {
-            displayName = chalk.gray(displayName);
           }
+          // Documentation and text files - dim
+          else if (['.md', '.txt', '.log', '.rst'].includes(ext)) {
+            displayName = chalk.dim(displayName);
+          }
+          // Image files - dim
+          else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp'].includes(ext)) {
+            displayName = chalk.dim(displayName);
+          }
+          // Other common files - default color
+          // (.gitignore, .env, LICENSE, etc.)
         }
 
         // Print the entry (connector already has dim color)
@@ -216,8 +228,12 @@ export class TreeCommand {
     }
   }
 
-  private showSummary(): void {
+  private showSummary(showFiles: boolean = true): void {
     console.log('');
-    UIHelper.showSuccess(`Summary: ${this.stats.directories} directories, ${this.stats.files} files`);
+    if (showFiles) {
+      UIHelper.showSuccess(`Summary: ${this.stats.directories} directories, ${this.stats.files} files`);
+    } else {
+      UIHelper.showSuccess(`Summary: ${this.stats.directories} directories`);
+    }
   }
 }
