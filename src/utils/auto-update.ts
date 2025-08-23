@@ -113,11 +113,11 @@ export class AutoUpdateChecker {
     
     // Show subtle notification
     console.log();
-    console.log(chalk.yellow('─'.repeat(50)));
+    console.log(chalk.dim('─'.repeat(50)));
     console.log(chalk.yellow('▪'), chalk.bold('Update Available for AI Tools'));
     console.log(chalk.gray(`  Current: ${current} → Latest: ${chalk.green(latest)}`));
     console.log(chalk.gray(`  Run ${chalk.cyan('ai upgrade')} to update`));
-    console.log(chalk.yellow('─'.repeat(50)));
+    console.log(chalk.dim('─'.repeat(50)));
     console.log();
   }
   

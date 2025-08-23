@@ -3,12 +3,18 @@
 import { Command } from 'commander';
 import { setupBasicCommands } from './cli/basic-commands.js';
 import { setupHooksCommand } from './cli/hooks-command.js';
-import { setupPsCommand } from './cli/ps-command.js';
 import { setupGitCommand } from './cli/git-command.js';
-import { setupUsageCommand } from './cli/usage-command.js';
+import { setupCostCommand } from './cli/cost-command.js';
 import { setupCompletionCommand } from './cli/completion-command.js';
-import { setupCheckCommand } from './cli/check-command.js';
 import { setupTreeCommand } from './cli/tree-command.js';
+import { setupInitCommand } from './cli/init-command.js';
+import { setupChangesCommand } from './cli/changes-command.js';
+import { setupLintCommand } from './cli/lint-command.js';
+import { setupLinesCommand } from './cli/lines-command.js';
+import { setupTestColorsCommand } from './cli/test-colors-command.js';
+import { setupConfigCommand } from './cli/config-command.js';
+import { setupTestNotificationCommand } from './cli/test-notification-command.js';
+import { setupNotifyCommand } from './cli/notify-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
@@ -26,15 +32,29 @@ program
     formatHelp: () => HelpFormatter.formatRootHelpAligned(program)
   });
 
-// Setup all commands using the extracted modules
+// Setup all commands using the extracted modules (in order of importance)
+// Core commands
+setupInitCommand(program);
+setupConfigCommand(program);  // config management
+setupCostCommand(program);
+setupTreeCommand(program);    // tree + files
+setupChangesCommand(program); // git changes
+setupLintCommand(program);    // quality checks
+setupLinesCommand(program);   // line limit checks
+
+// Supporting commands
 setupHooksCommand(program);
-setupPsCommand(program);
-setupGitCommand(program);
-setupUsageCommand(program);
 setupCompletionCommand(program);
-setupCheckCommand(program);
-setupTreeCommand(program);
+setupNotifyCommand(program);
+setupTestColorsCommand(program);
+setupTestNotificationCommand(program);
+
+// Legacy commands (keep for backward compatibility)
+setupGitCommand(program);     // legacy git command
+
+// Basic commands
 setupBasicCommands(program);
+
 
 // Help command with examples
 program

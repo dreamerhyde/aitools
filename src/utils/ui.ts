@@ -22,12 +22,12 @@ export class UIHelper {
     console.log();
     console.log(chalk.bold.cyan('▪ AI Tools CLI'));
     console.log(chalk.gray('Process Monitor & Management'));
-    console.log(chalk.gray('─'.repeat(30)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
   }
 
   static showSystemStats(stats: SystemStats) {
     console.log(chalk.bold.yellow('\n▪ System Status'));
-    console.log(chalk.gray('─'.repeat(30)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     const data = [
       ['Metric', 'Value'],
@@ -78,7 +78,7 @@ export class UIHelper {
     // Title with count indicator
     console.log();
     console.log(chalk.bold.yellow(`${title} ${chalk.gray(`(${processes.length})`)}`)  );
-    console.log(chalk.gray('─'.repeat(Math.min(terminalWidth - 2, 120))));
+    console.log(chalk.hex('#303030')('─'.repeat(Math.min(terminalWidth - 2, 120))));
 
     // Clean table data for the table library
     const data = [];

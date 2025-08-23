@@ -25,7 +25,7 @@ export class HelpFormatter {
       
       commands.forEach((cmd, index) => {
         const isLast = false; // Never make commands the last item since we add help manually
-        const prefix = chalk.dim(isLast ? '└─' : '├─');
+        const prefix = chalk.gray(isLast ? '└─' : '├─');
         
         // Build command with aliases
         const cmdName = cmd.name();
@@ -48,7 +48,7 @@ export class HelpFormatter {
         
         if (spaceNeeded > 2) {
           // Use very dim gray for the leader line
-          leader = ' ' + chalk.gray.dim('─'.repeat(spaceNeeded - 2)) + ' ';
+          leader = ' ' + chalk.hex('#404040')('─'.repeat(spaceNeeded - 2)) + ' ';
         } else if (spaceNeeded > 0) {
           leader = ' '.repeat(spaceNeeded);
         }
@@ -61,8 +61,8 @@ export class HelpFormatter {
         if (subcommands && subcommands.length > 0) {
           subcommands.forEach((sub, subIndex) => {
             const isLastSub = subIndex === subcommands.length - 1;
-            const subPrefix = chalk.dim(isLast ? '   ' : '│  ');
-            const subBranch = chalk.dim(isLastSub ? '└─' : '├─');
+            const subPrefix = chalk.gray(isLast ? '   ' : '│  ');
+            const subBranch = chalk.gray(isLastSub ? '└─' : '├─');
             
             const subName = sub.name();
             const subLeftColored = `${subPrefix}${subBranch} ${chalk.yellow(subName)}`;
@@ -74,7 +74,7 @@ export class HelpFormatter {
             let subLeader = '';
             
             if (subSpaceNeeded > 2) {
-              subLeader = ' ' + chalk.gray.dim('─'.repeat(subSpaceNeeded - 2)) + ' ';
+              subLeader = ' ' + chalk.hex('#404040')('─'.repeat(subSpaceNeeded - 2)) + ' ';
             } else if (subSpaceNeeded > 0) {
               subLeader = ' '.repeat(subSpaceNeeded);
             }
@@ -95,8 +95,8 @@ export class HelpFormatter {
         if (importantOptions.length > 0 && subcommands.length === 0) {
           importantOptions.forEach((opt, optIndex) => {
             const isLastOpt = optIndex === importantOptions.length - 1;
-            const optPrefix = chalk.dim(isLast ? '   ' : '│  ');
-            const optBranch = chalk.dim(isLastOpt ? '└─' : '├─');
+            const optPrefix = chalk.gray(isLast ? '   ' : '│  ');
+            const optBranch = chalk.gray(isLastOpt ? '└─' : '├─');
             
             // Extract flags
             const flagParts = opt.flags.split(/,\s*/);
@@ -122,7 +122,7 @@ export class HelpFormatter {
               let optLeader = '';
               
               if (optSpaceNeeded > 2) {
-                optLeader = ' ' + chalk.gray.dim('─'.repeat(optSpaceNeeded - 2)) + ' ';
+                optLeader = ' ' + chalk.dim('─'.repeat(optSpaceNeeded - 2)) + ' ';
               } else if (optSpaceNeeded > 0) {
                 optLeader = ' '.repeat(optSpaceNeeded);
               }
@@ -135,28 +135,28 @@ export class HelpFormatter {
       });
       
       // Add help command
-      const helpLeftColored = `${chalk.dim('└─')} ${chalk.blue('help')}`;
+      const helpLeftColored = `${chalk.gray('└─')} ${chalk.blue('help')}`;
       const helpLeftPlain = this.stripAnsi(helpLeftColored);
       const helpVisibleLength = helpLeftPlain.length;
       const helpSpaceNeeded = descStartCol - helpVisibleLength;
       let helpLeader = '';
       
       if (helpSpaceNeeded > 2) {
-        helpLeader = ' ' + chalk.gray.dim('─'.repeat(helpSpaceNeeded - 2)) + ' ';
+        helpLeader = ' ' + chalk.dim('─'.repeat(helpSpaceNeeded - 2)) + ' ';
       } else if (helpSpaceNeeded > 0) {
         helpLeader = ' '.repeat(helpSpaceNeeded);
       }
       
       output.push(`${helpLeftColored}${helpLeader}${chalk.gray('Show command help')}`);
       
-      const subHelpLeftColored = `   ${chalk.dim('└─')} ${chalk.yellow('<command>')}`;
+      const subHelpLeftColored = `   ${chalk.gray('└─')} ${chalk.yellow('<command>')}`;
       const subHelpLeftPlain = this.stripAnsi(subHelpLeftColored);
       const subHelpVisibleLength = subHelpLeftPlain.length;
       const subHelpSpaceNeeded = descStartCol - subHelpVisibleLength;
       let subHelpLeader = '';
       
       if (subHelpSpaceNeeded > 2) {
-        subHelpLeader = ' ' + chalk.gray.dim('─'.repeat(subHelpSpaceNeeded - 2)) + ' ';
+        subHelpLeader = ' ' + chalk.dim('─'.repeat(subHelpSpaceNeeded - 2)) + ' ';
       } else if (subHelpSpaceNeeded > 0) {
         subHelpLeader = ' '.repeat(subHelpSpaceNeeded);
       }

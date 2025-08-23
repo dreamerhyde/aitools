@@ -172,8 +172,8 @@ export class TreeCommand {
         const entryPath = path.join(dirPath, entry.name);
 
         // Determine the tree characters with very subtle appearance
-        const connector = chalk.dim(isLastEntry ? '└── ' : '├── ');
-        const extension = chalk.dim(isLastEntry ? '    ' : '│   ');
+        const connector = chalk.gray(isLastEntry ? '└── ' : '├── ');
+        const extension = chalk.gray(isLastEntry ? '    ' : '│   ');
 
         // Format entry name
         let displayName = entry.name;
@@ -223,7 +223,7 @@ export class TreeCommand {
     } catch (error) {
       // Silently skip directories we can't read
       if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
-        console.log(prefix + '└── ' + chalk.red('[Permission Denied]'));
+        console.log(prefix + chalk.gray('└── ') + chalk.red('[Permission Denied]'));
       }
     }
   }

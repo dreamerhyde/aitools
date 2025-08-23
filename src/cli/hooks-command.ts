@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { HooksCommand } from '../commands/hooks.js';
 import { UIHelper } from '../utils/ui.js';
+import { HooksInitCommand } from '../commands/hooks-init-command.js';
 
 export function setupHooksCommand(program: Command): void {
   const hooksCommand = program
@@ -92,6 +93,39 @@ export function setupHooksCommand(program: Command): void {
         console.log(chalk.green(' Your hooks are clean and ready to vibe!'));
       } catch (error) {
         UIHelper.showError(`Hook cleanup failed: ${error}`);
+        process.exit(1);
+      }
+    });
+
+  // hooks init subcommand - Setup Claude Code hooks
+  hooksCommand
+    .command('init')
+    .description('Initialize project-level Claude Code hooks')
+    .option('-g, --global', 'Setup global hooks instead of project hooks')
+    .option('-f, --force', 'Overwrite existing hooks')
+    .action(async (options) => {
+      try {
+        const hooksInit = new HooksInitCommand();
+        await hooksInit.execute({
+          global: options.global,
+          force: options.force
+        });
+      } catch (error) {
+        UIHelper.showError(`Hook initialization failed: ${error}`);
+        process.exit(1);
+      }
+    });
+
+  // hooks list subcommand - List all hooks
+  hooksCommand
+    .command('list')
+    .description('List all active hooks')
+    .action(async () => {
+      try {
+        const hooks = new HooksCommand();
+        await hooks.execute({});
+      } catch (error) {
+        UIHelper.showError(`Failed to list hooks: ${error}`);
         process.exit(1);
       }
     });

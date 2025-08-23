@@ -27,6 +27,50 @@ interface FileIssue {
 export class CheckCommand {
   private results: CheckResult[] = [];
   
+  async executeWithResults(): Promise<any> {
+    const results = {
+      errors: 0,
+      warnings: 0,
+      details: [] as any[]
+    };
+    
+    try {
+      // Run TypeScript check
+      const tsResult = await this.checkTypeScript();
+      results.errors += tsResult.errors;
+      results.warnings += tsResult.warnings;
+      
+      if (tsResult.files) {
+        tsResult.files.forEach((file: any) => {
+          results.details.push({
+            file: file.file,
+            message: file.message || 'Type error',
+            severity: file.severity
+          });
+        });
+      }
+      
+      // Run ESLint check
+      const eslintResult = await this.checkESLint();
+      results.errors += eslintResult.errors;
+      results.warnings += eslintResult.warnings;
+      
+      if (eslintResult.files) {
+        eslintResult.files.forEach((file: any) => {
+          results.details.push({
+            file: file.file,
+            message: file.message || 'Lint error',
+            severity: file.severity
+          });
+        });
+      }
+    } catch (error) {
+      // Return partial results even on error
+    }
+    
+    return results;
+  }
+  
   async execute(options: { 
     typescript?: boolean; 
     eslint?: boolean; 
@@ -34,7 +78,7 @@ export class CheckCommand {
     fix?: boolean;
   }): Promise<void> {
     console.log(chalk.bold('\nCode Quality Check'));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 80)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     const checks: Array<() => Promise<CheckResult>> = [];
     
@@ -354,7 +398,7 @@ export class CheckCommand {
   
   private displaySummary(): void {
     console.log('\n' + chalk.bold('Check Summary'));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 80)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     const table = new Table({
       head: ['Tool', 'Status', 'Errors', 'Warnings', 'Duration'],
@@ -440,7 +484,7 @@ export class CheckCommand {
     }
     
     console.log('\n' + chalk.bold('Detailed Issues'));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 80)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     // Group issues by file
     const fileGroups = new Map<string, FileIssue[]>();
@@ -491,7 +535,7 @@ export class CheckCommand {
     
     // Suggestions
     console.log('\n' + chalk.bold('Suggestions'));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 80)));
+    console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     if (this.results.some(r => r.tool === 'ESLint' && r.errors > 0)) {
       console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools check --fix') + ' to automatically fix some ESLint issues');

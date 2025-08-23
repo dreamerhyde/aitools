@@ -5,7 +5,6 @@ import { UIHelper } from '../utils/ui.js';
 export function setupTreeCommand(program: Command): void {
   const tree = program
     .command('tree')
-    .alias('tt')
     .description('Display directory tree structure (respects .gitignore by default)')
     .option('-f, --files', 'Show files and directories (default: directories only)')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
@@ -30,10 +29,9 @@ export function setupTreeCommand(program: Command): void {
       }
     });
 
-  // Add alias for files mode
+  // Add files command
   program
-    .command('treef')
-    .alias('ttf')
+    .command('files')
     .description('Display full directory tree with files (respects .gitignore by default)')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
     .option('-p, --path <path>', 'Target path (default: current directory)')
