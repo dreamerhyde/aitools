@@ -23,6 +23,8 @@ export function setupLintCommand(program: Command): void {
         }
         
         await command.execute(options);
+        // Ensure process exits cleanly after completion
+        process.exit(0);
       } catch (error) {
         if (error instanceof Error) {
           UIHelper.showError(error.message);

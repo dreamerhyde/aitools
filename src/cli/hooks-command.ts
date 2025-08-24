@@ -279,9 +279,37 @@ export function setupHooksCommand(program: Command): void {
     .description('Run lint checks for Claude Code hooks (AI-readable, always succeeds)')
     .action(async () => {
       try {
+        // Try to read tool input from stdin to get the edited file
+        let editedFile: string | undefined;
+        if (!process.stdin.isTTY) {
+          try {
+            const chunks: Buffer[] = [];
+            process.stdin.setEncoding('utf8');
+            
+            const timeoutPromise = new Promise<string>((_, reject) => {
+              setTimeout(() => reject(new Error('Stdin read timeout')), 100);
+            });
+            
+            const readPromise = (async () => {
+              for await (const chunk of process.stdin) {
+                chunks.push(Buffer.from(chunk));
+              }
+              return Buffer.concat(chunks).toString();
+            })();
+            
+            const stdinData = await Promise.race([readPromise, timeoutPromise]) as string;
+            if (stdinData.trim()) {
+              const toolData = JSON.parse(stdinData);
+              editedFile = toolData.tool_input?.file_path || toolData.file_path;
+            }
+          } catch {
+            // Ignore stdin errors
+          }
+        }
+
         const { CheckCommand } = await import('../commands/lint-command-impl.js');
         const checkCommand = new CheckCommand();
-        await checkCommand.executeForAI();
+        await checkCommand.executeForAI({ targetFile: editedFile });
       } catch (error) {
         // Hooks should never fail - just log if DEBUG is set
         if (process.env.DEBUG) {

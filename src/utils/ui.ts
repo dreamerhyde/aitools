@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { table } from 'table';
 import ora from 'ora';
 import { ProcessInfo, SystemStats, HookDetectionResult } from '../types/index.js';
+import { TABLE_CHARS } from './table-config.js';
 
 export class UIHelper {
   static createSpinner(text: string) {
@@ -147,22 +148,23 @@ export class UIHelper {
 
     // Table configuration with dynamic command column width
     const config = {
+      // 使用共用的表格字元配置
       border: {
-        topBody: '─',
-        topJoin: '┬',
-        topLeft: '┌',
-        topRight: '┐',
-        bottomBody: '─',
-        bottomJoin: '┴',
-        bottomLeft: '└',
-        bottomRight: '┘',
-        bodyLeft: '│',
-        bodyRight: '│',
-        bodyJoin: '│',
-        joinBody: '─',
-        joinLeft: '├',
-        joinRight: '┤',
-        joinJoin: '┼'
+        topBody: TABLE_CHARS['top'],
+        topJoin: TABLE_CHARS['top-mid'],
+        topLeft: TABLE_CHARS['top-left'],
+        topRight: TABLE_CHARS['top-right'],
+        bottomBody: TABLE_CHARS['bottom'],
+        bottomJoin: TABLE_CHARS['bottom-mid'],
+        bottomLeft: TABLE_CHARS['bottom-left'],
+        bottomRight: TABLE_CHARS['bottom-right'],
+        bodyLeft: TABLE_CHARS['left'],
+        bodyRight: TABLE_CHARS['right'],
+        bodyJoin: TABLE_CHARS['middle'],
+        joinBody: TABLE_CHARS['mid'],
+        joinLeft: TABLE_CHARS['left-mid'],
+        joinRight: TABLE_CHARS['right-mid'],
+        joinJoin: TABLE_CHARS['mid-mid']
       },
       columnDefault: {
         paddingLeft: 1,

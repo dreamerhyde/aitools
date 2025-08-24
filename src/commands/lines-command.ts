@@ -5,6 +5,7 @@ import { UIHelper } from '../utils/ui.js';
 import chalk from 'chalk';
 import { GitignoreParser } from '../utils/gitignore-parser.js';
 import { ConfigManager } from '../utils/config-manager.js';
+import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
 
 interface FileInfo {
   path: string;
@@ -60,6 +61,7 @@ export class LinesCommand {
     all?: boolean; 
     json?: boolean;
     path?: string;
+    fail?: boolean;
   } = {}): Promise<void> {
     try {
       // Load config to get line limit
@@ -119,8 +121,8 @@ export class LinesCommand {
         );
       }
 
-      console.log('');
-      console.log(chalk.gray('Please consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.'));
+      // Show suggestion with consistent format
+      SuggestionFormatter.show(SuggestionFormatter.REFACTOR_LINES, true);
 
       // Don't exit with error code in normal usage (only for CI/CD with --fail flag)
       // This prevents Warp from showing error blocks
@@ -216,7 +218,8 @@ export class LinesCommand {
             // Output to stdout for AI to see
             console.log(`File Length Warning:`);
             console.log(`- ${relativePath} (${lines} lines) exceeds limit by ${excess} lines`);
-            console.log('\nPlease consider extracting utility functions, splitting into modules, or refactoring this file to improve maintainability.');
+            // For AI: plain text without formatting
+            SuggestionFormatter.show(SuggestionFormatter.REFACTOR_LINES, false);
             
             // Also output to stderr for user to see in Claude Code terminal
             console.error(chalk.yellow('\n⚠ File Length Warning'));
@@ -251,7 +254,8 @@ export class LinesCommand {
           console.log(`- ${relativePath} (${file.lines} lines) - needs ${excess} line reduction`);
         });
       
-      console.log('\nPlease consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.');
+      // For AI: plain text without formatting
+      SuggestionFormatter.show(SuggestionFormatter.REFACTOR_LINES, false);
     } catch (error) {
       console.log(`Error checking line counts: ${error}`);
     }

@@ -1,31 +1,15 @@
+// path: src/commands/lint-command-impl.ts
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { spawn } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import ora from 'ora';
-
-interface CheckResult {
-  tool: string;
-  status: 'success' | 'warning' | 'error' | 'skipped';
-  errors: number;
-  warnings: number;
-  files: FileIssue[];
-  message?: string;
-  duration?: number;
-}
-
-interface FileIssue {
-  file: string;
-  line?: number;
-  column?: number;
-  severity: 'error' | 'warning' | 'info';
-  message: string;
-  rule?: string;
-}
+import { TypeScriptRunner, ESLintRunner, BuildRunner, type CheckResult, type FileIssue } from '../utils/check-runners.js';
+import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
+import { TABLE_CHARS, DEFAULT_TABLE_STYLE } from '../utils/table-config.js';
 
 export class CheckCommand {
   private results: CheckResult[] = [];
+  private tsRunner = new TypeScriptRunner();
+  private eslintRunner = new ESLintRunner();
+  private buildRunner = new BuildRunner();
   
   async executeWithResults(): Promise<any> {
     const results = {
@@ -36,7 +20,7 @@ export class CheckCommand {
     
     try {
       // Run TypeScript check
-      const tsResult = await this.checkTypeScript();
+      const tsResult = await this.tsRunner.run();
       results.errors += tsResult.errors;
       results.warnings += tsResult.warnings;
       
@@ -51,7 +35,7 @@ export class CheckCommand {
       }
       
       // Run ESLint check
-      const eslintResult = await this.checkESLint();
+      const eslintResult = await this.eslintRunner.run();
       results.errors += eslintResult.errors;
       results.warnings += eslintResult.warnings;
       
@@ -84,12 +68,12 @@ export class CheckCommand {
     
     // Determine which checks to run
     if (options.all || (!options.typescript && !options.eslint)) {
-      checks.push(() => this.checkTypeScript());
-      checks.push(() => this.checkESLint(options.fix));
-      checks.push(() => this.checkBuildStatus());
+      checks.push(() => this.tsRunner.run());
+      checks.push(() => this.eslintRunner.run(options.fix));
+      checks.push(() => this.buildRunner.run());
     } else {
-      if (options.typescript) checks.push(() => this.checkTypeScript());
-      if (options.eslint) checks.push(() => this.checkESLint(options.fix));
+      if (options.typescript) checks.push(() => this.tsRunner.run());
+      if (options.eslint) checks.push(() => this.eslintRunner.run(options.fix));
     }
     
     // Run all checks
@@ -104,304 +88,11 @@ export class CheckCommand {
     // Suggestion is shown in displayDetailedResults() if there are issues
   }
   
-  private async checkTypeScript(): Promise<CheckResult> {
-    const spinner = ora('Running TypeScript type check...').start();
-    const startTime = Date.now();
+  async executeForAI(options: { targetFile?: string } = {}): Promise<void> {
+    console.log('Code Quality Issues:\n');
     
-    return new Promise((resolve) => {
-      const tscPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsc');
-      const hasTsc = fs.existsSync(tscPath);
-      
-      if (!hasTsc) {
-        spinner.fail('TypeScript not found');
-        return resolve({
-          tool: 'TypeScript',
-          status: 'skipped',
-          errors: 0,
-          warnings: 0,
-          files: [],
-          message: 'TypeScript not installed in this project'
-        });
-      }
-      
-      // Add timeout and progress tracking
-      spinner.text = 'Running TypeScript type check (this may take a moment)...';
-      const tsc = spawn(tscPath, ['--noEmit', '--pretty', 'false'], {
-        timeout: 60000 // 60 second timeout
-      });
-      let output = '';
-      let errorOutput = '';
-      
-      tsc.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-      
-      tsc.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-      
-      tsc.on('close', (code) => {
-        const duration = Date.now() - startTime;
-        const files = this.parseTypeScriptOutput(output + errorOutput);
-        const errorCount = files.filter(f => f.severity === 'error').length;
-        const warningCount = files.filter(f => f.severity === 'warning').length;
-        
-        if (code === 0) {
-          spinner.succeed(chalk.green('TypeScript check passed'));
-          resolve({
-            tool: 'TypeScript',
-            status: 'success',
-            errors: 0,
-            warnings: 0,
-            files: [],
-            duration
-          });
-        } else {
-          spinner.fail(chalk.red(`TypeScript found ${errorCount} errors`));
-          resolve({
-            tool: 'TypeScript',
-            status: 'error',
-            errors: errorCount,
-            warnings: warningCount,
-            files,
-            duration
-          });
-        }
-      });
-    });
-  }
-  
-  private async checkESLint(fix?: boolean): Promise<CheckResult> {
-    const spinner = ora('Running ESLint...').start();
-    const startTime = Date.now();
-    
-    return new Promise((resolve) => {
-      const eslintPath = path.join(process.cwd(), 'node_modules', '.bin', 'eslint');
-      const hasEslint = fs.existsSync(eslintPath);
-      
-      if (!hasEslint) {
-        spinner.fail('ESLint not found');
-        return resolve({
-          tool: 'ESLint',
-          status: 'skipped',
-          errors: 0,
-          warnings: 0,
-          files: [],
-          message: 'ESLint not installed in this project'
-        });
-      }
-      
-      // Add excludes for common directories that should not be linted
-      const args = [
-        'src', // Only lint src directory 
-        '--format', 'json',
-        '--ignore-pattern', 'node_modules/**',
-        '--ignore-pattern', 'dist/**',
-        '--ignore-pattern', 'build/**',
-        '--ignore-pattern', '*.min.js',
-        '--ignore-pattern', 'coverage/**',
-        '--ignore-pattern', '.git/**'
-      ];
-      
-      if (fix) args.push('--fix');
-      
-      spinner.text = `Running ESLint on src directory...`;
-      const eslint = spawn(eslintPath, args);
-      let output = '';
-      
-      eslint.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-      
-      // Add timeout handler
-      const timeoutId = setTimeout(() => {
-        eslint.kill('SIGKILL');
-        spinner.fail(chalk.red('ESLint check timed out (60s limit)'));
-        resolve({
-          tool: 'ESLint',
-          status: 'error',
-          errors: 1,
-          warnings: 0,
-          files: [],
-          message: 'ESLint timed out - check if there are performance issues',
-          duration: 60000
-        });
-      }, 60000);
-      
-      eslint.on('close', (code) => {
-        clearTimeout(timeoutId);
-        const duration = Date.now() - startTime;
-        const files = this.parseESLintOutput(output);
-        const errorCount = files.filter(f => f.severity === 'error').length;
-        const warningCount = files.filter(f => f.severity === 'warning').length;
-        
-        if (code === 0) {
-          spinner.succeed(chalk.green('ESLint check passed'));
-          resolve({
-            tool: 'ESLint',
-            status: 'success',
-            errors: 0,
-            warnings: 0,
-            files: [],
-            duration
-          });
-        } else if (errorCount > 0) {
-          spinner.fail(chalk.red(`ESLint found ${errorCount} errors, ${warningCount} warnings`));
-          resolve({
-            tool: 'ESLint',
-            status: 'error',
-            errors: errorCount,
-            warnings: warningCount,
-            files,
-            duration
-          });
-        } else if (warningCount > 0) {
-          spinner.warn(chalk.yellow(`ESLint found ${warningCount} warnings`));
-          resolve({
-            tool: 'ESLint',
-            status: 'warning',
-            errors: 0,
-            warnings: warningCount,
-            files,
-            duration
-          });
-        }
-      });
-    });
-  }
-  
-  private async checkBuildStatus(): Promise<CheckResult> {
-    const spinner = ora('Checking build status...').start();
-    const startTime = Date.now();
-    
-    return new Promise((resolve) => {
-      const packageJson = path.join(process.cwd(), 'package.json');
-      
-      if (!fs.existsSync(packageJson)) {
-        spinner.fail('No package.json found');
-        return resolve({
-          tool: 'Build',
-          status: 'skipped',
-          errors: 0,
-          warnings: 0,
-          files: [],
-          message: 'No package.json in current directory'
-        });
-      }
-      
-      const pkg = JSON.parse(fs.readFileSync(packageJson, 'utf-8'));
-      
-      if (!pkg.scripts?.build) {
-        spinner.info('No build script defined');
-        return resolve({
-          tool: 'Build',
-          status: 'skipped',
-          errors: 0,
-          warnings: 0,
-          files: [],
-          message: 'No build script in package.json'
-        });
-      }
-      
-      // Use bun if available, otherwise npm
-      const runner = fs.existsSync(path.join(process.cwd(), 'bun.lockb')) ? 'bun' : 'npm';
-      const build = spawn(runner, ['run', 'build']);
-      
-      let output = '';
-      let errorOutput = '';
-      
-      build.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-      
-      build.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-      
-      build.on('close', (code) => {
-        const duration = Date.now() - startTime;
-        
-        if (code === 0) {
-          spinner.succeed(chalk.green('Build successful'));
-          resolve({
-            tool: 'Build',
-            status: 'success',
-            errors: 0,
-            warnings: 0,
-            files: [],
-            duration
-          });
-        } else {
-          spinner.fail(chalk.red('Build failed'));
-          resolve({
-            tool: 'Build',
-            status: 'error',
-            errors: 1,
-            warnings: 0,
-            files: [{
-              file: 'build',
-              severity: 'error',
-              message: errorOutput || 'Build process failed'
-            }],
-            duration
-          });
-        }
-      });
-    });
-  }
-  
-  private parseTypeScriptOutput(output: string): FileIssue[] {
-    const issues: FileIssue[] = [];
-    const lines = output.split('\n');
-    
-    for (const line of lines) {
-      // Parse TypeScript error format: file.ts(line,col): error TS2322: message
-      const match = line.match(/^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+TS\d+:\s+(.+)/);
-      if (match) {
-        issues.push({
-          file: match[1],
-          line: parseInt(match[2]),
-          column: parseInt(match[3]),
-          severity: match[4] as 'error' | 'warning',
-          message: match[5],
-          rule: match[0].match(/TS(\d+)/)?.[1] ? `TS${match[0].match(/TS(\d+)/)?.[1]}` : undefined
-        });
-      }
-    }
-    
-    return issues;
-  }
-  
-  private parseESLintOutput(output: string): FileIssue[] {
-    const issues: FileIssue[] = [];
-    
-    try {
-      const results = JSON.parse(output);
-      
-      for (const file of results) {
-        for (const message of file.messages) {
-          issues.push({
-            file: file.filePath,
-            line: message.line,
-            column: message.column,
-            severity: message.severity === 2 ? 'error' : 'warning',
-            message: message.message,
-            rule: message.ruleId
-          });
-        }
-      }
-    } catch (e) {
-      // Fallback to text parsing if JSON fails
-    }
-    
-    return issues;
-  }
-  
-  async executeForAI(): Promise<void> {
-    console.log('Project Quality Issues:\n');
-    
-    const tsResult = await this.checkTypeScript();
-    const eslintResult = await this.checkESLint();
+    const tsResult = await this.tsRunner.run(options.targetFile);
+    const eslintResult = await this.eslintRunner.run(false, options.targetFile);
     
     // TypeScript Errors
     if (tsResult.errors > 0 || tsResult.warnings > 0) {
@@ -425,10 +116,10 @@ export class CheckCommand {
         tsResult.warnings === 0 && eslintResult.warnings === 0) {
       console.log('No issues found - code quality is good.');
     } else {
-      console.log('\nPlease run `aitools lint --fix` to auto-fix ESLint issues, then manually fix remaining TypeScript errors.');
+      // For AI: plain text without formatting
+      SuggestionFormatter.show(SuggestionFormatter.LINT_FIX, false);
       
       // Also output summary to stderr for user to see in Claude Code terminal
-      const totalIssues = tsResult.errors + tsResult.warnings + eslintResult.errors + eslintResult.warnings;
       console.error(chalk.yellow('\n⚠ Code Quality Issues'));
       if (tsResult.errors > 0) {
         console.error(chalk.red(`  TypeScript: ${tsResult.errors} errors`));
@@ -444,29 +135,16 @@ export class CheckCommand {
     console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     const table = new Table({
-      head: ['Tool', 'Status', 'Errors', 'Warnings', 'Duration'],
+      head: [
+        { content: 'Tool', hAlign: 'right' } as any,
+        { content: 'Status', hAlign: 'center' } as any, 
+        { content: 'Errors', hAlign: 'center' } as any,
+        { content: 'Warnings', hAlign: 'center' } as any,
+        { content: 'Duration', hAlign: 'center' } as any
+      ],
       colWidths: [15, 12, 10, 10, 12],
-      style: { 
-        head: ['cyan'],
-        border: ['gray']
-      },
-      chars: {
-        'top': '─',
-        'top-mid': '┬',
-        'top-left': '┌',
-        'top-right': '┐',
-        'bottom': '─',
-        'bottom-mid': '┴',
-        'bottom-left': '└',
-        'bottom-right': '┘',
-        'left': '│',
-        'left-mid': '├',
-        'mid': '─',
-        'mid-mid': '┼',
-        'right': '│',
-        'right-mid': '┤',
-        'middle': '│'
-      }
+      style: DEFAULT_TABLE_STYLE as any,
+      chars: TABLE_CHARS
     });
     
     let totalErrors = 0;
@@ -489,21 +167,21 @@ export class CheckCommand {
         chalk.gray('Skipped');
       
       table.push([
-        result.tool,
-        `${statusIcon} ${status}`,
-        result.errors > 0 ? chalk.red(result.errors.toString()) : chalk.green('0'),
-        result.warnings > 0 ? chalk.yellow(result.warnings.toString()) : chalk.green('0'),
-        result.duration ? `${(result.duration / 1000).toFixed(2)}s` : '-'
+        { content: result.tool, hAlign: 'right' } as any,
+        { content: `${statusIcon} ${status}`, hAlign: 'center' } as any,
+        { content: result.errors > 0 ? chalk.red(result.errors.toString()) : chalk.green('0'), hAlign: 'right' } as any,
+        { content: result.warnings > 0 ? chalk.yellow(result.warnings.toString()) : chalk.green('0'), hAlign: 'right' } as any,
+        { content: result.duration ? `${(result.duration / 1000).toFixed(2)}s` : '-', hAlign: 'right' } as any
       ]);
     }
     
     // Add totals row
     table.push([
-      chalk.bold('Total'),
-      '',
-      totalErrors > 0 ? chalk.red.bold(totalErrors.toString()) : chalk.green.bold('0'),
-      totalWarnings > 0 ? chalk.yellow.bold(totalWarnings.toString()) : chalk.green.bold('0'),
-      ''
+      { content: chalk.bold('Total'), hAlign: 'right' } as any,
+      { content: '', hAlign: 'center' } as any,
+      { content: totalErrors > 0 ? chalk.red.bold(totalErrors.toString()) : chalk.green.bold('0'), hAlign: 'right' } as any,
+      { content: totalWarnings > 0 ? chalk.yellow.bold(totalWarnings.toString()) : chalk.green.bold('0'), hAlign: 'right' } as any,
+      { content: '', hAlign: 'right' } as any
     ]);
     
     console.log(table.toString());
@@ -574,14 +252,15 @@ export class CheckCommand {
       }
     }
     
-    // Add consistent suggestion for fixing issues (matching hooks output)
+    // Add consistent suggestion for fixing issues
     const hasErrors = this.results.some(r => r.errors > 0);
     const hasWarnings = this.results.some(r => r.warnings > 0);
     
     if (hasErrors || hasWarnings) {
-      console.log('\n' + chalk.bold('Suggested Action'));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
-      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint --fix') + ' to auto-fix ESLint issues, then manually fix remaining TypeScript errors');
+      SuggestionFormatter.show(
+        SuggestionFormatter.format(SuggestionFormatter.LINT_FIX, 'aitools lint --fix'),
+        true
+      );
     }
   }
 }
