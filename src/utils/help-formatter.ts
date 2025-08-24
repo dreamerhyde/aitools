@@ -50,7 +50,7 @@ export class HelpFormatter {
         let leader = '';
         
         if (spaceNeeded > 2) {
-          // Use very dim gray for the leader line
+          // Use consistent hex color for all leader lines
           leader = ' ' + chalk.hex('#404040')('─'.repeat(spaceNeeded - 2)) + ' ';
         } else if (spaceNeeded > 0) {
           leader = ' '.repeat(spaceNeeded);
@@ -125,7 +125,7 @@ export class HelpFormatter {
               let optLeader = '';
               
               if (optSpaceNeeded > 2) {
-                optLeader = ' ' + chalk.dim('─'.repeat(optSpaceNeeded - 2)) + ' ';
+                optLeader = ' ' + chalk.hex('#404040')('─'.repeat(optSpaceNeeded - 2)) + ' ';
               } else if (optSpaceNeeded > 0) {
                 optLeader = ' '.repeat(optSpaceNeeded);
               }
@@ -145,7 +145,7 @@ export class HelpFormatter {
       let helpLeader = '';
       
       if (helpSpaceNeeded > 2) {
-        helpLeader = ' ' + chalk.dim('─'.repeat(helpSpaceNeeded - 2)) + ' ';
+        helpLeader = ' ' + chalk.hex('#404040')('─'.repeat(helpSpaceNeeded - 2)) + ' ';
       } else if (helpSpaceNeeded > 0) {
         helpLeader = ' '.repeat(helpSpaceNeeded);
       }
@@ -159,7 +159,7 @@ export class HelpFormatter {
       let subHelpLeader = '';
       
       if (subHelpSpaceNeeded > 2) {
-        subHelpLeader = ' ' + chalk.dim('─'.repeat(subHelpSpaceNeeded - 2)) + ' ';
+        subHelpLeader = ' ' + chalk.hex('#404040')('─'.repeat(subHelpSpaceNeeded - 2)) + ' ';
       } else if (subHelpSpaceNeeded > 0) {
         subHelpLeader = ' '.repeat(subHelpSpaceNeeded);
       }
