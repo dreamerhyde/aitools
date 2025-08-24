@@ -118,15 +118,7 @@ export class LinesCommand {
       }
 
       console.log('');
-      console.log(chalk.bold('Refactoring Recommendations:'));
-      
-      for (const file of exceededFiles.slice(0, 3)) { // Top 3 worst offenders
-        const recommendation = this.getRefactoringRecommendation(file);
-        console.log(`  ${chalk.blue('→')} ${chalk.cyan(path.basename(file.path))}: ${recommendation}`);
-      }
-
-      console.log('');
-      console.log(chalk.gray('Tip: Use "ai refactor" for detailed refactoring suggestions'));
+      console.log(chalk.gray('Please consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.'));
 
       // Set exit code for CI/CD
       if (exceededFiles.length > 0 && !options.all) {
@@ -201,41 +193,6 @@ export class LinesCommand {
     }
   }
 
-  private getRefactoringRecommendation(file: FileInfo): string {
-    const ext = path.extname(file.path).toLowerCase();
-    const excess = file.lines - this.lineLimit;
-
-    if (file.path.includes('component') || ['.jsx', '.tsx', '.vue'].includes(ext)) {
-      if (excess > 200) {
-        return 'Split into multiple components';
-      } else if (excess > 100) {
-        return 'Extract sub-components and hooks';
-      } else {
-        return 'Extract utility functions';
-      }
-    }
-
-    if (file.path.includes('utils') || file.path.includes('helper')) {
-      return 'Split into domain-specific utility modules';
-    }
-
-    if (file.path.includes('api') || file.path.includes('route')) {
-      return 'Extract middleware and validation logic';
-    }
-
-    if (file.path.includes('test') || file.path.includes('spec')) {
-      return 'Split into separate test suites';
-    }
-
-    // Generic recommendations based on size
-    if (excess > 300) {
-      return 'Consider splitting into multiple modules';
-    } else if (excess > 150) {
-      return 'Extract reusable functions and types';
-    } else {
-      return 'Review and extract complex logic';
-    }
-  }
 
   async executeForAI(options: { limit?: number } = {}): Promise<void> {
     this.lineLimit = options.limit || 500;
@@ -264,17 +221,7 @@ export class LinesCommand {
           console.log(`- ${relativePath} (${file.lines} lines) - needs ${excess} line reduction`);
         });
       
-      console.log('\nRefactoring Recommendations:');
-      let recommendationNum = 1;
-      exceededFiles
-        .sort((a, b) => b.lines - a.lines)
-        .slice(0, 5)
-        .forEach(file => {
-          const relativePath = path.relative(process.cwd(), file.path);
-          const recommendation = this.getRefactoringRecommendation(file);
-          console.log(`${recommendationNum}. ${recommendation} for ${relativePath}`);
-          recommendationNum++;
-        });
+      console.log('\nPlease consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.');
     } catch (error) {
       console.log(`Error checking line counts: ${error}`);
     }

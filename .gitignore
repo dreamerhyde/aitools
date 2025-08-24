@@ -7,8 +7,9 @@ dist/
 coverage/
 .nyc_output/
 
-# Local IDE settings
+# Claude settings
 .claude/settings.local.json
+.claude/settings.json
 
 # Cursor settings
 .cursor/

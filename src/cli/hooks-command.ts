@@ -1,6 +1,5 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { HooksCommand } from '../commands/hooks.js';
 import { UIHelper } from '../utils/ui.js';
 import { HooksInitCommand } from '../commands/hooks-init-command.js';
 
@@ -8,91 +7,85 @@ export function setupHooksCommand(program: Command): void {
   const hooksCommand = program
     .command('hooks')
     .alias('h')
-    .description('Manage AI development hooks (Claude, Git, etc.)');
+    .description('Manage Claude Code hooks configuration');
 
-  // Default hooks action
+  // Default hooks action - show current hook configuration
   hooksCommand
-    .option('-i, --interactive', 'Interactive mode for hook management')
-    .option('-k, --kill', 'Terminate all detected hooks')
-    .option('-w, --watch', 'Watch hooks in real-time')
-    .action(async (options) => {
+    .action(async () => {
       try {
-        const hooks = new HooksCommand();
-        await hooks.execute(options);
-      } catch (error) {
-        UIHelper.showError(`Hooks command failed: ${error}`);
-        process.exit(1);
-      }
-    });
-
-  // hooks clean subcommand - clean abnormal hooks only
-  hooksCommand
-    .command('clean')
-    .description('Clean up abnormal hooks (high CPU while sleeping)')
-    .option('-y, --yes', 'Skip confirmation')
-    .action(async (options) => {
-      try {
-        UIHelper.showHeader();
-        console.log(chalk.red.bold('▪ Hook Cleanup'));
-        console.log('─'.repeat(30));
+        // Show current hook configuration
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
         
-        const processMonitor = new (await import('../utils/process-monitor.js')).ProcessMonitor({
-          cpuThreshold: 1.0
-        });
+        console.log(chalk.bold.cyan('Claude Code Hooks Configuration'));
+        console.log('─'.repeat(50));
         
-        const processes = await processMonitor.getAllProcesses();
+        let hasHooks = false;
         
-        // Only abnormal hooks
-        const abnormalHooks = processes.filter(proc => {
-          if (!proc.isHook) return false;
-          const isClaudeHook = proc.command.includes('.claude/hooks/');
-          const isSleepingWithCPU = proc.status === 'sleeping' && proc.cpu > 1;
-          return isClaudeHook && isSleepingWithCPU;
-        });
+        // Check project settings
+        const projectSettings = path.join(process.cwd(), '.claude', 'settings.json');
+        const projectLocalSettings = path.join(process.cwd(), '.claude', 'settings.local.json');
         
-        if (abnormalHooks.length === 0) {
-          UIHelper.showSuccess('No abnormal hooks to clean!');
-          return;
-        }
-        
-        console.log(chalk.red(`Found ${abnormalHooks.length} abnormal hook(s):`));
-        abnormalHooks.forEach(proc => {
-          const shortCmd = proc.command.split('/').pop() || proc.command;
-          console.log(chalk.red(`   ● PID ${proc.pid} (${proc.cpu.toFixed(1)}% CPU) - ${shortCmd}`));
-        });
-        
-        if (!options.yes) {
-          const readline = require('readline').createInterface({
-            input: process.stdin,
-            output: process.stdout
-          });
-          
-          const answer = await new Promise<string>(resolve => {
-            readline.question(chalk.bold('\nClean these hooks? (y/N): '), resolve);
-          });
-          readline.close();
-          
-          if (answer.toLowerCase() !== 'y') {
-            console.log(chalk.gray('Cancelled.'));
-            return;
+        console.log(chalk.green('\n● Project Configuration:'));
+        try {
+          const settings = JSON.parse(await fs.readFile(projectSettings, 'utf-8'));
+          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+            hasHooks = true;
+            console.log(`  → ${chalk.cyan('.claude/settings.json')}`);
+            for (const hookType of Object.keys(settings.hooks)) {
+              console.log(`     ${chalk.gray('▪')} ${hookType}`);
+            }
           }
+        } catch {
+          // No project settings
         }
         
-        let cleaned = 0;
-        for (const proc of abnormalHooks) {
-          if (await processMonitor.killProcess(proc.pid)) {
-            console.log(chalk.green(`   ✓ Terminated PID ${proc.pid}`));
-            cleaned++;
-          } else {
-            console.log(chalk.red(`   ✗ Failed PID ${proc.pid}`));
+        try {
+          const localSettings = JSON.parse(await fs.readFile(projectLocalSettings, 'utf-8'));
+          if (localSettings.hooks && Object.keys(localSettings.hooks).length > 0) {
+            hasHooks = true;
+            console.log(`  → ${chalk.cyan('.claude/settings.local.json')}`);
+            for (const hookType of Object.keys(localSettings.hooks)) {
+              console.log(`     ${chalk.gray('▪')} ${hookType}`);
+            }
           }
+        } catch {
+          // No local project settings
         }
         
-        console.log();
-        UIHelper.showSuccess(`Cleaned ${cleaned} abnormal hook(s)!`);
-        console.log(chalk.green(' Your hooks are clean and ready to vibe!'));
+        if (!hasHooks) {
+          console.log(chalk.gray('  ○ No project hooks configured'));
+        }
+        
+        // Check global settings
+        const globalSettings = path.join(os.homedir(), '.claude', 'settings.json');
+        
+        console.log(chalk.blue('\n● Global Configuration:'));
+        hasHooks = false;
+        try {
+          const settings = JSON.parse(await fs.readFile(globalSettings, 'utf-8'));
+          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+            hasHooks = true;
+            console.log(`  → ${chalk.cyan('~/.claude/settings.json')}`);
+            for (const hookType of Object.keys(settings.hooks)) {
+              console.log(`     ${chalk.gray('▪')} ${hookType}`);
+            }
+          }
+        } catch {
+          // No global settings
+        }
+        
+        if (!hasHooks) {
+          console.log(chalk.gray('  ○ No global hooks configured'));
+        }
+        
+        console.log(chalk.gray('\nAvailable Hook Types:'));
+        console.log('  PreToolUse, PostToolUse, UserPromptSubmit, Stop,');
+        console.log('  SubagentStop, SessionEnd, PreCompact, SessionStart');
+        console.log(chalk.yellow('\n▪ Tip: Use "ai hooks init" to set up Claude Code hooks'));
       } catch (error) {
-        UIHelper.showError(`Hook cleanup failed: ${error}`);
+        UIHelper.showError(`Failed to show hooks configuration: ${error}`);
         process.exit(1);
       }
     });
@@ -100,7 +93,7 @@ export function setupHooksCommand(program: Command): void {
   // hooks init subcommand - Setup Claude Code hooks
   hooksCommand
     .command('init')
-    .description('Initialize project-level Claude Code hooks')
+    .description('Initialize Claude Code hooks for your project')
     .option('-g, --global', 'Setup global hooks instead of project hooks')
     .option('-f, --force', 'Overwrite existing hooks')
     .action(async (options) => {
@@ -116,86 +109,289 @@ export function setupHooksCommand(program: Command): void {
       }
     });
 
-  // hooks list subcommand - List all hooks
+  // hooks list subcommand - List configured hooks in detail
   hooksCommand
     .command('list')
-    .description('List all active hooks')
-    .action(async () => {
+    .description('List all configured Claude Code hooks')
+    .option('-v, --verbose', 'Show hook commands and matchers')
+    .action(async (options) => {
       try {
-        const hooks = new HooksCommand();
-        await hooks.execute({});
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
+        
+        console.log(chalk.bold.cyan('Claude Code Hooks Details'));
+        console.log('─'.repeat(50));
+        
+        let totalHooks = 0;
+        
+        // Helper to display hooks
+        const displayHooks = (hooks: any, prefix: string = '') => {
+          for (const [hookType, hookConfigs] of Object.entries(hooks)) {
+            totalHooks++;
+            console.log(`${prefix}${chalk.yellow(hookType)}:`);
+            if (Array.isArray(hookConfigs)) {
+              hookConfigs.forEach((config: any) => {
+                if (config.matcher) {
+                  console.log(`${prefix}  Matcher: ${chalk.gray(config.matcher || '(all)')}`);
+                }
+                if (config.hooks && Array.isArray(config.hooks)) {
+                  config.hooks.forEach((hook: any) => {
+                    if (hook.type === 'command') {
+                      console.log(`${prefix}    → ${chalk.cyan(hook.command)}`);
+                    }
+                  });
+                }
+              });
+            }
+          }
+        };
+        
+        // Check project settings
+        console.log(chalk.green('\n● Project Hooks:'));
+        let hasProjectHooks = false;
+        
+        const projectSettings = path.join(process.cwd(), '.claude', 'settings.json');
+        try {
+          const settings = JSON.parse(await fs.readFile(projectSettings, 'utf-8'));
+          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+            hasProjectHooks = true;
+            console.log(`  ${chalk.blue('From .claude/settings.json:')}`);
+            displayHooks(settings.hooks, '    ');
+          }
+        } catch {
+          // No project settings
+        }
+        
+        const projectLocalSettings = path.join(process.cwd(), '.claude', 'settings.local.json');
+        try {
+          const settings = JSON.parse(await fs.readFile(projectLocalSettings, 'utf-8'));
+          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+            hasProjectHooks = true;
+            console.log(`  ${chalk.blue('From .claude/settings.local.json:')}`);
+            displayHooks(settings.hooks, '    ');
+          }
+        } catch {
+          // No local settings
+        }
+        
+        if (!hasProjectHooks) {
+          console.log(chalk.gray('  ○ No project hooks configured'));
+        }
+        
+        // Check global settings
+        console.log(chalk.blue('\n● Global Hooks:'));
+        let hasGlobalHooks = false;
+        
+        const globalSettings = path.join(os.homedir(), '.claude', 'settings.json');
+        try {
+          const settings = JSON.parse(await fs.readFile(globalSettings, 'utf-8'));
+          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+            hasGlobalHooks = true;
+            console.log(`  ${chalk.blue('From ~/.claude/settings.json:')}`);
+            displayHooks(settings.hooks, '    ');
+          }
+        } catch {
+          // No global settings
+        }
+        
+        if (!hasGlobalHooks) {
+          console.log(chalk.gray('  ○ No global hooks configured'));
+        }
+        
+        if (totalHooks === 0) {
+          console.log(chalk.yellow('\n▪ Tip: Use "ai hooks init" to set up Claude Code hooks'));
+        } else {
+          console.log(chalk.gray(`\nTotal: ${totalHooks} hook type(s) configured`));
+        }
       } catch (error) {
         UIHelper.showError(`Failed to list hooks: ${error}`);
         process.exit(1);
       }
     });
 
-  // hooks notify subcommand - Send notifications
+  // hooks start subcommand - Track task start time
+  hooksCommand
+    .command('start')
+    .description('Track task start time (for Claude Code SessionStart hook)')
+    .action(async () => {
+      try {
+        const { NotificationManager } = await import('../utils/notification-manager.js');
+        
+        // Try to read session ID from stdin if available
+        let sessionId: string | undefined;
+        if (!process.stdin.isTTY) {
+          try {
+            const chunks: Buffer[] = [];
+            process.stdin.setEncoding('utf8');
+            
+            const timeoutPromise = new Promise<string>((_, reject) => {
+              setTimeout(() => reject(new Error('Stdin read timeout')), 500);
+            });
+            
+            const readPromise = (async () => {
+              for await (const chunk of process.stdin) {
+                chunks.push(Buffer.from(chunk));
+              }
+              return Buffer.concat(chunks).toString();
+            })();
+            
+            const stdinData = await Promise.race([readPromise, timeoutPromise]) as string;
+            if (stdinData.trim()) {
+              const hookData = JSON.parse(stdinData);
+              sessionId = hookData.session_id;
+            }
+          } catch {
+            // Ignore stdin errors
+          }
+        }
+        
+        const notificationManager = new NotificationManager(sessionId);
+        await notificationManager.startTracking();
+        
+        // Silent by default for hooks - no output
+        if (process.env.DEBUG) {
+          console.log(chalk.gray(`[DEBUG] Task start time recorded${sessionId ? ` for session ${sessionId}` : ''}`));
+        }
+      } catch (error) {
+        // Hooks should never fail - just log if DEBUG is set
+        if (process.env.DEBUG) {
+          console.error(chalk.gray(`[DEBUG] Start tracking: ${error}`));
+        }
+      }
+      // Always exit successfully for hooks
+      process.exit(0);
+    });
+
+  // hooks notify subcommand - Send task completion notification from hooks
   hooksCommand
     .command('notify')
-    .description('Send Slack notifications for AI Tools events')
-    .option('--task-complete', 'Send task completion notification')
-    .option('--task-error <message>', 'Send error notification')
+    .description('Send task completion notification to Slack (for Claude Code hooks)')
     .option('--message <text>', 'Custom message to include')
-    .option('--silent', 'Suppress console output')
+    .option('--error', 'Send as error notification instead')
     .action(async (options) => {
       try {
         const { NotificationManager } = await import('../utils/notification-manager.js');
         const notificationManager = new NotificationManager();
         
-        if (options.taskComplete) {
-          // This is called by the Claude Code hook
-          const message = options.message || 'Task completed successfully';
-          await notificationManager.sendTaskComplete(message);
-          
-          if (!options.silent) {
-            console.log(chalk.gray('✓ Task completion notification sent'));
-          }
-        } else if (options.taskError) {
-          // Send error notification
-          await notificationManager.sendTaskError(options.taskError);
-          
-          if (!options.silent) {
-            console.log(chalk.gray('✓ Error notification sent'));
+        // Debug stdin availability
+        if (process.env.DEBUG) {
+          console.error(chalk.gray(`[DEBUG] stdin.isTTY: ${process.stdin.isTTY}`));
+          console.error(chalk.gray(`[DEBUG] stdin.readable: ${process.stdin.readable}`));
+        }
+        
+        // Try to read stdin JSON from Claude Code hook
+        let aiSummary: string | undefined;
+        let taskDuration: number | undefined;
+        
+        // Check if stdin is available (not TTY)
+        if (!process.stdin.isTTY) {
+          try {
+            // Set timeout for stdin reading
+            const timeoutPromise = new Promise<string>((_, reject) => {
+              setTimeout(() => reject(new Error('Stdin read timeout')), 1000);
+            });
+            
+            const readPromise = (async () => {
+              const chunks: Buffer[] = [];
+              process.stdin.setEncoding('utf8');
+              
+              for await (const chunk of process.stdin) {
+                chunks.push(Buffer.from(chunk));
+                if (process.env.DEBUG) {
+                  console.error(chalk.gray(`[DEBUG] Received chunk: ${chunk.length} bytes`));
+                }
+              }
+              
+              return Buffer.concat(chunks).toString();
+            })();
+            
+            const stdinData = await Promise.race([readPromise, timeoutPromise]) as string;
+            
+            if (process.env.DEBUG) {
+              console.error(chalk.gray(`[DEBUG] Raw stdin data (${stdinData.length} bytes): ${stdinData.substring(0, 200)}...`));
+            }
+            
+            if (stdinData.trim()) {
+              const hookData = JSON.parse(stdinData);
+              
+              if (process.env.DEBUG) {
+                console.error(chalk.gray(`[DEBUG] Parsed hook data keys: ${Object.keys(hookData).join(', ')}`));
+                if (hookData.transcript_path) {
+                  console.error(chalk.gray(`[DEBUG] Transcript path: ${hookData.transcript_path}`));
+                }
+              }
+              
+              // Extract AI summary and timing from transcript if available
+              if (hookData.transcript_path) {
+                const result = await notificationManager.extractAISummaryAndTiming(hookData.transcript_path);
+                aiSummary = result.summary;
+                taskDuration = result.duration;
+                
+                if (process.env.DEBUG) {
+                  if (aiSummary) {
+                    console.error(chalk.gray(`[DEBUG] Extracted AI summary: ${aiSummary.substring(0, 100)}...`));
+                  }
+                  if (taskDuration) {
+                    console.error(chalk.gray(`[DEBUG] Task duration: ${Math.round(taskDuration / 1000)}s`));
+                  }
+                }
+              }
+            }
+          } catch (stdinError) {
+            if (process.env.DEBUG) {
+              console.error(chalk.gray(`[DEBUG] Failed to read stdin: ${stdinError}`));
+            }
           }
         } else {
-          // Default: send a generic notification
-          const message = options.message || 'AI Tools notification';
-          await notificationManager.sendTaskComplete(message);
-          
-          if (!options.silent) {
-            console.log(chalk.gray('✓ Notification sent'));
+          if (process.env.DEBUG) {
+            console.error(chalk.gray('[DEBUG] Stdin is TTY, skipping stdin read'));
           }
         }
-      } catch (error) {
-        if (!options.silent) {
-          // Don't fail loudly in hooks
-          console.error(chalk.gray(`Notification failed: ${error}`));
+        
+        if (options.error) {
+          // Send error notification
+          const message = options.message || 'Task encountered an error';
+          await notificationManager.sendTaskError(message);
+        } else {
+          // Use AI summary if available, otherwise use provided message or default
+          const message = aiSummary || options.message || 'Task completed successfully';
+          await notificationManager.sendTaskComplete(message, taskDuration);
         }
-        // Exit gracefully
-        process.exit(0);
+        // Silent by default for hooks - no output
+      } catch (error) {
+        // Hooks should never fail - just log if DEBUG is set
+        if (process.env.DEBUG) {
+          console.error(chalk.gray(`[DEBUG] Notification: ${error}`));
+        }
       }
+      // Always exit successfully for hooks
+      process.exit(0);
     });
 
-  // hooks lint subcommand - AI-readable lint output
+  // hooks lint subcommand - AI-readable lint output for hooks
   hooksCommand
     .command('lint')
-    .description('Run lint checks and output AI-readable format')
+    .description('Run lint checks for Claude Code hooks (AI-readable, always succeeds)')
     .action(async () => {
       try {
         const { CheckCommand } = await import('../commands/check-command.js');
         const checkCommand = new CheckCommand();
         await checkCommand.executeForAI();
       } catch (error) {
-        UIHelper.showError(`Lint check failed: ${error}`);
-        process.exit(1);
+        // Hooks should never fail - just log if DEBUG is set
+        if (process.env.DEBUG) {
+          console.error(chalk.gray(`[DEBUG] Lint check: ${error}`));
+        }
       }
+      // Always exit successfully for hooks
+      process.exit(0);
     });
 
-  // hooks lines subcommand - AI-readable lines check output
+  // hooks lines subcommand - AI-readable lines check for hooks
   hooksCommand
     .command('lines')
-    .description('Check file line counts and output AI-readable format')
+    .description('Check file line counts for Claude Code hooks (AI-readable, always succeeds)')
     .option('-l, --limit <lines>', 'Line limit threshold', '500')
     .action(async (options) => {
       try {
@@ -205,7 +401,60 @@ export function setupHooksCommand(program: Command): void {
           limit: parseInt(options.limit)
         });
       } catch (error) {
-        UIHelper.showError(`Lines check failed: ${error}`);
+        // Hooks should never fail - just log if DEBUG is set
+        if (process.env.DEBUG) {
+          console.error(chalk.gray(`[DEBUG] Lines check: ${error}`));
+        }
+      }
+      // Always exit successfully for hooks
+      process.exit(0);
+    });
+
+  // hooks remove subcommand - Remove hooks
+  hooksCommand
+    .command('remove')
+    .description('Remove Claude Code hooks')
+    .option('-g, --global', 'Remove global hooks')
+    .option('-p, --project', 'Remove project hooks')
+    .action(async (options) => {
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
+        
+        let removed = 0;
+        
+        // Remove project hooks if requested or by default
+        if (options.project || (!options.global && !options.project)) {
+          const projectHooksDir = path.join(process.cwd(), '.claude', 'hooks');
+          try {
+            await fs.rm(projectHooksDir, { recursive: true });
+            console.log(chalk.green('✓ Removed project hooks'));
+            removed++;
+          } catch {
+            console.log(chalk.gray('○ No project hooks to remove'));
+          }
+        }
+        
+        // Remove global hooks if requested
+        if (options.global) {
+          const globalHooksDir = path.join(os.homedir(), '.claude', 'hooks');
+          try {
+            await fs.rm(globalHooksDir, { recursive: true });
+            console.log(chalk.green('✓ Removed global hooks'));
+            removed++;
+          } catch {
+            console.log(chalk.gray('○ No global hooks to remove'));
+          }
+        }
+        
+        if (removed > 0) {
+          UIHelper.showSuccess('Hooks removed successfully');
+        } else {
+          console.log(chalk.gray('No hooks to remove'));
+        }
+      } catch (error) {
+        UIHelper.showError(`Failed to remove hooks: ${error}`);
         process.exit(1);
       }
     });
