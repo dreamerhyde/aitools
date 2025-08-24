@@ -1,4 +1,5 @@
 import { MODEL_PRICING } from '../types/claude-usage.js';
+import { PricingCache } from './pricing-cache.js';
 
 export interface ModelPricing {
   input_cost_per_token?: number;
@@ -12,27 +13,20 @@ export interface ModelPricing {
 export class PricingFetcher {
   private cachedPricing: Map<string, ModelPricing> | null = null;
   private readonly offline: boolean;
-  private lastFetch: number = 0;
-  private readonly CACHE_DURATION = 60 * 60 * 1000; // 1 小時快取
-  private readonly RATE_LIMIT = 1000; // 1 秒速率限制
+  private pricingCache: PricingCache;
 
   constructor(offline = false) {
     this.offline = offline;
+    this.pricingCache = new PricingCache();
   }
 
   /**
-   * Load pricing data from LiteLLM or fallback to static pricing
+   * Load pricing data using the 24-hour cache system
    */
   async fetchModelPricing(): Promise<Map<string, ModelPricing>> {
-    // 檢查快取是否仍然有效
-    const now = Date.now();
-    if (this.cachedPricing && (now - this.lastFetch) < this.CACHE_DURATION) {
+    // Return cached pricing if already loaded in memory
+    if (this.cachedPricing) {
       return this.cachedPricing;
-    }
-
-    // 速率限制檢查
-    if ((now - this.lastFetch) < this.RATE_LIMIT) {
-      return this.cachedPricing || this.loadStaticPricing();
     }
 
     if (this.offline) {
@@ -40,25 +34,8 @@ export class PricingFetcher {
     }
 
     try {
-      // Silently fetch pricing - no console output during spinner
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 秒超時
-      
-      const response = await fetch('https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json', {
-        headers: {
-          'User-Agent': 'aitools-cli/1.0.0'
-        },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.warn(`LiteLLM API returned ${response.status}, using static pricing`);
-        return this.loadStaticPricing();
-      }
-
-      const data = await response.json() as Record<string, any>;
+      // Use the 24-hour cache system
+      const data = await this.pricingCache.getPricingData();
       const pricing = new Map<string, ModelPricing>();
 
       for (const [modelName, modelData] of Object.entries(data)) {
@@ -75,11 +52,10 @@ export class PricingFetcher {
       }
 
       this.cachedPricing = pricing;
-      this.lastFetch = now;
-      // Silently loaded pricing - no console output
       return pricing;
     } catch (error) {
-      // Silently fallback to static pricing
+      // Fallback to static pricing if cache system fails
+      console.warn('Failed to load pricing from cache, using static pricing');
       return this.loadStaticPricing();
     }
   }
@@ -88,7 +64,6 @@ export class PricingFetcher {
    * Load static pricing as fallback
    */
   private loadStaticPricing(): Map<string, ModelPricing> {
-    // Using static pricing fallback
     const pricing = new Map<string, ModelPricing>();
     
     for (const [modelName, modelPricing] of Object.entries(MODEL_PRICING)) {
@@ -101,13 +76,11 @@ export class PricingFetcher {
     }
 
     this.cachedPricing = pricing;
-    this.lastFetch = Date.now();
-    // Loaded static model prices
     return pricing;
   }
 
   /**
-   * Get pricing for a specific model with fallback matching
+   * Get pricing for a specific model with intelligent fallback matching
    */
   async getModelPricing(modelName: string): Promise<ModelPricing | null> {
     const pricing = await this.fetchModelPricing();
@@ -118,23 +91,15 @@ export class PricingFetcher {
       return directMatch;
     }
 
-    // Try with provider prefix variations for Claude models
-    const variations = [
-      modelName,
-      `anthropic/${modelName}`,
-      `claude-4-${modelName}`,
-      `claude-${modelName}`,
-      `claude-3-5-${modelName}`,
-      `claude-3-${modelName}`,
-      // LiteLLM 中的實際 Claude 4 模型名稱（優先匹配）
-      'claude-4-sonnet-20250514',
-      'claude-4-opus-20250514',
-      // Claude 3.x 模型名稱
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-    ];
+    // Normalize the model name by removing date stamps and version suffixes
+    const normalizedModel = this.normalizeModelName(modelName);
+    const normalizedMatch = pricing.get(normalizedModel);
+    if (normalizedMatch) {
+      return normalizedMatch;
+    }
 
+    // Try common LiteLLM variations
+    const variations = this.generateModelVariations(modelName);
     for (const variant of variations) {
       const match = pricing.get(variant);
       if (match) {
@@ -142,24 +107,108 @@ export class PricingFetcher {
       }
     }
 
-    // Try partial matching for Claude models
+    // Intelligent fuzzy matching for Claude models
+    return this.findBestFuzzyMatch(modelName, pricing);
+  }
+
+  /**
+   * Normalize model names by removing date stamps and version suffixes
+   */
+  private normalizeModelName(modelName: string): string {
+    return modelName
+      .replace(/-\d{8}$/, '')          // Remove date stamps like -20250805
+      .replace(/-\d+$/, '')            // Remove version numbers like -1
+      .replace(/-v\d+$/, '');          // Remove version prefixes like -v1
+  }
+
+  /**
+   * Generate common model name variations for LiteLLM
+   */
+  private generateModelVariations(modelName: string): string[] {
     const lowerModel = modelName.toLowerCase();
+    const variations: string[] = [];
+
+    // Add anthropic prefix variations
+    variations.push(`anthropic/${modelName}`);
+    
+    // Handle new Claude 4 format: claude-opus-4-1-20250805
+    if (lowerModel.includes('claude-opus-4')) {
+      variations.push(
+        'claude-3-opus-20240229',     // Fallback to Claude 3 Opus
+        'anthropic/claude-3-opus-20240229'
+      );
+    }
+    
+    if (lowerModel.includes('claude-sonnet-4')) {
+      variations.push(
+        'claude-3-5-sonnet-20241022', // Fallback to Claude 3.5 Sonnet
+        'anthropic/claude-3-5-sonnet-20241022'
+      );
+    }
+
+    // Common LiteLLM model names
+    if (lowerModel.includes('opus')) {
+      variations.push(
+        'claude-3-opus-20240229',
+        'anthropic/claude-3-opus-20240229'
+      );
+    }
+
+    if (lowerModel.includes('sonnet')) {
+      variations.push(
+        'claude-3-5-sonnet-20241022',
+        'anthropic/claude-3-5-sonnet-20241022'
+      );
+    }
+
+    if (lowerModel.includes('haiku')) {
+      variations.push(
+        'claude-3-5-haiku-20241022',
+        'anthropic/claude-3-5-haiku-20241022'
+      );
+    }
+
+    return variations;
+  }
+
+  /**
+   * Find the best fuzzy match based on model characteristics
+   */
+  private findBestFuzzyMatch(modelName: string, pricing: Map<string, ModelPricing>): ModelPricing | null {
+    const lowerModel = modelName.toLowerCase();
+    
+    // Create scoring system for matches
+    const candidates: Array<{ key: string; value: ModelPricing; score: number }> = [];
+
     for (const [key, value] of pricing) {
       const lowerKey = key.toLowerCase();
-      if (
-        (lowerModel.includes('opus') && lowerKey.includes('opus')) ||
-        (lowerModel.includes('sonnet') && lowerKey.includes('sonnet')) ||
-        (lowerModel.includes('haiku') && lowerKey.includes('haiku'))
-      ) {
-        // Further check for version compatibility
-        if (
-          (lowerModel.includes('4') && lowerKey.includes('4')) ||
-          (lowerModel.includes('3.5') && lowerKey.includes('3.5')) ||
-          (lowerModel.includes('3-5') && lowerKey.includes('3-5'))
-        ) {
-          return value;
-        }
+      let score = 0;
+
+      // Model type matching (highest priority)
+      if (lowerModel.includes('opus') && lowerKey.includes('opus')) score += 100;
+      if (lowerModel.includes('sonnet') && lowerKey.includes('sonnet')) score += 100;
+      if (lowerModel.includes('haiku') && lowerKey.includes('haiku')) score += 100;
+
+      // Version matching (high priority)
+      if (lowerModel.includes('4') && lowerKey.includes('4')) score += 50;
+      if (lowerModel.includes('3.5') && lowerKey.includes('3.5')) score += 45;
+      if (lowerModel.includes('3-5') && lowerKey.includes('3-5')) score += 45;
+      if (lowerModel.includes('3') && lowerKey.includes('3')) score += 40;
+
+      // Claude brand matching (medium priority)
+      if (lowerModel.includes('claude') && lowerKey.includes('claude')) score += 20;
+      if (lowerKey.includes('anthropic')) score += 10;
+
+      // Only consider candidates with meaningful similarity
+      if (score >= 100) {
+        candidates.push({ key, value, score });
       }
+    }
+
+    // Return the highest scoring match
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.score - a.score);
+      return candidates[0].value;
     }
 
     return null;

@@ -8,7 +8,6 @@ import { PricingFetcher } from './pricing-fetcher.js';
 export class JSONLParser {
   private logDirs: string[];
   private pricingFetcher: PricingFetcher;
-  private processedHashes: Set<string> = new Set();
 
   constructor(logDir?: string, useDynamicPricing: boolean = true) {
     // Match ccusage's logic for finding Claude data
@@ -98,32 +97,86 @@ export class JSONLParser {
     const messages: ConversationMessage[] = [];
     const lines: string[] = [];
     
-    // First, read all lines
-    await new Promise<void>((resolve, reject) => {
-      const stream = fs.createReadStream(filePath);
-      const rl = readline.createInterface({
-        input: stream,
-        crlfDelay: Infinity
-      });
+    // Track message hashes for deduplication
+    const processedHashes = new Set<string>();
+    
+    try {
+      // First, read all lines with better error handling
+      await new Promise<void>((resolve, reject) => {
+        const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+        const rl = readline.createInterface({
+          input: stream,
+          crlfDelay: Infinity
+        });
 
-      rl.on('line', (line) => {
-        lines.push(line);
-      });
+        rl.on('line', (line) => {
+          if (line.trim()) { // Skip empty lines
+            lines.push(line.trim());
+          }
+        });
 
-      rl.on('close', () => resolve());
-      rl.on('error', reject);
-    });
+        rl.on('close', () => resolve());
+        rl.on('error', (error) => {
+          console.warn(`Error reading file ${filePath}:`, error.message);
+          reject(error);
+        });
+
+        // Add timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          rl.close();
+          reject(new Error(`Timeout reading file: ${filePath}`));
+        }, 30000); // 30 second timeout
+
+        rl.on('close', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    } catch (error) {
+      console.warn(`Failed to read file ${filePath}:`, error);
+      return messages; // Return empty array instead of failing
+    }
 
     // Then process each line asynchronously
+    let validCount = 0;
+    let skipCount = 0;
+
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
+        
+        // Check for duplicate using same logic as ccusage
+        const hash = this.createUniqueHash(entry);
+        if (hash && processedHashes.has(hash)) {
+          skipCount++;
+          continue;
+        }
+        
         const message = await this.extractMessage(entry);
         if (message) {
           messages.push(message);
+          validCount++;
+          if (hash) {
+            processedHashes.add(hash);
+          }
         }
       } catch (err) {
-        // Skip invalid JSON lines
+        // Skip invalid JSON lines - this is expected for some lines
+      }
+    }
+
+    // Debug info for files with today's data
+    if (process.env.DEBUG) {
+      const fileName = filePath.split('/').pop();
+      const todayLines = lines.filter(line => {
+        try {
+          const entry = JSON.parse(line);
+          return entry.timestamp?.startsWith('2025-08-24');
+        } catch { return false; }
+      });
+      
+      if (todayLines.length > 0 || validCount > 100) {
+        console.log(`${fileName}: ${validCount} valid messages, ${skipCount} duplicates from ${lines.length} lines (${todayLines.length} today)`);
       }
     }
 
@@ -156,6 +209,9 @@ export class JSONLParser {
 
   private async extractMessage(entry: any): Promise<ConversationMessage | null> {
     try {
+      const isToday = entry.timestamp?.startsWith('2025-08-24');
+      let debugStep = '';
+      
       // Follow CCUsage's exact validation logic from usageDataSchema
       // Required fields:
       // 1. timestamp (ISO string)
@@ -165,44 +221,59 @@ export class JSONLParser {
       
       // Validate required fields like CCUsage does
       if (!entry.timestamp || typeof entry.timestamp !== 'string') {
+        if (process.env.DEBUG && isToday) console.log('DEBUG: Today message filtered - no timestamp');
         return null;
       }
+      debugStep = 'timestamp OK';
+      
+      // Skip non-assistant messages first - only assistant messages have usage data
+      if (entry.type && entry.type !== 'assistant') {
+        if (process.env.DEBUG && isToday) console.log(`DEBUG: Today message filtered - wrong type: ${entry.type}`);
+        return null;
+      }
+      debugStep = 'type OK';
       
       if (!entry.message?.usage) {
+        if (process.env.DEBUG && isToday) {
+          console.log('DEBUG: Today message filtered - no usage');
+          console.log('  entry.message exists:', !!entry.message);
+          console.log('  entry.message.usage exists:', !!entry.message?.usage);
+        }
         return null;
       }
+      debugStep = 'usage OK';
       
       const usage = entry.message.usage;
       if (typeof usage.input_tokens !== 'number' || typeof usage.output_tokens !== 'number') {
+        if (process.env.DEBUG && isToday) {
+          console.log('DEBUG: Today message filtered - invalid token types');
+          console.log('  input_tokens:', usage.input_tokens, typeof usage.input_tokens);
+          console.log('  output_tokens:', usage.output_tokens, typeof usage.output_tokens);
+          console.log('  usage object:', JSON.stringify(usage, null, 2));
+        }
         return null;
       }
+      debugStep = 'tokens OK';
       
       // Model is optional in CCUsage schema but required for our calculations
       const model = entry.message?.model;
       if (!model || typeof model !== 'string') {
+        if (process.env.DEBUG && isToday) console.log('DEBUG: Today message filtered - no model');
         return null;
       }
-      
-      // Skip non-assistant messages like CCUsage does
-      if (entry.type && entry.type !== 'assistant') {
-        return null;
-      }
-      
-      // Check for duplicates using hash
-      const uniqueHash = this.createUniqueHash(entry);
-      if (uniqueHash && this.processedHashes.has(uniqueHash)) {
-        return null; // Skip duplicate
-      }
-      if (uniqueHash) {
-        this.processedHashes.add(uniqueHash);
-      }
+      debugStep = 'model OK';
       
       // Extract token usage exactly like CCUsage
+      // The top-level cache_creation_input_tokens and cache_read_input_tokens 
+      // are the values we should use (they already include all ephemeral tokens)
+      const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
+      const cacheReadTokens = usage.cache_read_input_tokens || 0;
+      
       const tokenUsage: TokenUsage = {
         input: usage.input_tokens || 0,
         output: usage.output_tokens || 0,
-        cache_creation: usage.cache_creation_input_tokens || 0,
-        cache_read: usage.cache_read_input_tokens || 0
+        cache_creation: cacheCreationTokens,
+        cache_read: cacheReadTokens
       };
       
       // Use the exact fields CCUsage uses
@@ -252,22 +323,26 @@ export class JSONLParser {
     // Find pricing for model - check for exact match first, then partial
     let pricing = null;
     
-    // Check for opus-4 variations
+    // Check for opus-4 variations (including new format like claude-opus-4-1-20250805)
     if (modelLower.includes('opus-4') || modelLower.includes('opus_4') || 
-        modelLower.includes('claude-opus-4')) {
+        modelLower.includes('claude-opus-4') || modelLower.includes('opus-4-1')) {
       pricing = MODEL_PRICING['opus-4'];
     }
-    // Check for sonnet variations
+    // Check for sonnet-4 variations (including new format like claude-sonnet-4-1-20250805)
     else if (modelLower.includes('sonnet-4') || modelLower.includes('sonnet_4') ||
-             modelLower.includes('claude-3-5-sonnet')) {
+             modelLower.includes('claude-sonnet-4') || modelLower.includes('sonnet-4-1')) {
       pricing = MODEL_PRICING['sonnet-4'];
     }
+    // Check for Claude 3.5 Sonnet
+    else if (modelLower.includes('claude-3-5-sonnet') || modelLower.includes('claude-3.5-sonnet')) {
+      pricing = MODEL_PRICING['sonnet-4'];  // Use sonnet-4 pricing for 3.5 as well
+    }
     // Check for haiku variations
-    else if (modelLower.includes('haiku') && modelLower.includes('3-5')) {
+    else if (modelLower.includes('haiku') && (modelLower.includes('3-5') || modelLower.includes('3.5'))) {
       pricing = MODEL_PRICING['claude-3-5-haiku-20241022'];
     }
     // Legacy models
-    else if (modelLower.includes('opus') && modelLower.includes('3')) {
+    else if (modelLower.includes('opus') && modelLower.includes('3') && !modelLower.includes('4')) {
       pricing = MODEL_PRICING['claude-3-opus-20240229'];
     }
     else {
@@ -280,7 +355,7 @@ export class JSONLParser {
       }
     }
     
-    // Default to sonnet pricing if not found
+    // Default to sonnet-4 pricing if not found
     if (!pricing) {
       pricing = MODEL_PRICING['sonnet-4'];
     }
@@ -295,25 +370,78 @@ export class JSONLParser {
   }
 
   async parseAllLogs(startDate?: Date, endDate?: Date): Promise<ConversationMessage[]> {
-    // Reset processed hashes for new parsing session
-    this.processedHashes.clear();
-    
     const files = await this.findLogFiles();
     const allMessages: ConversationMessage[] = [];
+    const globalProcessedHashes = new Set<string>(); // Global deduplication across all files
+    let totalFiles = 0;
+    let processedFiles = 0;
+    let emptyFiles = 0;
+    let failedFiles = 0;
+    let globalDuplicates = 0;
 
     for (const file of files) {
-      const messages = await this.parseFile(file);
-      allMessages.push(...messages);
+      totalFiles++;
+      try {
+        const messages = await this.parseFile(file);
+        // Additional cross-file deduplication
+        const dedupedMessages = [];
+        for (const msg of messages) {
+          // Create hash from message data for cross-file dedup
+          if (msg.message_id && msg.project_id) {
+            const hash = `${msg.message_id}:${msg.project_id}`;
+            if (globalProcessedHashes.has(hash)) {
+              globalDuplicates++;
+              continue;
+            }
+            globalProcessedHashes.add(hash);
+          }
+          dedupedMessages.push(msg);
+        }
+        
+        if (dedupedMessages.length > 0) {
+          allMessages.push(...dedupedMessages);
+          processedFiles++;
+        } else {
+          emptyFiles++;
+          if (process.env.DEBUG) {
+            console.log(`Empty file (no valid messages): ${file.split('/').pop()}`);
+          }
+        }
+      } catch (error) {
+        failedFiles++;
+        console.warn(`Failed to parse file ${file.split('/').pop()}:`, error.message);
+        // Continue processing other files
+      }
+    }
+
+    // Debug info (only if there's a significant discrepancy)
+    if (process.env.DEBUG || (totalFiles > 10 && processedFiles < totalFiles * 0.7)) {
+      console.log(`Processed ${processedFiles}/${totalFiles} files (${emptyFiles} empty, ${failedFiles} failed), got ${allMessages.length} messages`);
+      if (globalDuplicates > 0) {
+        console.log(`Cross-file duplicates removed: ${globalDuplicates}`);
+      }
+      
+      // Count today messages before any filtering
+      const todayBeforeFilter = allMessages.filter(m => m.timestamp.startsWith('2025-08-24')).length;
+      console.log(`Messages before any filtering: ${allMessages.length}, today: ${todayBeforeFilter}`);
     }
 
     // Filter by date range if provided
     if (startDate || endDate) {
-      return allMessages.filter(msg => {
+      const filtered = allMessages.filter(msg => {
         const msgDate = new Date(msg.timestamp);
         if (startDate && msgDate < startDate) return false;
         if (endDate && msgDate > endDate) return false;
         return true;
       });
+      
+      if (process.env.DEBUG) {
+        const todayAfterFilter = filtered.filter(m => m.timestamp.startsWith('2025-08-24')).length;
+        console.log(`After date filtering: ${filtered.length} messages, today: ${todayAfterFilter}`);
+        console.log(`Date filter: startDate=${startDate}, endDate=${endDate}`);
+      }
+      
+      return filtered;
     }
 
     return allMessages;

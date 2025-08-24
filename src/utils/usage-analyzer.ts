@@ -39,6 +39,22 @@ export class UsageAnalyzer {
   analyzeDailyUsage(messages: ConversationMessage[]): DailyUsage[] {
     const dailyMap = new Map<string, DailyUsage>();
     
+    // Debug: Count today's messages using same formatting logic
+    const todayDate = this.formatDate('2025-08-24T12:00:00.000Z'); // Use noon to avoid timezone edge cases
+    const todayMessages = messages.filter(m => this.formatDate(m.timestamp) === todayDate);
+    if (process.env.DEBUG) {
+      console.log(`analyzeDailyUsage: Processing ${messages.length} total messages, ${todayMessages.length} from today (${todayDate})`);
+      console.log(`  Timezone: ${this.timezone || 'system default'}, Locale: ${this.locale}`);
+      
+      if (todayMessages.length > 0) {
+        const todayWithConversationId = todayMessages.filter(m => m.conversation_id);
+        console.log(`  Today messages with conversation_id: ${todayWithConversationId.length}`);
+        console.log(`  Sample conversation_ids: ${todayWithConversationId.slice(0, 3).map(m => m.conversation_id).join(', ')}`);
+      } else {
+        console.log(`  No today messages found! Sample timestamps: ${messages.slice(0, 3).map(m => m.timestamp).join(', ')}`);
+      }
+    }
+    
     messages.forEach(msg => {
       // Use timezone-aware date formatting like ccusage
       const date = this.formatDate(msg.timestamp);
@@ -81,6 +97,8 @@ export class UsageAnalyzer {
     
     // Count unique conversations per day
     const conversationsByDay = new Map<string, Set<string>>();
+    let todayConversationsCount = 0;
+    
     messages.forEach(msg => {
       if (msg.conversation_id) {
         const date = this.formatDate(msg.timestamp);
@@ -88,8 +106,21 @@ export class UsageAnalyzer {
           conversationsByDay.set(date, new Set());
         }
         conversationsByDay.get(date)!.add(msg.conversation_id);
+        
+        // Debug: Count today's unique conversations
+        if (process.env.DEBUG && msg.timestamp.startsWith('2025-08-24')) {
+          if (!conversationsByDay.get(date)!.has(msg.conversation_id)) {
+            todayConversationsCount++;
+          }
+        }
       }
     });
+    
+    if (process.env.DEBUG) {
+      const todayDate = this.formatDate('2025-08-24T12:00:00.000Z');
+      const todayConversations = conversationsByDay.get(todayDate);
+      console.log(`Today (${todayDate}) conversations: ${todayConversations?.size || 0}`);
+    }
     
     conversationsByDay.forEach((convs, date) => {
       const daily = dailyMap.get(date);

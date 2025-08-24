@@ -13,10 +13,12 @@ import inquirer from 'inquirer';
 export class ClaudeUsageCommand {
   private parser: JSONLParser;
   private analyzer: UsageAnalyzer;
+  private timezone?: string;
 
   constructor(logPath?: string, timezone?: string, useDynamicPricing: boolean = true) {
     this.parser = new JSONLParser(logPath, useDynamicPricing);
     this.analyzer = new UsageAnalyzer(timezone);
+    this.timezone = timezone;
   }
 
   async execute(options: any): Promise<void> {
@@ -30,6 +32,22 @@ export class ClaudeUsageCommand {
         options.from ? new Date(options.from) : undefined,
         options.to ? new Date(options.to) : undefined
       );
+      
+      if (process.env.DEBUG) {
+        // Use same timezone-aware date formatting as UsageAnalyzer
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          timeZone: this.timezone
+        });
+        const todayDate = formatter.format(new Date('2025-08-24T12:00:00.000Z'));
+        const todayMessages = messages.filter(m => {
+          const msgDate = formatter.format(new Date(m.timestamp));
+          return msgDate === todayDate;
+        });
+        console.log(`parseAllLogs returned ${messages.length} total messages, ${todayMessages.length} from today (${todayDate})`);
+      }
       
       // Stop spinner and completely clear the line
       spinner.stop();
@@ -141,7 +159,15 @@ export class ClaudeUsageCommand {
     console.log(table.toString());
     
     // Model breakdown for current month
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    // Use timezone-aware date formatting to match the analyzer
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: this.timezone
+    });
+    const currentDate = formatter.format(new Date());
+    const currentMonth = currentDate.substring(0, 7); // Extract YYYY-MM from YYYY-MM-DD
     const currentMonthUsage = monthlyUsage.get(currentMonth);
     
     if (currentMonthUsage) {
@@ -317,17 +343,19 @@ export class ClaudeUsageCommand {
     // Format model names like ccusage - Prioritize Claude 4 models
     const modelLower = model.toLowerCase();
     
-    // Claude 4 models (highest priority)
-    if (modelLower.includes('claude-4-opus') || modelLower.includes('opus-4') || modelLower.includes('opus_4')) return 'opus-4';
-    if (modelLower.includes('claude-4-sonnet') || modelLower.includes('sonnet-4') || modelLower.includes('sonnet_4')) return 'sonnet-4';
+    // Claude 4 models (highest priority) - including new format like claude-opus-4-1-20250805
+    if (modelLower.includes('opus-4') || modelLower.includes('opus_4') || 
+        modelLower.includes('claude-opus-4') || modelLower.includes('opus-4-1')) return 'opus-4';
+    if (modelLower.includes('sonnet-4') || modelLower.includes('sonnet_4') || 
+        modelLower.includes('claude-sonnet-4') || modelLower.includes('sonnet-4-1')) return 'sonnet-4';
     
     // Claude 3.5 models
-    if (modelLower.includes('claude-3-5-sonnet')) return 'sonnet-3.5';
+    if (modelLower.includes('claude-3-5-sonnet') || modelLower.includes('claude-3.5-sonnet')) return 'sonnet-3.5';
     if (modelLower.includes('claude-3-5-haiku') || modelLower.includes('haiku-3.5')) return 'haiku-3.5';
     
     // Legacy Claude 3 models
     if (modelLower.includes('opus') && !modelLower.includes('4')) return 'opus-3';
-    if (modelLower.includes('sonnet') && !modelLower.includes('4') && !modelLower.includes('3-5')) return 'sonnet-3';
+    if (modelLower.includes('sonnet') && !modelLower.includes('4') && !modelLower.includes('3-5') && !modelLower.includes('3.5')) return 'sonnet-3';
     if (modelLower.includes('haiku') && !modelLower.includes('3.5') && !modelLower.includes('3-5')) return 'haiku-3';
     
     return model;

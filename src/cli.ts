@@ -11,6 +11,7 @@ import { setupChangesCommand } from './cli/changes-command.js';
 import { setupLintCommand } from './cli/lint-command.js';
 import { setupLinesCommand } from './cli/lines-command.js';
 import { setupProcessCommand } from './cli/process-command.js';
+import { setupPricingCommand } from './cli/pricing-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
@@ -57,6 +58,7 @@ setupLinesCommand(program);   // line limit checks
 // Supporting commands
 setupHooksCommand(program);
 setupProcessCommand(program);
+setupPricingCommand(program);
 setupCompletionCommand(program);
 
 // Basic commands

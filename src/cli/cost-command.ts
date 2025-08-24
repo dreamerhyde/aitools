@@ -16,8 +16,9 @@ export function setupCostCommand(program: Command) {
       if (!options.from && !options.to) {
         const today = new Date();
         const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000); // Add one day to include full today
         options.from = monthAgo.toISOString().split('T')[0];
-        options.to = today.toISOString().split('T')[0];
+        options.to = tomorrow.toISOString().split('T')[0];
       }
       
       const timezone = options.timezone === 'system' ? undefined : options.timezone;
@@ -47,8 +48,9 @@ export function setupCostCommand(program: Command) {
       if (!options.from && !options.to) {
         const today = new Date();
         const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000); // Add one day to include full today
         options.from = monthAgo.toISOString().split('T')[0];
-        options.to = today.toISOString().split('T')[0];
+        options.to = tomorrow.toISOString().split('T')[0];
       }
       
       const timezone = options.timezone === 'system' ? undefined : options.timezone;
