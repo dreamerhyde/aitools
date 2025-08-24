@@ -10,6 +10,7 @@ export function setupLinesCommand(program: Command): void {
     .option('--json', 'Output as JSON for AI processing')
     .option('-p, --path <path>', 'Target path to check')
     .option('-c, --check', 'Quick check mode (less verbose, for hooks)')
+    .option('--fail', 'Exit with error code if files exceed limit (for CI/CD)')
     .action(async (options) => {
       const command = new LinesCommand();
       await command.execute(options);

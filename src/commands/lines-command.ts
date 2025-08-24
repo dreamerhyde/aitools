@@ -92,7 +92,8 @@ export class LinesCommand {
 
       // Human-readable output
       console.log('');
-      console.log(chalk.bold(`📏 File Line Count Check (limit: ${this.lineLimit} lines)\n`));
+      console.log(chalk.bold(`File Line Count Check (limit: ${this.lineLimit} lines)`));
+      console.log(chalk.hex('#303030')('─'.repeat(30)));
 
       if (exceededFiles.length === 0) {
         UIHelper.showSuccess('All files are within the line limit!');
@@ -111,17 +112,18 @@ export class LinesCommand {
         const percentage = ((excess / this.lineLimit) * 100).toFixed(1);
         
         console.log(
-          `  ${chalk.red('●')} ${chalk.cyan(file.path)} - ` +
+          `  ${chalk.yellow('▪')} ${chalk.cyan(file.path)} - ` +
           `${chalk.bold(file.lines)} lines ` +
-          chalk.red(`(+${excess} lines, ${percentage}% over)`)
+          chalk.yellow(`(+${excess} lines, ${percentage}% over)`)
         );
       }
 
       console.log('');
       console.log(chalk.gray('Please consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.'));
 
-      // Set exit code for CI/CD
-      if (exceededFiles.length > 0 && !options.all) {
+      // Don't exit with error code in normal usage (only for CI/CD with --fail flag)
+      // This prevents Warp from showing error blocks
+      if (exceededFiles.length > 0 && options.fail) {
         process.exit(1);
       }
 
@@ -129,7 +131,8 @@ export class LinesCommand {
       if (error instanceof Error) {
         UIHelper.showError(`Failed to check file lines: ${error.message}`);
       }
-      process.exit(1);
+      // Don't exit with error code to avoid Warp showing error blocks
+      // The error message is enough for users to understand something went wrong
     }
   }
 

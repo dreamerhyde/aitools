@@ -101,6 +101,7 @@ export class CheckCommand {
     // Display results
     this.displaySummary();
     this.displayDetailedResults();
+    // Suggestion is shown in displayDetailedResults() if there are issues
   }
   
   private async checkTypeScript(): Promise<CheckResult> {
@@ -424,7 +425,7 @@ export class CheckCommand {
         tsResult.warnings === 0 && eslintResult.warnings === 0) {
       console.log('No issues found - code quality is good.');
     } else {
-      console.log('\nPlease fix the issues above. Consider using --fix flag for auto-fixable ESLint issues.');
+      console.log('\nPlease run `aitools lint --fix` to auto-fix ESLint issues, then manually fix remaining TypeScript errors.');
     }
   }
   
@@ -509,74 +510,68 @@ export class CheckCommand {
   }
   
   private displayDetailedResults(): void {
-    const hasIssues = this.results.some(r => r.files.length > 0);
+    const hasDetailedIssues = this.results.some(r => r.files.length > 0);
     
-    if (!hasIssues) {
-      return;
-    }
+    if (hasDetailedIssues) {
+      console.log('\n' + chalk.bold('Detailed Issues'));
+      console.log(chalk.hex('#303030')('─'.repeat(30)));
     
-    console.log('\n' + chalk.bold('Detailed Issues'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
-    
-    // Group issues by file
-    const fileGroups = new Map<string, FileIssue[]>();
-    
-    for (const result of this.results) {
-      for (const issue of result.files) {
-        if (!fileGroups.has(issue.file)) {
-          fileGroups.set(issue.file, []);
+      // Group issues by file
+      const fileGroups = new Map<string, FileIssue[]>();
+      
+      for (const result of this.results) {
+        for (const issue of result.files) {
+          if (!fileGroups.has(issue.file)) {
+            fileGroups.set(issue.file, []);
+          }
+          fileGroups.get(issue.file)!.push(issue);
         }
-        fileGroups.get(issue.file)!.push(issue);
+      }
+      
+      // Sort files by number of issues (most issues first)
+      const sortedFiles = Array.from(fileGroups.entries())
+        .sort((a, b) => b[1].length - a[1].length);
+      
+      for (const [file, issues] of sortedFiles) {
+        const errorCount = issues.filter(i => i.severity === 'error').length;
+        const warningCount = issues.filter(i => i.severity === 'warning').length;
+        
+        // File header
+        const fileLabel = chalk.cyan(file);
+        const counts = [];
+        if (errorCount > 0) counts.push(chalk.red(`${errorCount} errors`));
+        if (warningCount > 0) counts.push(chalk.yellow(`${warningCount} warnings`));
+        
+        console.log(`\n${fileLabel} ${chalk.dim(`(${counts.join(', ')})`)}`);
+        
+        // Sort issues by line number
+        const sortedIssues = issues.sort((a, b) => (a.line || 0) - (b.line || 0));
+        
+        for (const issue of sortedIssues) {
+          const icon = 
+            issue.severity === 'error' ? chalk.red('✗') :
+            issue.severity === 'warning' ? chalk.yellow('▪') :
+            chalk.blue('○');
+          
+          const location = issue.line ? 
+            chalk.gray(`  ${issue.line}:${issue.column || 0}`) : '';
+          
+          const rule = issue.rule ? 
+            chalk.dim(` [${issue.rule}]`) : '';
+          
+          console.log(`  ${icon}${location}  ${issue.message}${rule}`);
+        }
       }
     }
     
-    // Sort files by number of issues (most issues first)
-    const sortedFiles = Array.from(fileGroups.entries())
-      .sort((a, b) => b[1].length - a[1].length);
+    // Add consistent suggestion for fixing issues (matching hooks output)
+    const hasErrors = this.results.some(r => r.errors > 0);
+    const hasWarnings = this.results.some(r => r.warnings > 0);
     
-    for (const [file, issues] of sortedFiles) {
-      const errorCount = issues.filter(i => i.severity === 'error').length;
-      const warningCount = issues.filter(i => i.severity === 'warning').length;
-      
-      // File header
-      const fileLabel = chalk.cyan(file);
-      const counts = [];
-      if (errorCount > 0) counts.push(chalk.red(`${errorCount} errors`));
-      if (warningCount > 0) counts.push(chalk.yellow(`${warningCount} warnings`));
-      
-      console.log(`\n${fileLabel} ${chalk.dim(`(${counts.join(', ')})`)}`);
-      
-      // Sort issues by line number
-      const sortedIssues = issues.sort((a, b) => (a.line || 0) - (b.line || 0));
-      
-      for (const issue of sortedIssues) {
-        const icon = 
-          issue.severity === 'error' ? chalk.red('✗') :
-          issue.severity === 'warning' ? chalk.yellow('▪') :
-          chalk.blue('○');
-        
-        const location = issue.line ? 
-          chalk.gray(`  ${issue.line}:${issue.column || 0}`) : '';
-        
-        const rule = issue.rule ? 
-          chalk.dim(` [${issue.rule}]`) : '';
-        
-        console.log(`  ${icon}${location}  ${issue.message}${rule}`);
-      }
+    if (hasErrors || hasWarnings) {
+      console.log('\n' + chalk.bold('Suggested Action'));
+      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint --fix') + ' to auto-fix ESLint issues, then manually fix remaining TypeScript errors');
     }
-    
-    // Suggestions
-    console.log('\n' + chalk.bold('Suggestions'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
-    
-    if (this.results.some(r => r.tool === 'ESLint' && r.errors > 0)) {
-      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint --fix') + ' to automatically fix some ESLint issues');
-    }
-    
-    if (this.results.some(r => r.tool === 'TypeScript' && r.errors > 0)) {
-      console.log(chalk.yellow('▪') + ' Fix TypeScript errors to ensure type safety');
-    }
-    
-    console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint') + ' to run TypeScript and ESLint checks');
   }
 }

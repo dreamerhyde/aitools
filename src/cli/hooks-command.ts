@@ -279,7 +279,7 @@ export function setupHooksCommand(program: Command): void {
     .description('Run lint checks for Claude Code hooks (AI-readable, always succeeds)')
     .action(async () => {
       try {
-        const { CheckCommand } = await import('../commands/check-command.js');
+        const { CheckCommand } = await import('../commands/lint-command-impl.js');
         const checkCommand = new CheckCommand();
         await checkCommand.executeForAI();
       } catch (error) {

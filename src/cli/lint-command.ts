@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { CheckCommand } from '../commands/check-command.js';
+import { CheckCommand } from '../commands/lint-command-impl.js';
 import { UIHelper } from '../utils/ui.js';
 
 export function setupLintCommand(program: Command): void {
