@@ -2,9 +2,6 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function setupCompletionCommand(program: Command): void {
   const completion = program

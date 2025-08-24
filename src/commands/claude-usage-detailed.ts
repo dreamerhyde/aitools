@@ -315,7 +315,7 @@ export class DetailedUsageDisplay {
     
     // Clear any remaining spinner artifacts
     if (process.stdout.isTTY) {
-      process.stdout.write('\x1b[?25h'); // Show cursor
+      process.stdout.write('\u001b[?25h'); // Show cursor
     }
   }
 

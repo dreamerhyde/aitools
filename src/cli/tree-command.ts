@@ -3,7 +3,7 @@ import { TreeCommand } from '../commands/tree-command.js';
 import { UIHelper } from '../utils/ui.js';
 
 export function setupTreeCommand(program: Command): void {
-  const tree = program
+  program
     .command('tree')
     .description('Display directory tree structure (respects .gitignore by default)')
     .option('-f, --files', 'Show files and directories (default: directories only)')

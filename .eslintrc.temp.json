@@ -5,7 +5,7 @@
   },
   "extends": [
     "eslint:recommended",
-    "plugin:@typescript-eslint/recommended"
+    "@typescript-eslint/recommended"
   ],
   "parserOptions": {
     "ecmaVersion": "latest",
@@ -23,8 +23,7 @@
     "node_modules/",
     "build/",
     ".next/",
-    "coverage/",
-    "*.d.ts"
+    "coverage/"
   ],
   "parser": "@typescript-eslint/parser",
   "plugins": [

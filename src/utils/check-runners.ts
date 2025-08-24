@@ -1,9 +1,9 @@
 import chalk from 'chalk';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import ora from 'ora';
-import { GitignoreHelper } from './gitignore-helper.js';
+// GitignoreHelper import removed as it's no longer used
 
 export interface CheckResult {
   tool: string;
@@ -25,8 +25,8 @@ export interface FileIssue {
 }
 
 export class TypeScriptRunner {
-  async run(targetFile?: string): Promise<CheckResult> {
-    const spinner = ora('Running TypeScript type check...').start();
+  async run(targetFile?: string, silent?: boolean): Promise<CheckResult> {
+    const spinner = silent ? null : ora('Running TypeScript type check...').start();
     const startTime = Date.now();
     
     return new Promise((resolve) => {
@@ -34,7 +34,7 @@ export class TypeScriptRunner {
       const hasTsc = fs.existsSync(tscPath);
       
       if (!hasTsc) {
-        spinner.fail('TypeScript not found');
+        spinner?.fail('TypeScript not found');
         return resolve({
           tool: 'TypeScript',
           status: 'skipped',
@@ -45,7 +45,7 @@ export class TypeScriptRunner {
         });
       }
       
-      spinner.text = 'Running TypeScript type check (this may take a moment)...';
+      if (spinner) spinner.text = 'Running TypeScript type check (this may take a moment)...';
       const tscArgs = ['--noEmit', '--pretty', 'false'];
       if (targetFile) {
         tscArgs.push(targetFile);
@@ -65,13 +65,13 @@ export class TypeScriptRunner {
       tsc.stderr.on('data', (data) => {
         errorOutput += data.toString();
         // Keep spinner alive to show progress
-        spinner.text = `Running TypeScript type check... (${output.split('\n').length} lines processed)`;
+        if (spinner) spinner.text = `Running TypeScript type check... (${output.split('\n').length} lines processed)`;
       });
       
       // Add timeout handler
       const timeoutId = setTimeout(() => {
         tsc.kill('SIGKILL');
-        spinner.fail(chalk.red('TypeScript check timed out (60s limit)'));
+        spinner?.fail(chalk.red('TypeScript check timed out (60s limit)'));
         resolve({
           tool: 'TypeScript',
           status: 'error',
@@ -84,33 +84,36 @@ export class TypeScriptRunner {
       }, 60000);
       
       // Add progress indicator with file count estimation
-      let progressInterval: NodeJS.Timeout;
+      let progressInterval: NodeJS.Timeout | undefined;
       let fileCount = 0;
       
-      // Count TypeScript files to give better progress indication
-      setTimeout(() => {
-        try {
-          const { execSync } = require('child_process');
-          const findCmd = 'find . -path "./node_modules" -prune -o -path "./.next" -prune -o -path "./dist" -prune -o -path "./build" -prune -o \\( -name "*.ts" -o -name "*.tsx" \\) -print | wc -l';
-          const result = execSync(findCmd, { encoding: 'utf8', timeout: 3000 });
-          fileCount = parseInt(result.trim());
-        } catch (e) {
-          fileCount = 0;
-        }
-        
-        let dots = 0, estimatedProgress = 0;
-        progressInterval = setInterval(() => {
-          dots = (dots + 1) % 4;
-          const dotStr = '.'.repeat(dots) + ' '.repeat(3 - dots);
-          const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          if (fileCount > 0) {
-            estimatedProgress = Math.min(90, Math.floor((elapsed * 10 / fileCount) * 100));
-            spinner.text = `TypeScript checking${dotStr} ${estimatedProgress}% (${elapsed}s)`;
-          } else {
-            spinner.text = `TypeScript checking${dotStr} (${elapsed}s)`;
+      // Only show progress if not in silent mode
+      if (!silent) {
+        // Count TypeScript files to give better progress indication
+        setTimeout(() => {
+          try {
+            // execSync imported at top
+            const findCmd = 'find . -path "./node_modules" -prune -o -path "./.next" -prune -o -path "./dist" -prune -o -path "./build" -prune -o \\( -name "*.ts" -o -name "*.tsx" \\) -print | wc -l';
+            const result = execSync(findCmd, { encoding: 'utf8', timeout: 3000 });
+            fileCount = parseInt(result.trim());
+          } catch (e) {
+            fileCount = 0;
           }
-        }, 500);
-      }, 1000);
+          
+          let dots = 0, estimatedProgress = 0;
+          progressInterval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            const dotStr = '.'.repeat(dots) + ' '.repeat(3 - dots);
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            if (fileCount > 0) {
+              estimatedProgress = Math.min(90, Math.floor((elapsed * 10 / fileCount) * 100));
+              if (spinner) spinner.text = `TypeScript checking${dotStr} ${estimatedProgress}% (${elapsed}s)`;
+            } else {
+              if (spinner) spinner.text = `TypeScript checking${dotStr} (${elapsed}s)`;
+            }
+          }, 500);
+        }, 1000);
+      }
       
       tsc.on('close', (code) => {
         clearTimeout(timeoutId);
@@ -122,7 +125,7 @@ export class TypeScriptRunner {
         const warningCount = files.filter(f => f.severity === 'warning').length;
         
         if (code === 0) {
-          spinner.succeed(chalk.green('TypeScript check passed'));
+          spinner?.succeed(chalk.green('TypeScript check passed'));
           resolve({
             tool: 'TypeScript',
             status: 'success',
@@ -132,7 +135,7 @@ export class TypeScriptRunner {
             duration
           });
         } else {
-          spinner.fail(chalk.red(`TypeScript found ${errorCount} errors`));
+          spinner?.fail(chalk.red(`TypeScript found ${errorCount} errors`));
           resolve({
             tool: 'TypeScript',
             status: 'error',
@@ -169,28 +172,30 @@ export class TypeScriptRunner {
 }
 
 export class ESLintRunner {
-  async run(fix?: boolean, targetFile?: string): Promise<CheckResult> {
-    const spinner = ora('Checking ESLint...').start();
+  async run(fix?: boolean, targetFile?: string, silent?: boolean): Promise<CheckResult> {
+    const spinner = silent ? null : ora('Checking ESLint...').start();
     const startTime = Date.now();
     
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       // Only check for local ESLint
       const localEslintPath = path.join(process.cwd(), 'node_modules', '.bin', 'eslint');
       const hasLocalEslint = fs.existsSync(localEslintPath);
       
       if (!hasLocalEslint) {
         // No local ESLint found - provide helpful message
-        spinner.fail(chalk.yellow('Local ESLint not found'));
-        console.log('\n' + chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-        console.log(chalk.bold('  Local ESLint is required for reliable code checking'));
-        console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-        console.log('\nPlease install ESLint as a dev dependency:\n');
-        console.log(chalk.cyan('  Using Bun:'));
-        console.log('    bun add -d eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser\n');
-        console.log(chalk.cyan('  Using npm:'));
-        console.log('    npm install --save-dev eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser\n');
-        console.log(chalk.dim('  Local ESLint ensures consistent configuration and better performance.'));
-        console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+        if (!silent) {
+          spinner?.fail(chalk.yellow('Local ESLint not found'));
+          console.log('\n' + chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+          console.log(chalk.bold('  Local ESLint is required for reliable code checking'));
+          console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+          console.log('\nPlease install ESLint as a dev dependency:\n');
+          console.log(chalk.cyan('  Using Bun:'));
+          console.log('    bun add -d eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser\n');
+          console.log(chalk.cyan('  Using npm:'));
+          console.log('    npm install --save-dev eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser\n');
+          console.log(chalk.dim('  Local ESLint ensures consistent configuration and better performance.'));
+          console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+        }
         
         return resolve({
           tool: 'ESLint',
@@ -203,7 +208,7 @@ export class ESLintRunner {
       }
       
       // Check ESLint version and configuration
-      const { execSync } = require('child_process');
+      // execSync imported at top
       let eslintVersion = '8';
       try {
         const versionOutput = execSync(`${localEslintPath} --version`, { encoding: 'utf8' });
@@ -212,25 +217,27 @@ export class ESLintRunner {
         // Default to version 8
       }
       
-      // Check if project has ESLint config
+      // Check if project has ESLint config or package.json lint script
       const configFiles = ['.eslintrc.js', '.eslintrc.json', '.eslintrc.yml', 'eslint.config.js', 'eslint.config.mjs'];
       const hasConfig = configFiles.some(file => fs.existsSync(path.join(process.cwd(), file)));
       
+      // Also check for package.json lint script
+      const packageJsonPath = path.join(process.cwd(), 'package.json');
+      let hasLintScript = false;
+      
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+        hasLintScript = !!(packageJson.scripts && packageJson.scripts.lint);
+      } catch {
+        // No package.json
+      }
+      
       if (!hasConfig) {
-        spinner.info(chalk.yellow('No ESLint configuration found'));
-        console.log('\n' + chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-        console.log(chalk.bold('  ESLint configuration is required'));
-        console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-        console.log('\nPlease add ESLint configuration:\n');
-        if (eslintVersion === '9') {
-          console.log(chalk.cyan('  For ESLint 9.x (flat config):'));
-          console.log('    Create eslint.config.mjs or use legacy config with ESLINT_USE_FLAT_CONFIG=false\n');
-        } else {
-          console.log(chalk.cyan('  For ESLint 8.x:'));
-          console.log('    Create .eslintrc.json or .eslintrc.js\n');
+        if (!silent) {
+          spinner?.info(chalk.yellow('No ESLint configuration found'));
+          console.log(chalk.dim('  Run') + chalk.cyan(' ai lint init') + chalk.dim(' to create ESLint configuration'));
+          console.log();
         }
-        console.log(chalk.dim('  Without configuration, ESLint may check unnecessary files.'));
-        console.log(chalk.yellow('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
         
         return resolve({
           tool: 'ESLint',
@@ -238,73 +245,52 @@ export class ESLintRunner {
           errors: 0,
           warnings: 0,
           files: [],
-          message: `ESLint ${eslintVersion}.x found but no configuration - add .eslintrc.json or eslint.config.mjs`
+          message: 'No configuration - run ai lint init'
         });
       }
       
-      // Use local ESLint
-      const eslintCommand = localEslintPath;
-      const eslintArgs: string[] = [];
-      spinner.text = 'Running ESLint (local)...';
+      // For now, disable package script usage to avoid hanging
+      const usePackageScript = false; // !hasConfig && hasLintScript;
       
-      // Get actual target files for accurate count
-      let fileCount = 0;
+      const eslintCommand = usePackageScript ? 'npm' : localEslintPath;
+      const eslintArgs: string[] = usePackageScript ? ['run', 'lint'] : [];
+      if (spinner) spinner.text = 'Running ESLint (local)...';
       
-      // Use GitignoreHelper to count actual files that will be checked
-      const gitignoreHelper = new GitignoreHelper();
+      // Simplified file count - let ESLint handle the file discovery
+      const fileCount = 10; // Estimated fallback
       
-      // Count files using GitignoreHelper to respect .gitignore
-      const extensions = ['.ts', '.tsx', '.js', '.jsx'];
-      const walkDir = async (dir: string): Promise<void> => {
-        try {
-          const entries = await import('fs').then(fs => fs.promises.readdir(dir, { withFileTypes: true }));
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            const relativePath = path.relative(process.cwd(), fullPath);
-            
-            // Skip if ignored by gitignore
-            if (gitignoreHelper.isIgnored(relativePath)) {
-              continue;
-            }
-            
-            if (entry.isDirectory()) {
-              await walkDir(fullPath);
-            } else if (entry.isFile()) {
-              const ext = path.extname(entry.name);
-              if (extensions.includes(ext)) {
-                fileCount++;
-              }
-            }
-          }
-        } catch (e) {
-          // Skip directories we can't read
-        }
-      };
+      let args: string[];
       
-      try {
-        await walkDir(process.cwd());
-        if (fileCount === 0) fileCount = 10; // Fallback
-      } catch (e) {
-        fileCount = 10; // Fallback
+      if (usePackageScript) {
+        // When using npm run lint, the arguments are already set
+        args = eslintArgs;
+      } else {
+        // Direct ESLint command
+        args = [
+          ...eslintArgs,
+          targetFile || '.',  // Check specific file or current directory
+          '--format', 'json',
+          '--ext', '.js,.jsx,.ts,.tsx'  // Explicitly specify extensions
+        ];
+        
       }
       
-      const args = [
-        ...eslintArgs,
-        targetFile || '.',  // Check specific file or current directory
-        '--format', 'json',
-        '--ext', '.js,.jsx,.ts,.tsx'  // Explicitly specify extensions
-      ];
+      if (fix && !usePackageScript) {
+        args.push('--fix');
+      }
+      // Note: fix option with package scripts would need to be handled differently
       
-      if (fix) args.push('--fix');
-      
-      spinner.text = targetFile ? `ESLint (local): checking ${targetFile}...` : `ESLint (local): checking ${fileCount} files...`;
+      if (spinner) spinner.text = targetFile ? `ESLint (local): checking ${targetFile}...` : `ESLint (local): checking ${fileCount} files...`;
       
       // Add simple progress indicator with elapsed time
-      const progressInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const estimatedProgress = Math.min(90, elapsed * 8); // Roughly 8% per second
-        spinner.text = `ESLint (local): ${estimatedProgress}% (${elapsed}s of ~${Math.ceil(fileCount/6)}s)`;
-      }, 1000);
+      let progressInterval: NodeJS.Timeout | undefined;
+      if (spinner) {
+        progressInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const estimatedProgress = Math.min(90, elapsed * 8); // Roughly 8% per second
+          if (spinner) spinner.text = `ESLint (local): ${estimatedProgress}% (${elapsed}s of ~${Math.ceil(fileCount/6)}s)`;
+        }, 1000);
+      }
       
       const eslint = spawn(eslintCommand, args, {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -316,10 +302,10 @@ export class ESLintRunner {
         output += data.toString();
         // Update progress based on output
         const lines = output.split('\n').length;
-        spinner.text = `ESLint: Processing... (${lines} issues found so far)`;
+        if (spinner) spinner.text = `ESLint: Processing... (${lines} issues found so far)`;
       });
       
-      eslint.stderr.on('data', (data) => {
+      eslint.stderr.on('data', (_data) => {
         // Handle stderr if needed but don't store it since it's not used
       });
       
@@ -327,11 +313,13 @@ export class ESLintRunner {
       const timeoutId = setTimeout(() => {
         eslint.kill('SIGKILL');
         if (progressInterval) clearInterval(progressInterval);
-        spinner.fail(chalk.red('ESLint check timed out (30s limit)'));
-        console.log(chalk.yellow('\nESLint is taking too long. Possible solutions:'));
-        console.log('  1. Add .eslintignore file to exclude unnecessary files');
-        console.log('  2. Check specific directories: ' + chalk.cyan('eslint src/'));
-        console.log('  3. Fix your .eslintrc configuration\n');
+        if (!silent) {
+          spinner?.fail(chalk.red('ESLint check timed out (30s limit)'));
+          console.log(chalk.yellow('\nESLint is taking too long. Possible solutions:'));
+          console.log('  1. Add .eslintignore file to exclude unnecessary files');
+          console.log('  2. Check specific directories: ' + chalk.cyan('eslint src/'));
+          console.log('  3. Fix your .eslintrc configuration\n');
+        }
         resolve({
           tool: 'ESLint',
           status: 'error',
@@ -347,12 +335,14 @@ export class ESLintRunner {
         clearTimeout(timeoutId);
         if (progressInterval) clearInterval(progressInterval);
         const duration = Date.now() - startTime;
-        const files = this.parseESLintOutput(output);
+        const files = usePackageScript ? 
+          this.parseESLintTextOutput(output) : 
+          this.parseESLintOutput(output);
         const errorCount = files.filter(f => f.severity === 'error').length;
         const warningCount = files.filter(f => f.severity === 'warning').length;
         
         if (code === 0) {
-          spinner.succeed(chalk.green('ESLint check passed'));
+          spinner?.succeed(chalk.green('ESLint check passed'));
           resolve({
             tool: 'ESLint',
             status: 'success',
@@ -362,7 +352,7 @@ export class ESLintRunner {
             duration
           });
         } else if (errorCount > 0) {
-          spinner.fail(chalk.red(`ESLint found ${errorCount} errors, ${warningCount} warnings`));
+          spinner?.fail(chalk.red(`ESLint found ${errorCount} errors, ${warningCount} warnings`));
           resolve({
             tool: 'ESLint',
             status: 'error',
@@ -372,7 +362,7 @@ export class ESLintRunner {
             duration
           });
         } else if (warningCount > 0) {
-          spinner.warn(chalk.yellow(`ESLint found ${warningCount} warnings`));
+          spinner?.warn(chalk.yellow(`ESLint found ${warningCount} warnings`));
           resolve({
             tool: 'ESLint',
             status: 'warning',
@@ -386,6 +376,29 @@ export class ESLintRunner {
     });
   }
   
+  private parseESLintTextOutput(output: string): FileIssue[] {
+    const issues: FileIssue[] = [];
+    const lines = output.split('\n');
+    
+    for (const line of lines) {
+      // Parse ESLint text format: filepath:line:column: level message [rule]
+      const match = line.match(/^(.+):(\d+):(\d+):\s+(error|warning)\s+(.+?)\s+(@\S+|\S+)$/);
+      if (match) {
+        const [, file, lineNum, column, level, message, rule] = match;
+        issues.push({
+          file: file.trim(),
+          line: parseInt(lineNum),
+          column: parseInt(column),
+          severity: level as 'error' | 'warning',
+          message: message.trim(),
+          rule: rule.replace(/[@\[\]]/g, '')
+        });
+      }
+    }
+    
+    return issues;
+  }
+
   private parseESLintOutput(output: string): FileIssue[] {
     const issues: FileIssue[] = [];
     
@@ -450,7 +463,7 @@ export class BuildRunner {
       const build = spawn(runner, ['run', 'build']);
       let errorOutput = '';
       
-      build.stdout.on('data', (data) => {
+      build.stdout.on('data', (_data) => {
         // Handle stdout if needed
       });
       

@@ -35,7 +35,7 @@ export class ClaudeUsageCommand {
       spinner.stop();
       if (process.stdout.isTTY) {
         // Clear spinner line completely
-        process.stdout.write('\r\x1b[2K');
+        process.stdout.write('\r\u001b[2K');
       }
 
       if (messages.length === 0) {

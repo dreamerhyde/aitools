@@ -4,28 +4,42 @@ import Table from 'cli-table3';
 import { TypeScriptRunner, ESLintRunner, BuildRunner, type CheckResult, type FileIssue } from '../utils/check-runners.js';
 import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
 import { TABLE_CHARS, DEFAULT_TABLE_STYLE } from '../utils/table-config.js';
+import type { TableCellConfig, TableHeaderConfig, TableConstructor } from '../types/cli-table.js';
 
 export class CheckCommand {
   private results: CheckResult[] = [];
   private tsRunner = new TypeScriptRunner();
   private eslintRunner = new ESLintRunner();
   private buildRunner = new BuildRunner();
+  private TableClass = Table as unknown as TableConstructor;
   
-  async executeWithResults(): Promise<any> {
+  async executeWithResults(): Promise<{
+    errors: number;
+    warnings: number;
+    details: Array<{
+      file: string;
+      message: string;
+      severity: string;
+    }>;
+  }> {
     const results = {
       errors: 0,
       warnings: 0,
-      details: [] as any[]
+      details: [] as Array<{
+        file: string;
+        message: string;
+        severity: string;
+      }>
     };
     
     try {
       // Run TypeScript check
-      const tsResult = await this.tsRunner.run();
+      const tsResult = await this.tsRunner.run(undefined, false);
       results.errors += tsResult.errors;
       results.warnings += tsResult.warnings;
       
       if (tsResult.files) {
-        tsResult.files.forEach((file: any) => {
+        tsResult.files.forEach((file) => {
           results.details.push({
             file: file.file,
             message: file.message || 'Type error',
@@ -35,12 +49,12 @@ export class CheckCommand {
       }
       
       // Run ESLint check
-      const eslintResult = await this.eslintRunner.run();
+      const eslintResult = await this.eslintRunner.run(false, undefined, false);
       results.errors += eslintResult.errors;
       results.warnings += eslintResult.warnings;
       
       if (eslintResult.files) {
-        eslintResult.files.forEach((file: any) => {
+        eslintResult.files.forEach((file) => {
           results.details.push({
             file: file.file,
             message: file.message || 'Lint error',
@@ -60,6 +74,7 @@ export class CheckCommand {
     eslint?: boolean; 
     all?: boolean;
     fix?: boolean;
+    showWarnings?: boolean;
   }): Promise<void> {
     console.log(chalk.bold('\nCode Quality Check'));
     console.log(chalk.hex('#303030')('─'.repeat(30)));
@@ -68,12 +83,12 @@ export class CheckCommand {
     
     // Determine which checks to run
     if (options.all || (!options.typescript && !options.eslint)) {
-      checks.push(() => this.tsRunner.run());
-      checks.push(() => this.eslintRunner.run(options.fix));
+      checks.push(() => this.tsRunner.run(undefined, false));
+      checks.push(() => this.eslintRunner.run(options.fix, undefined, false));
       checks.push(() => this.buildRunner.run());
     } else {
-      if (options.typescript) checks.push(() => this.tsRunner.run());
-      if (options.eslint) checks.push(() => this.eslintRunner.run(options.fix));
+      if (options.typescript) checks.push(() => this.tsRunner.run(undefined, false));
+      if (options.eslint) checks.push(() => this.eslintRunner.run(options.fix, undefined, false));
     }
     
     // Run all checks
@@ -83,37 +98,73 @@ export class CheckCommand {
     }
     
     // Display results
-    this.displaySummary();
-    this.displayDetailedResults();
+    this.displaySummary(options.showWarnings);
+    this.displayDetailedResults(options.showWarnings);
     // Suggestion is shown in displayDetailedResults() if there are issues
   }
   
-  async executeForAI(options: { targetFile?: string } = {}): Promise<void> {
+  async executeForAI(options: { targetFile?: string; showWarnings?: boolean } = {}): Promise<void> {
     console.log('Code Quality Issues:\n');
     
-    const tsResult = await this.tsRunner.run(options.targetFile);
-    const eslintResult = await this.eslintRunner.run(false, options.targetFile);
+    const tsResult = await this.tsRunner.run(options.targetFile, true); // Pass silent=true for AI mode
+    const eslintResult = await this.eslintRunner.run(false, options.targetFile, true); // Pass silent=true for AI mode
+    
+    // Filter issues based on showWarnings setting
+    const filterIssues = (files: FileIssue[]) => {
+      if (options.showWarnings) {
+        return files;
+      }
+      return files.filter(issue => issue.severity === 'error');
+    };
+
+    const filteredTsIssues = filterIssues(tsResult.files);
+    const filteredEslintIssues = filterIssues(eslintResult.files);
     
     // TypeScript Errors
-    if (tsResult.errors > 0 || tsResult.warnings > 0) {
-      console.log(`TypeScript Errors (${tsResult.errors + tsResult.warnings}):`);
-      tsResult.files.forEach(issue => {
+    if (filteredTsIssues.length > 0) {
+      const errorCount = filteredTsIssues.filter(i => i.severity === 'error').length;
+      const warningCount = filteredTsIssues.filter(i => i.severity === 'warning').length;
+      
+      let title = 'TypeScript';
+      if (options.showWarnings && warningCount > 0) {
+        title += ` (${errorCount} error${errorCount !== 1 ? 's' : ''}, ${warningCount} warning${warningCount !== 1 ? 's' : ''})`;
+      } else {
+        title += ` (${errorCount} error${errorCount !== 1 ? 's' : ''})`;
+      }
+      console.log(`${title}:`);
+      
+      filteredTsIssues.forEach(issue => {
         console.log(`- ${issue.file}${issue.line ? ':' + issue.line : ''}: ${issue.message}`);
       });
       console.log();
     }
     
     // ESLint Issues
-    if (eslintResult.errors > 0 || eslintResult.warnings > 0) {
-      console.log(`ESLint Issues (${eslintResult.errors + eslintResult.warnings}):`);
-      eslintResult.files.forEach(issue => {
+    if (filteredEslintIssues.length > 0) {
+      const errorCount = filteredEslintIssues.filter(i => i.severity === 'error').length;
+      const warningCount = filteredEslintIssues.filter(i => i.severity === 'warning').length;
+      
+      let title = 'ESLint';
+      if (options.showWarnings && warningCount > 0) {
+        title += ` (${errorCount} error${errorCount !== 1 ? 's' : ''}, ${warningCount} warning${warningCount !== 1 ? 's' : ''})`;
+      } else {
+        title += ` (${errorCount} error${errorCount !== 1 ? 's' : ''})`;
+      }
+      console.log(`${title}:`);
+      
+      filteredEslintIssues.forEach(issue => {
         console.log(`- ${issue.file}${issue.line ? ':' + issue.line : ''}: ${issue.message}`);
       });
       console.log();
     }
     
-    if (tsResult.errors === 0 && eslintResult.errors === 0 && 
-        tsResult.warnings === 0 && eslintResult.warnings === 0) {
+    const hasErrors = filteredTsIssues.some(i => i.severity === 'error') || 
+                     filteredEslintIssues.some(i => i.severity === 'error');
+    const hasWarnings = options.showWarnings && 
+                       (filteredTsIssues.some(i => i.severity === 'warning') || 
+                        filteredEslintIssues.some(i => i.severity === 'warning'));
+    
+    if (!hasErrors && !hasWarnings) {
       console.log('No issues found - code quality is good.');
     } else {
       // For AI: plain text without formatting
@@ -121,29 +172,38 @@ export class CheckCommand {
       
       // Also output summary to stderr for user to see in Claude Code terminal
       console.error(chalk.yellow('\n⚠ Code Quality Issues'));
-      if (tsResult.errors > 0) {
-        console.error(chalk.red(`  TypeScript: ${tsResult.errors} errors`));
+      
+      const tsErrors = filteredTsIssues.filter(i => i.severity === 'error').length;
+      if (tsErrors > 0) {
+        console.error(chalk.red(`  TypeScript: ${tsErrors} error${tsErrors !== 1 ? 's' : ''}`));
       }
-      if (eslintResult.errors > 0 || eslintResult.warnings > 0) {
-        console.error(chalk.gray(`  ESLint: ${eslintResult.errors} errors, ${eslintResult.warnings} warnings`));
+      
+      const eslintErrors = filteredEslintIssues.filter(i => i.severity === 'error').length;
+      const eslintWarnings = filteredEslintIssues.filter(i => i.severity === 'warning').length;
+      
+      if (eslintErrors > 0 || (options.showWarnings && eslintWarnings > 0)) {
+        const parts = [];
+        if (eslintErrors > 0) parts.push(`${eslintErrors} error${eslintErrors !== 1 ? 's' : ''}`);
+        if (options.showWarnings && eslintWarnings > 0) parts.push(`${eslintWarnings} warning${eslintWarnings !== 1 ? 's' : ''}`);
+        console.error(chalk.gray(`  ESLint: ${parts.join(', ')}`));
       }
     }
   }
   
-  private displaySummary(): void {
+  private displaySummary(showWarnings = false): void {
     console.log('\n' + chalk.bold('Check Summary'));
     console.log(chalk.hex('#303030')('─'.repeat(30)));
     
-    const table = new Table({
+    const table = new this.TableClass({
       head: [
-        { content: 'Tool', hAlign: 'right' } as any,
-        { content: 'Status', hAlign: 'center' } as any, 
-        { content: 'Errors', hAlign: 'center' } as any,
-        { content: 'Warnings', hAlign: 'center' } as any,
-        { content: 'Duration', hAlign: 'center' } as any
+        { content: 'Tool', hAlign: 'right' } as TableHeaderConfig,
+        { content: 'Status', hAlign: 'center' } as TableHeaderConfig, 
+        { content: 'Errors', hAlign: 'center' } as TableHeaderConfig,
+        ...(showWarnings ? [{ content: 'Warnings', hAlign: 'center' } as TableHeaderConfig] : []),
+        { content: 'Duration', hAlign: 'center' } as TableHeaderConfig
       ],
-      colWidths: [15, 12, 10, 10, 12],
-      style: DEFAULT_TABLE_STYLE as any,
+      colWidths: showWarnings ? [15, 12, 10, 10, 12] : [15, 12, 10, 12],
+      style: DEFAULT_TABLE_STYLE,
       chars: TABLE_CHARS
     });
     
@@ -166,38 +226,54 @@ export class CheckCommand {
         result.status === 'error' ? chalk.red('Failed') :
         chalk.gray('Skipped');
       
-      table.push([
-        { content: result.tool, hAlign: 'right' } as any,
-        { content: `${statusIcon} ${status}`, hAlign: 'center' } as any,
-        { content: result.errors > 0 ? chalk.red(result.errors.toString()) : chalk.green('0'), hAlign: 'right' } as any,
-        { content: result.warnings > 0 ? chalk.yellow(result.warnings.toString()) : chalk.green('0'), hAlign: 'right' } as any,
-        { content: result.duration ? `${(result.duration / 1000).toFixed(2)}s` : '-', hAlign: 'right' } as any
-      ]);
+      const row = [
+        { content: result.tool, hAlign: 'right' } as TableCellConfig,
+        { content: `${statusIcon} ${status}`, hAlign: 'center' } as TableCellConfig,
+        { content: result.errors > 0 ? chalk.red(result.errors.toString()) : chalk.green('0'), hAlign: 'right' } as TableCellConfig,
+      ];
+      
+      if (showWarnings) {
+        row.push({ content: result.warnings > 0 ? chalk.yellow(result.warnings.toString()) : chalk.green('0'), hAlign: 'right' } as TableCellConfig);
+      }
+      
+      row.push({ content: result.duration ? `${(result.duration / 1000).toFixed(2)}s` : '-', hAlign: 'right' } as TableCellConfig);
+      
+      table.push(row);
     }
     
     // Add totals row
-    table.push([
-      { content: chalk.bold('Total'), hAlign: 'right' } as any,
-      { content: '', hAlign: 'center' } as any,
-      { content: totalErrors > 0 ? chalk.red.bold(totalErrors.toString()) : chalk.green.bold('0'), hAlign: 'right' } as any,
-      { content: totalWarnings > 0 ? chalk.yellow.bold(totalWarnings.toString()) : chalk.green.bold('0'), hAlign: 'right' } as any,
-      { content: '', hAlign: 'right' } as any
-    ]);
+    const totalRow = [
+      { content: chalk.bold('Total'), hAlign: 'right' } as TableCellConfig,
+      { content: '', hAlign: 'center' } as TableCellConfig,
+      { content: totalErrors > 0 ? chalk.red.bold(totalErrors.toString()) : chalk.green.bold('0'), hAlign: 'right' } as TableCellConfig,
+    ];
+    
+    if (showWarnings) {
+      totalRow.push({ content: totalWarnings > 0 ? chalk.yellow.bold(totalWarnings.toString()) : chalk.green.bold('0'), hAlign: 'right' } as TableCellConfig);
+    }
+    
+    totalRow.push({ content: '', hAlign: 'right' } as TableCellConfig);
+    
+    table.push(totalRow);
     
     console.log(table.toString());
     
     // Overall status
     console.log();
-    if (totalErrors === 0 && totalWarnings === 0) {
+    if (totalErrors === 0 && (showWarnings ? totalWarnings === 0 : true)) {
       console.log(chalk.green.bold('✓ All checks passed successfully!'));
     } else if (totalErrors > 0) {
-      console.log(chalk.red.bold(`✗ Found ${totalErrors} errors and ${totalWarnings} warnings`));
-    } else {
+      if (showWarnings && totalWarnings > 0) {
+        console.log(chalk.red.bold(`✗ Found ${totalErrors} errors and ${totalWarnings} warnings`));
+      } else {
+        console.log(chalk.red.bold(`✗ Found ${totalErrors} errors`));
+      }
+    } else if (showWarnings && totalWarnings > 0) {
       console.log(chalk.yellow.bold(`▪ Found ${totalWarnings} warnings`));
     }
   }
   
-  private displayDetailedResults(): void {
+  private displayDetailedResults(showWarnings = false): void {
     const hasDetailedIssues = this.results.some(r => r.files.length > 0);
     
     if (hasDetailedIssues) {
@@ -209,6 +285,11 @@ export class CheckCommand {
       
       for (const result of this.results) {
         for (const issue of result.files) {
+          // Filter out warnings if not requested
+          if (!showWarnings && issue.severity === 'warning') {
+            continue;
+          }
+          
           if (!fileGroups.has(issue.file)) {
             fileGroups.set(issue.file, []);
           }
@@ -227,10 +308,12 @@ export class CheckCommand {
         // File header
         const fileLabel = chalk.cyan(file);
         const counts = [];
-        if (errorCount > 0) counts.push(chalk.red(`${errorCount} errors`));
-        if (warningCount > 0) counts.push(chalk.yellow(`${warningCount} warnings`));
+        if (errorCount > 0) counts.push(chalk.red(`${errorCount} error${errorCount > 1 ? 's' : ''}`));
+        if (showWarnings && warningCount > 0) counts.push(chalk.yellow(`${warningCount} warning${warningCount > 1 ? 's' : ''}`));
         
-        console.log(`\n${fileLabel} ${chalk.dim(`(${counts.join(', ')})`)}`);
+        if (counts.length > 0) {
+          console.log(`\n${fileLabel} ${chalk.dim(`(${counts.join(', ')})`)}`);
+        }
         
         // Sort issues by line number
         const sortedIssues = issues.sort((a, b) => (a.line || 0) - (b.line || 0));

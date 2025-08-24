@@ -162,7 +162,7 @@ export function setupProcessCommand(program: Command): void {
         const termWidth = process.stdout.columns || 120;
         const commandWidth = Math.max(50, termWidth - 40);
         
-        const processOptions = targetProcesses.slice(0, 30).map((proc, index) => {
+        const processOptions = targetProcesses.slice(0, 30).map((proc) => {
           const shortCmd = proc.command.length > commandWidth ? 
             proc.command.substring(0, commandWidth - 3) + '...' : 
             proc.command;
@@ -245,7 +245,7 @@ export function setupProcessCommand(program: Command): void {
     .command('hooks')
     .description('Show hook-related processes')
     .option('--all', 'Show all hook processes including normal ones')
-    .action(async (options) => {
+    .action(async (_options) => {
       try {
         const processMonitor = new ProcessMonitor();
         const processes = await processMonitor.getAllProcesses();

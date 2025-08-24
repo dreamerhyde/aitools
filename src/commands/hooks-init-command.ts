@@ -144,7 +144,7 @@ export class HooksInitCommand {
     // 3. Check if user ran via npx/bunx (detect from process.argv)
     // 4. Try bunx/npx as fallback
     
-    const { execSync } = require('child_process');
+    const { execSync } = await import('child_process');
     
     // Helper to check if a command exists
     const commandExists = async (cmd: string): Promise<boolean> => {

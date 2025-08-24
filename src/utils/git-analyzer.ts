@@ -131,11 +131,10 @@ export class GitAnalyzer {
       const { stdout: nameStatus } = await execAsync('git diff HEAD --name-status 2>/dev/null || echo ""');
       const statusLines = nameStatus.trim().split('\n').filter(l => l);
       
-      let added = 0, modified = 0, deleted = 0;
+      let modified = 0, deleted = 0;
       statusLines.forEach(line => {
         const status = line.charAt(0);
-        if (status === 'A') added++;
-        else if (status === 'M') modified++;
+        if (status === 'M') modified++;
         else if (status === 'D') deleted++;
       });
       

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import ora from 'ora';
@@ -18,7 +18,6 @@ export class ESLintV9Runner {
       let hasGlobalEslint = false;
       let globalEslintVersion = '';
       try {
-        const { execSync } = require('child_process');
         execSync('which eslint', { stdio: 'ignore' });
         hasGlobalEslint = true;
         // Check version to determine if it's v9+
@@ -142,9 +141,13 @@ export class ESLintV9Runner {
             setTimeout(() => {
               try {
                 eslintProcess.kill('SIGKILL');
-              } catch {}
+              } catch {
+                // Ignore kill errors
+              }
             }, 1000);
-          } catch {}
+          } catch {
+            // Ignore process kill errors
+          }
         }
       };
       

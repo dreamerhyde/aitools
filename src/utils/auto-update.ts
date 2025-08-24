@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import chalk from 'chalk';
@@ -79,7 +79,7 @@ export class AutoUpdateChecker {
     try {
       const configDir = join(homedir(), '.aitools');
       if (!existsSync(configDir)) {
-        const { mkdirSync } = require('fs');
+        // mkdirSync imported at top
         mkdirSync(configDir, { recursive: true });
       }
       
@@ -146,7 +146,7 @@ export class AutoUpdateChecker {
       
       const configDir = join(homedir(), '.aitools');
       if (!existsSync(configDir)) {
-        const { mkdirSync } = require('fs');
+        // mkdirSync imported at top
         mkdirSync(configDir, { recursive: true });
       }
       
@@ -168,7 +168,7 @@ export class AutoUpdateChecker {
       
       const configDir = join(homedir(), '.aitools');
       if (!existsSync(configDir)) {
-        const { mkdirSync } = require('fs');
+        // mkdirSync imported at top
         mkdirSync(configDir, { recursive: true });
       }
       

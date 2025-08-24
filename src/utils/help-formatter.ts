@@ -4,7 +4,10 @@ import { Command } from 'commander';
 export class HelpFormatter {
   // Strip ANSI color codes to calculate real string length
   private static stripAnsi(str: string): string {
-    return str.replace(/\x1b\[[0-9;]*m/g, '');
+    // Use string escape instead of regex control character
+    const ansiEscape = String.fromCharCode(27);
+    const ansiRegex = new RegExp(`${ansiEscape}\\[[0-9;]*m`, 'g');
+    return str.replace(ansiRegex, '');
   }
   
   // Generate tree-structured help with proper alignment
@@ -23,7 +26,7 @@ export class HelpFormatter {
       const commands = program.commands.filter(cmd => cmd.name() !== 'help');
       const descStartCol = 45; // Fixed column for descriptions
       
-      commands.forEach((cmd, index) => {
+      commands.forEach((cmd) => {
         const isLast = false; // Never make commands the last item since we add help manually
         const prefix = chalk.gray(isLast ? '└─' : '├─');
         

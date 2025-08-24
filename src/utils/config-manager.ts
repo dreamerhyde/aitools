@@ -4,7 +4,6 @@ import { parse, stringify } from 'smol-toml';
 import * as dotenv from 'dotenv';
 import { AiToolsConfig, defaultConfig } from '../types/config.js';
 import { UIHelper } from './ui.js';
-import chalk from 'chalk';
 
 export class ConfigManager {
   private static CONFIG_DIR = '.aitools';

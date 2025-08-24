@@ -16,7 +16,6 @@ export function setupHooksCommand(program: Command): void {
         // Show current hook configuration
         const fs = await import('fs/promises');
         const path = await import('path');
-        const os = await import('os');
         
         console.log(chalk.bold.cyan('Claude Code Hooks Configuration'));
         console.log('─'.repeat(50));
@@ -91,11 +90,10 @@ export function setupHooksCommand(program: Command): void {
     .command('list')
     .description('List all configured Claude Code hooks')
     .option('-v, --verbose', 'Show hook commands and matchers')
-    .action(async (options) => {
+    .action(async (_options) => {
       try {
         const fs = await import('fs/promises');
         const path = await import('path');
-        const os = await import('os');
         
         console.log(chalk.bold.cyan('Claude Code Hooks Details'));
         console.log('─'.repeat(50));

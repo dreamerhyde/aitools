@@ -1,8 +1,6 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
 import { UpgradeCommand } from '../commands/upgrade.js';
 import { UIHelper } from '../utils/ui.js';
-import { AutoUpdateChecker } from '../utils/auto-update.js';
 
 export function setupBasicCommands(program: Command): void {
 

@@ -25,4 +25,4 @@ export const TABLE_CHARS = {
 export const DEFAULT_TABLE_STYLE = {
   head: ['cyan'],
   border: ['gray']
-} as const;
+};
