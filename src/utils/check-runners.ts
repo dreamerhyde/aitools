@@ -316,7 +316,7 @@ export class ESLintRunner {
       spinner.text = `ESLint (${statusText}): checking ${fileCount} files...`;
       
       // Add simple progress indicator with elapsed time
-      let progressInterval = setInterval(() => {
+      const progressInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         const estimatedProgress = Math.min(90, elapsed * 8); // Roughly 8% per second
         spinner.text = `ESLint (${statusText}): ${estimatedProgress}% (${elapsed}s of ~${Math.ceil(fileCount/6)}s)`;

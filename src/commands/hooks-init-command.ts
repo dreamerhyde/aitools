@@ -18,7 +18,6 @@ export class HooksInitCommand {
   }
 
   async execute(options: { 
-    global?: boolean;
     force?: boolean;
   } = {}): Promise<void> {
     try {
@@ -31,10 +30,7 @@ export class HooksInitCommand {
       await this.configManager.load();
       const config = this.configManager.getConfig();
 
-      const isGlobal = options.global || false;
-      const targetDir = isGlobal 
-        ? path.join(process.env.HOME || '', '.claude')
-        : this.projectClaudeDir;
+      const targetDir = this.projectClaudeDir;
 
       // Check if .claude directory exists
       try {
@@ -48,7 +44,7 @@ export class HooksInitCommand {
       const commandMethod = await this.updateClaudeSettings(settingsPath, config, options);
 
       console.log();
-      UIHelper.showSuccess(`${isGlobal ? 'Global' : 'Project'} hooks configured successfully!`);
+      UIHelper.showSuccess('Project hooks configured successfully!');
       
       console.log();
       console.log(chalk.bold('Hooks configured:'));
@@ -59,7 +55,7 @@ export class HooksInitCommand {
       if (slackWebhook && !slackWebhook.includes('YOUR/WEBHOOK/URL')) {
         console.log(chalk.green(`  • Slack notifications enabled`));
       } else {
-        console.log(chalk.yellow(`  • Slack webhook not configured (set SLACK_WEBHOOK_URL env var)`));
+        console.log(chalk.yellow(`  • Slack webhook not configured (set SLACK_WEBHOOK_URL in .env)`));
       }
 
       console.log();
@@ -94,10 +90,6 @@ export class HooksInitCommand {
         console.log(chalk.blue(`Using: Development mode`));
       }
 
-      if (!isGlobal) {
-        console.log();
-        console.log(chalk.yellow('Note: Project hooks override global hooks'));
-      }
 
     } catch (error) {
       UIHelper.showError(`Failed to initialize hooks: ${error}`);
@@ -226,7 +218,7 @@ export class HooksInitCommand {
     };
     
     // 1. First priority: Check for aitools alias
-    let resolvedCommand = await resolveAlias('aitools');
+    const resolvedCommand = await resolveAlias('aitools');
     
     if (resolvedCommand) {
       // Found an alias, use the resolved path

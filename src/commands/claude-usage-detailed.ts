@@ -284,7 +284,7 @@ export class DetailedUsageDisplay {
     console.log(chalk.dim('      └' + '─'.repeat(Math.min(chartWidth, 120))));
     
     // Show day numbers aligned with bars (slightly shifted right for better centering)
-    let dateRow = '       '; // 7 spaces for Y-axis alignment (one extra for shift)
+    const dateRow = '       '; // 7 spaces for Y-axis alignment (one extra for shift)
     
     // Create array to hold exact character positions
     const dateChars: string[] = new Array(chartWidth + 1).fill(' ');

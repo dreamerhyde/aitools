@@ -58,27 +58,6 @@ export function setupHooksCommand(program: Command): void {
           console.log(chalk.gray('  ○ No project hooks configured'));
         }
         
-        // Check global settings
-        const globalSettings = path.join(os.homedir(), '.claude', 'settings.json');
-        
-        console.log(chalk.blue('\n● Global Configuration:'));
-        hasHooks = false;
-        try {
-          const settings = JSON.parse(await fs.readFile(globalSettings, 'utf-8'));
-          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
-            hasHooks = true;
-            console.log(`  → ${chalk.cyan('~/.claude/settings.json')}`);
-            for (const hookType of Object.keys(settings.hooks)) {
-              console.log(`     ${chalk.gray('▪')} ${hookType}`);
-            }
-          }
-        } catch {
-          // No global settings
-        }
-        
-        if (!hasHooks) {
-          console.log(chalk.gray('  ○ No global hooks configured'));
-        }
         
         console.log(chalk.gray('\nAvailable Hook Types:'));
         console.log('  PreToolUse, PostToolUse, UserPromptSubmit, Stop,');
@@ -93,14 +72,12 @@ export function setupHooksCommand(program: Command): void {
   // hooks init subcommand - Setup Claude Code hooks
   hooksCommand
     .command('init')
-    .description('Initialize Claude Code hooks for your project')
-    .option('-g, --global', 'Setup global hooks instead of project hooks')
+    .description('Initialize Claude Code hooks for current project')
     .option('-f, --force', 'Overwrite existing hooks')
     .action(async (options) => {
       try {
         const hooksInit = new HooksInitCommand();
         await hooksInit.execute({
-          global: options.global,
           force: options.force
         });
       } catch (error) {
@@ -179,26 +156,6 @@ export function setupHooksCommand(program: Command): void {
           console.log(chalk.gray('  ○ No project hooks configured'));
         }
         
-        // Check global settings
-        console.log(chalk.blue('\n● Global Hooks:'));
-        let hasGlobalHooks = false;
-        
-        const globalSettings = path.join(os.homedir(), '.claude', 'settings.json');
-        try {
-          const settings = JSON.parse(await fs.readFile(globalSettings, 'utf-8'));
-          if (settings.hooks && Object.keys(settings.hooks).length > 0) {
-            hasGlobalHooks = true;
-            console.log(`  ${chalk.blue('From ~/.claude/settings.json:')}`);
-            displayHooks(settings.hooks, '    ');
-          }
-        } catch {
-          // No global settings
-        }
-        
-        if (!hasGlobalHooks) {
-          console.log(chalk.gray('  ○ No global hooks configured'));
-        }
-        
         if (totalHooks === 0) {
           console.log(chalk.yellow('\n▪ Tip: Use "ai hooks init" to set up Claude Code hooks'));
         } else {
@@ -208,59 +165,6 @@ export function setupHooksCommand(program: Command): void {
         UIHelper.showError(`Failed to list hooks: ${error}`);
         process.exit(1);
       }
-    });
-
-  // hooks start subcommand - Track task start time
-  hooksCommand
-    .command('start')
-    .description('Track task start time (for Claude Code SessionStart hook)')
-    .action(async () => {
-      try {
-        const { NotificationManager } = await import('../utils/notification-manager.js');
-        
-        // Try to read session ID from stdin if available
-        let sessionId: string | undefined;
-        if (!process.stdin.isTTY) {
-          try {
-            const chunks: Buffer[] = [];
-            process.stdin.setEncoding('utf8');
-            
-            const timeoutPromise = new Promise<string>((_, reject) => {
-              setTimeout(() => reject(new Error('Stdin read timeout')), 500);
-            });
-            
-            const readPromise = (async () => {
-              for await (const chunk of process.stdin) {
-                chunks.push(Buffer.from(chunk));
-              }
-              return Buffer.concat(chunks).toString();
-            })();
-            
-            const stdinData = await Promise.race([readPromise, timeoutPromise]) as string;
-            if (stdinData.trim()) {
-              const hookData = JSON.parse(stdinData);
-              sessionId = hookData.session_id;
-            }
-          } catch {
-            // Ignore stdin errors
-          }
-        }
-        
-        const notificationManager = new NotificationManager(sessionId);
-        await notificationManager.startTracking();
-        
-        // Silent by default for hooks - no output
-        if (process.env.DEBUG) {
-          console.log(chalk.gray(`[DEBUG] Task start time recorded${sessionId ? ` for session ${sessionId}` : ''}`));
-        }
-      } catch (error) {
-        // Hooks should never fail - just log if DEBUG is set
-        if (process.env.DEBUG) {
-          console.error(chalk.gray(`[DEBUG] Start tracking: ${error}`));
-        }
-      }
-      // Always exit successfully for hooks
-      process.exit(0);
     });
 
   // hooks notify subcommand - Send task completion notification from hooks
@@ -408,54 +312,5 @@ export function setupHooksCommand(program: Command): void {
       }
       // Always exit successfully for hooks
       process.exit(0);
-    });
-
-  // hooks remove subcommand - Remove hooks
-  hooksCommand
-    .command('remove')
-    .description('Remove Claude Code hooks')
-    .option('-g, --global', 'Remove global hooks')
-    .option('-p, --project', 'Remove project hooks')
-    .action(async (options) => {
-      try {
-        const fs = await import('fs/promises');
-        const path = await import('path');
-        const os = await import('os');
-        
-        let removed = 0;
-        
-        // Remove project hooks if requested or by default
-        if (options.project || (!options.global && !options.project)) {
-          const projectHooksDir = path.join(process.cwd(), '.claude', 'hooks');
-          try {
-            await fs.rm(projectHooksDir, { recursive: true });
-            console.log(chalk.green('✓ Removed project hooks'));
-            removed++;
-          } catch {
-            console.log(chalk.gray('○ No project hooks to remove'));
-          }
-        }
-        
-        // Remove global hooks if requested
-        if (options.global) {
-          const globalHooksDir = path.join(os.homedir(), '.claude', 'hooks');
-          try {
-            await fs.rm(globalHooksDir, { recursive: true });
-            console.log(chalk.green('✓ Removed global hooks'));
-            removed++;
-          } catch {
-            console.log(chalk.gray('○ No global hooks to remove'));
-          }
-        }
-        
-        if (removed > 0) {
-          UIHelper.showSuccess('Hooks removed successfully');
-        } else {
-          console.log(chalk.gray('No hooks to remove'));
-        }
-      } catch (error) {
-        UIHelper.showError(`Failed to remove hooks: ${error}`);
-        process.exit(1);
-      }
     });
 }

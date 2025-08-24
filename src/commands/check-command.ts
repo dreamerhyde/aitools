@@ -423,6 +423,8 @@ export class CheckCommand {
     if (tsResult.errors === 0 && eslintResult.errors === 0 && 
         tsResult.warnings === 0 && eslintResult.warnings === 0) {
       console.log('No issues found - code quality is good.');
+    } else {
+      console.log('\nPlease fix the issues above. Consider using --fix flag for auto-fixable ESLint issues.');
     }
   }
   
@@ -568,13 +570,13 @@ export class CheckCommand {
     console.log(chalk.hex('#303030')('─'.repeat(30)));
     
     if (this.results.some(r => r.tool === 'ESLint' && r.errors > 0)) {
-      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools check --fix') + ' to automatically fix some ESLint issues');
+      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint --fix') + ' to automatically fix some ESLint issues');
     }
     
     if (this.results.some(r => r.tool === 'TypeScript' && r.errors > 0)) {
       console.log(chalk.yellow('▪') + ' Fix TypeScript errors to ensure type safety');
     }
     
-    console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools check --all') + ' to run all available checks');
+    console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint') + ' to run TypeScript and ESLint checks');
   }
 }

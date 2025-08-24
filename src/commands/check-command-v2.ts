@@ -178,14 +178,14 @@ export class CheckCommand {
     console.log(chalk.dim('─'.repeat(40)));
     
     if (this.results.some(r => r.tool === 'ESLint' && r.errors > 0)) {
-      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools check --eslint --fix') + ' to automatically fix ESLint issues');
+      console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint --fix') + ' to automatically fix ESLint issues');
     }
     
     if (this.results.some(r => r.tool === 'TypeScript' && r.errors > 0)) {
       console.log(chalk.yellow('▪') + ' Fix TypeScript errors to ensure type safety');
     }
     
-    console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools check --all') + ' to run all available checks');
+    console.log(chalk.yellow('▪') + ' Run ' + chalk.cyan('aitools lint') + ' to run TypeScript and ESLint checks');
     console.log(chalk.yellow('▪') + ' Use ' + chalk.cyan('aitools health') + ' to check file complexity and size');
   }
 }

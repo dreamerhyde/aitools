@@ -294,7 +294,7 @@ export class UIHelper {
       // DD-HH:MM:SS format
       const days = parseInt(parts[0]);
       const hours = parseInt(parts[1]);
-      const minutes = parseInt(parts[2]);
+      // const minutes = parseInt(parts[2]); // unused variable
       if (days === 1) {
         return `1 day ${hours}h`;
       } else {
