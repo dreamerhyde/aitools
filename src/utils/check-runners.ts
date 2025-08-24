@@ -3,7 +3,7 @@ import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import ora from 'ora';
-// GitignoreHelper import removed as it's no longer used
+import { parseTypeScriptOutput, parseESLintOutput, parseESLintTextOutput } from './check-formatters.js';
 
 export interface CheckResult {
   tool: string;
@@ -120,7 +120,7 @@ export class TypeScriptRunner {
         if (progressInterval) clearInterval(progressInterval);
         
         const duration = Date.now() - startTime;
-        const files = this.parseTypeScriptOutput(output + errorOutput);
+        const files = parseTypeScriptOutput(output, errorOutput);
         const errorCount = files.filter(f => f.severity === 'error').length;
         const warningCount = files.filter(f => f.severity === 'warning').length;
         
@@ -149,26 +149,6 @@ export class TypeScriptRunner {
     });
   }
   
-  private parseTypeScriptOutput(output: string): FileIssue[] {
-    const issues: FileIssue[] = [];
-    const lines = output.split('\n');
-    
-    for (const line of lines) {
-      const match = line.match(/^(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+TS\d+:\s+(.+)/);
-      if (match) {
-        issues.push({
-          file: match[1],
-          line: parseInt(match[2]),
-          column: parseInt(match[3]),
-          severity: match[4] as 'error' | 'warning',
-          message: match[5],
-          rule: match[0].match(/TS(\d+)/)?.[1] ? `TS${match[0].match(/TS(\d+)/)?.[1]}` : undefined
-        });
-      }
-    }
-    
-    return issues;
-  }
 }
 
 export class ESLintRunner {
@@ -324,8 +304,8 @@ export class ESLintRunner {
         if (progressInterval) clearInterval(progressInterval);
         const duration = Date.now() - startTime;
         const files = usePackageScript ? 
-          this.parseESLintTextOutput(output) : 
-          this.parseESLintOutput(output);
+          parseESLintTextOutput(output) : 
+          parseESLintOutput(output);
         const errorCount = files.filter(f => f.severity === 'error').length;
         const warningCount = files.filter(f => f.severity === 'warning').length;
         
@@ -375,53 +355,6 @@ export class ESLintRunner {
     });
   }
   
-  private parseESLintTextOutput(output: string): FileIssue[] {
-    const issues: FileIssue[] = [];
-    const lines = output.split('\n');
-    
-    for (const line of lines) {
-      // Parse ESLint text format: filepath:line:column: level message [rule]
-      const match = line.match(/^(.+):(\d+):(\d+):\s+(error|warning)\s+(.+?)\s+(@\S+|\S+)$/);
-      if (match) {
-        const [, file, lineNum, column, level, message, rule] = match;
-        issues.push({
-          file: file.trim(),
-          line: parseInt(lineNum),
-          column: parseInt(column),
-          severity: level as 'error' | 'warning',
-          message: message.trim(),
-          rule: rule.replace(/[@[\]]/g, '')
-        });
-      }
-    }
-    
-    return issues;
-  }
-
-  private parseESLintOutput(output: string): FileIssue[] {
-    const issues: FileIssue[] = [];
-    
-    try {
-      const results = JSON.parse(output);
-      
-      for (const file of results) {
-        for (const message of file.messages) {
-          issues.push({
-            file: file.filePath,
-            line: message.line,
-            column: message.column,
-            severity: message.severity === 2 ? 'error' : 'warning',
-            message: message.message,
-            rule: message.ruleId
-          });
-        }
-      }
-    } catch (e) {
-      // Fallback to text parsing if JSON fails
-    }
-    
-    return issues;
-  }
 }
 
 export class BuildRunner {

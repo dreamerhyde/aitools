@@ -40,13 +40,14 @@ export class PricingFetcher {
 
       for (const [modelName, modelData] of Object.entries(data)) {
         if (typeof modelData === 'object' && modelData !== null) {
+          const typedModelData = modelData as ModelPricing;
           pricing.set(modelName, {
-            input_cost_per_token: modelData.input_cost_per_token,
-            output_cost_per_token: modelData.output_cost_per_token,
-            cache_creation_input_token_cost: modelData.cache_creation_input_token_cost,
-            cache_read_input_token_cost: modelData.cache_read_input_token_cost,
-            max_input_tokens: modelData.max_input_tokens,
-            max_tokens: modelData.max_tokens,
+            input_cost_per_token: typedModelData.input_cost_per_token,
+            output_cost_per_token: typedModelData.output_cost_per_token,
+            cache_creation_input_token_cost: typedModelData.cache_creation_input_token_cost,
+            cache_read_input_token_cost: typedModelData.cache_read_input_token_cost,
+            max_input_tokens: typedModelData.max_input_tokens,
+            max_tokens: typedModelData.max_tokens,
           });
         }
       }
