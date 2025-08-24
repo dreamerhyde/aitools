@@ -115,7 +115,6 @@ export class JSONLParser {
           }
         });
 
-        rl.on('close', () => resolve());
         rl.on('error', (error) => {
           console.warn(`Error reading file ${filePath}:`, error.message);
           reject(error);
@@ -195,73 +194,33 @@ export class JSONLParser {
     return `${messageId}:${requestId}`;
   }
 
-  private formatDate(dateStr: string, timezone?: string): string {
-    // Format date like CCUsage using Intl.DateTimeFormat
-    const date = new Date(dateStr);
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      timeZone: timezone
-    });
-    return formatter.format(date);
-  }
 
   private async extractMessage(entry: any): Promise<ConversationMessage | null> {
     try {
-      const isToday = entry.timestamp?.startsWith('2025-08-24');
-      let debugStep = '';
-      
-      // Follow CCUsage's exact validation logic from usageDataSchema
-      // Required fields:
-      // 1. timestamp (ISO string)
-      // 2. message.usage with input_tokens and output_tokens
-      // 3. message.model (optional in schema but we need it)
-      // 4. requestId (optional in schema but helps with deduplication)
-      
       // Validate required fields like CCUsage does
       if (!entry.timestamp || typeof entry.timestamp !== 'string') {
-        if (process.env.DEBUG && isToday) console.log('DEBUG: Today message filtered - no timestamp');
         return null;
       }
-      debugStep = 'timestamp OK';
       
-      // Skip non-assistant messages first - only assistant messages have usage data
+      // Skip non-assistant messages - only assistant messages have usage data
       if (entry.type && entry.type !== 'assistant') {
-        if (process.env.DEBUG && isToday) console.log(`DEBUG: Today message filtered - wrong type: ${entry.type}`);
         return null;
       }
-      debugStep = 'type OK';
       
       if (!entry.message?.usage) {
-        if (process.env.DEBUG && isToday) {
-          console.log('DEBUG: Today message filtered - no usage');
-          console.log('  entry.message exists:', !!entry.message);
-          console.log('  entry.message.usage exists:', !!entry.message?.usage);
-        }
         return null;
       }
-      debugStep = 'usage OK';
       
       const usage = entry.message.usage;
       if (typeof usage.input_tokens !== 'number' || typeof usage.output_tokens !== 'number') {
-        if (process.env.DEBUG && isToday) {
-          console.log('DEBUG: Today message filtered - invalid token types');
-          console.log('  input_tokens:', usage.input_tokens, typeof usage.input_tokens);
-          console.log('  output_tokens:', usage.output_tokens, typeof usage.output_tokens);
-          console.log('  usage object:', JSON.stringify(usage, null, 2));
-        }
         return null;
       }
-      debugStep = 'tokens OK';
       
       // Model is optional in CCUsage schema but required for our calculations
       const model = entry.message?.model;
       if (!model || typeof model !== 'string') {
-        if (process.env.DEBUG && isToday) console.log('DEBUG: Today message filtered - no model');
         return null;
       }
-      debugStep = 'model OK';
       
       // Extract token usage exactly like CCUsage
       // The top-level cache_creation_input_tokens and cache_read_input_tokens 

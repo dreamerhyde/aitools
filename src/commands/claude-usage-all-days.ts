@@ -20,8 +20,19 @@ export class AllDaysUsageDisplay {
         'Total Tokens',
         'Cost (USD)'
       ],
-      // Adjusted column widths for better display
-      colWidths: [12, 10, 18, 10, 10, 13, 13, 13, 12],
+      // Remove fixed widths to allow automatic sizing
+      // colWidths will be calculated automatically based on content
+      colAligns: [
+        'left',   // Date
+        'center', // Sessions (置中)
+        'left',   // Models
+        'right',  // Input
+        'right',  // Output
+        'right',  // Cache Create
+        'right',  // Cache Read
+        'right',  // Total Tokens
+        'right'   // Cost
+      ],
       style: { 
         head: ['cyan'],
         border: ['gray']
