@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { Separator } from './separator.js';
 
 export class SuggestionFormatter {
   /**
@@ -10,7 +11,7 @@ export class SuggestionFormatter {
     if (showLabel) {
       // Human-readable format with label and separator
       console.log('\n' + chalk.bold('Suggested Action'));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(Separator.short());
       console.log(chalk.yellow('▪') + ' ' + suggestion);
     } else {
       // AI-readable format without label

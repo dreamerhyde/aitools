@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import { DailyUsage } from '../types/claude-usage.js';
 import { UsageSummaryDisplay } from './claude-usage-summary.js';
+import { Separator } from '../utils/separator.js';
 
 export class DetailedUsageDisplay {
   static showChartAndSummary(dailyUsage: DailyUsage[]): void {
@@ -46,7 +47,7 @@ export class DetailedUsageDisplay {
   static showDetailedDailyReport(dailyUsage: DailyUsage[]): void {
     console.log();
     console.log(chalk.bold('Claude Code Token Usage Report - Daily (Last 7 days)'));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 88)));
+    console.log(Separator.short());
 
     const table = new Table({
       head: [
@@ -281,7 +282,7 @@ export class DetailedUsageDisplay {
     }
     
     // Print X-axis (shifted right to align with dates)
-    console.log(chalk.dim('      └' + '─'.repeat(Math.min(chartWidth, 120))));
+    console.log(chalk.dim('      └') + Separator.line(Math.min(chartWidth, 120)));
     
     // Show day numbers aligned with bars (slightly shifted right for better centering)
     const dateRow = '       '; // 7 spaces for Y-axis alignment (one extra for shift)

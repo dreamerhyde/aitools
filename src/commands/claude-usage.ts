@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { UIHelper } from '../utils/ui.js';
 import { JSONLParser } from '../utils/jsonl-parser.js';
 import { UsageAnalyzer } from '../utils/usage-analyzer.js';
+import { Separator } from '../utils/separator.js';
 import { DetailedUsageDisplay } from './claude-usage-detailed.js';
 import { AllDaysUsageDisplay } from './claude-usage-all-days.js';
 import { 
@@ -134,7 +135,7 @@ export class ClaudeUsageCommand {
     
     console.log();
     console.log(chalk.bold('Monthly Usage Summary'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
 
     const table = new Table({
       head: ['Month', 'Total Cost', 'Tokens', 'Days Active', 'Avg Daily'],
@@ -173,7 +174,7 @@ export class ClaudeUsageCommand {
     if (currentMonthUsage) {
       console.log();
       console.log(chalk.bold(`Current Month (${currentMonth}) Model Breakdown:`));
-      console.log('─'.repeat(50));
+      console.log(Separator.line(50));
       
       const modelTable = new Table({
         head: ['Model', 'Messages', 'Tokens', 'Cost'],
@@ -201,7 +202,7 @@ export class ClaudeUsageCommand {
     
     console.log();
     console.log(chalk.bold('Session Analysis'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
 
     // Interactive session selection
     const { selectedSessions } = await inquirer.prompt([{
@@ -221,7 +222,7 @@ export class ClaudeUsageCommand {
     if (selectedSessions.length > 0) {
       console.log();
       console.log(chalk.bold('Session Details'));
-      console.log('─'.repeat(50));
+      console.log(Separator.line(50));
 
       selectedSessions.forEach((session: SessionUsage) => {
         console.log();
@@ -242,7 +243,7 @@ export class ClaudeUsageCommand {
     
     console.log();
     console.log(chalk.bold('5-Hour Billing Blocks'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
 
     const table = new Table({
       head: ['Block Start', 'Status', 'Sessions', 'Tokens', 'Cost'],
@@ -269,7 +270,7 @@ export class ClaudeUsageCommand {
     if (activeBlock) {
       console.log();
       console.log(chalk.bold.green('Current Active Block'));
-      console.log('─'.repeat(50));
+      console.log(Separator.line(50));
       console.log(`Started: ${new Date(activeBlock.startTime).toLocaleString()}`);
       console.log(`Expires: ${new Date(activeBlock.endTime).toLocaleString()}`);
       console.log(`Time remaining: ${this.formatDuration(activeBlock.endTime.getTime() - Date.now())}`);
@@ -289,7 +290,7 @@ export class ClaudeUsageCommand {
     
     console.log();
     console.log(chalk.bold('Overall Usage Summary'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     console.log(`Period: ${summary.dateRange.start.toLocaleDateString()} - ${summary.dateRange.end.toLocaleDateString()}`);
     console.log(`Total Cost: ${chalk.green.bold(`$${summary.totalCost.toFixed(2)}`)}`);
@@ -307,7 +308,7 @@ export class ClaudeUsageCommand {
   private async showLiveMonitor(): Promise<void> {
     console.log();
     console.log(chalk.bold.yellow('Live Usage Monitor'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     console.log(chalk.gray('Monitoring Claude usage in real-time...'));
     console.log(chalk.gray('Press Ctrl+C to exit'));
     
@@ -317,7 +318,7 @@ export class ClaudeUsageCommand {
       process.stdout.write('\x1Bc'); // Clear console
       UIHelper.showHeader();
       console.log(chalk.bold.cyan('Claude Usage Analytics - Live Mode'));
-      console.log('─'.repeat(50));
+      console.log(Separator.line(50));
       
       const messages = await this.parser.parseAllLogs();
       const blocks = this.analyzer.analyzeBillingBlocks(messages, 5);

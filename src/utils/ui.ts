@@ -3,6 +3,7 @@ import { table } from 'table';
 import ora from 'ora';
 import { ProcessInfo, SystemStats, HookDetectionResult } from '../types/index.js';
 import { TABLE_CHARS } from './table-config.js';
+import { Separator } from './separator.js';
 
 export class UIHelper {
   static createSpinner(text: string) {
@@ -23,12 +24,12 @@ export class UIHelper {
     console.log();
     console.log(chalk.bold.cyan('▪ AI Tools CLI'));
     console.log(chalk.gray('Process Monitor & Management'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
+    console.log(Separator.short());
   }
 
   static showSystemStats(stats: SystemStats) {
     console.log(chalk.bold.yellow('\n▪ System Status'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
+    console.log(Separator.short());
     
     const data = [
       ['Metric', 'Value'],
@@ -79,7 +80,7 @@ export class UIHelper {
     // Title with count indicator
     console.log();
     console.log(chalk.bold.yellow(`${title} ${chalk.gray(`(${processes.length})`)}`)  );
-    console.log(chalk.hex('#303030')('─'.repeat(Math.min(terminalWidth - 2, 120))));
+    console.log(Separator.line(Math.min(terminalWidth - 2, 120)));
 
     // Clean table data for the table library
     const data = [];

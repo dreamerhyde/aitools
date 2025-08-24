@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { DailyUsage } from '../types/claude-usage.js';
+import { Separator } from '../utils/separator.js';
 
 export class AllDaysUsageDisplay {
   static showAllDaysReport(dailyUsage: DailyUsage[]): void {
     console.log();
     console.log(chalk.bold(`Claude Code Token Usage Report - All Days (${dailyUsage.length} days)`));
-    console.log(chalk.dim('─'.repeat(process.stdout.columns || 88)));
+    console.log(Separator.short());
 
     const table = new Table({
       head: [

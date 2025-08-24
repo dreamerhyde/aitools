@@ -1,12 +1,13 @@
 import chalk from 'chalk';
 import { GitStats } from './git-types.js';
 import { isGeneratedFile, categorizeFileChanges } from './git-file-detector.js';
+import { Separator } from './separator.js';
 
 export class GitDisplayFormatter {
   
   static formatOverview(stats: GitStats): void {
     console.log(chalk.bold('Changes Since Last Commit'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     const totalFiles = stats.added.length + stats.modified.length + 
                       stats.deleted.length + stats.renamed.length + 
@@ -61,7 +62,7 @@ export class GitDisplayFormatter {
       : '';
     
     console.log(chalk.bold.yellow('Modified Files') + chalk.gray(` (${codeStats}${generatedStats})`));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     this.formatFileList(files);
     console.log();
@@ -104,7 +105,7 @@ export class GitDisplayFormatter {
     const generatedStats = generatedLines > 0 ? chalk.gray(` (+${generatedLines})`) : '';
     
     console.log(chalk.bold.green('New Files') + chalk.gray(` (${codeStats}${generatedStats})`));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     // Show all files
     const maxPathLength = Math.min(
@@ -164,7 +165,7 @@ export class GitDisplayFormatter {
     
     const deletedLines = files.reduce((sum, f) => sum + f.deletions, 0);
     console.log(chalk.bold.red('Deleted Files') + chalk.gray(` (${chalk.red('-' + deletedLines)})`));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     const maxPathLength = Math.min(Math.max(...files.map(f => f.path.length)), 50);
     files.forEach(file => {
@@ -180,7 +181,7 @@ export class GitDisplayFormatter {
     if (files.length === 0) return;
     
     console.log(chalk.bold.cyan('Renamed Files'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     files.forEach(file => {
       const stageIcon = file.staged ? chalk.green('●') : chalk.gray('○');
       console.log(`  ${stageIcon} ${chalk.cyan(file.path)}`);
@@ -190,7 +191,7 @@ export class GitDisplayFormatter {
 
   static formatSummary(stats: GitStats): void {
     console.log(chalk.bold('Summary'));
-    console.log('─'.repeat(50));
+    console.log(Separator.line(50));
     
     const totalFiles = stats.added.length + stats.modified.length + 
                       stats.deleted.length + stats.renamed.length + 

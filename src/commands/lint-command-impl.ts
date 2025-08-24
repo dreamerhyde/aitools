@@ -4,6 +4,7 @@ import Table from 'cli-table3';
 import { TypeScriptRunner, ESLintRunner, BuildRunner, type CheckResult, type FileIssue } from '../utils/check-runners.js';
 import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
 import { TABLE_CHARS, DEFAULT_TABLE_STYLE } from '../utils/table-config.js';
+import { Separator } from '../utils/separator.js';
 import type { TableCellConfig, TableHeaderConfig, TableConstructor } from '../types/cli-table.js';
 
 export class CheckCommand {
@@ -77,7 +78,7 @@ export class CheckCommand {
     showWarnings?: boolean;
   }): Promise<void> {
     console.log(chalk.bold('\nCode Quality Check'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
+    console.log(Separator.short());
     
     const checks: Array<() => Promise<CheckResult>> = [];
     
@@ -195,7 +196,7 @@ export class CheckCommand {
   
   private displaySummary(showWarnings = false): void {
     console.log('\n' + chalk.bold('Check Summary'));
-    console.log(chalk.hex('#303030')('─'.repeat(30)));
+    console.log(Separator.short());
     
     const table = new this.TableClass({
       head: [
@@ -281,7 +282,7 @@ export class CheckCommand {
     
     if (hasDetailedIssues) {
       console.log('\n' + chalk.bold('Detailed Issues'));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(Separator.short());
     
       // Group issues by file
       const fileGroups = new Map<string, FileIssue[]>();

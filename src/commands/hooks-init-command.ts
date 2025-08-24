@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { UIHelper } from '../utils/ui.js';
 import { ConfigManager } from '../utils/config-manager.js';
 import chalk from 'chalk';
+import { Separator } from '../utils/separator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +24,7 @@ export class HooksInitCommand {
     try {
       UIHelper.showHeader();
       console.log(chalk.bold('▪ AI Tools Hooks Setup'));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(Separator.short());
       console.log();
 
       // Load config

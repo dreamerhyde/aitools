@@ -2,13 +2,14 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { UIHelper } from '../utils/ui.js';
+import { Separator } from '../utils/separator.js';
 
 export class LintInitCommand {
   async execute(options: { force?: boolean } = {}): Promise<void> {
     try {
       UIHelper.showHeader();
       console.log(chalk.bold('▪ ESLint Configuration Setup'));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(Separator.short());
       console.log();
 
       const eslintrcPath = path.join(process.cwd(), '.eslintrc.json');

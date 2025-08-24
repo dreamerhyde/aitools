@@ -3,6 +3,7 @@ import * as fsSync from 'fs';
 import path from 'path';
 import { UIHelper } from '../utils/ui.js';
 import chalk from 'chalk';
+import { Separator } from '../utils/separator.js';
 import { GitignoreParser } from '../utils/gitignore-parser.js';
 import { ConfigManager } from '../utils/config-manager.js';
 import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
@@ -96,7 +97,7 @@ export class LinesCommand {
       // Human-readable output
       console.log('');
       console.log(chalk.bold(`File Line Count Check (limit: ${this.lineLimit} lines)`));
-      console.log(chalk.hex('#303030')('─'.repeat(30)));
+      console.log(Separator.short());
 
       if (exceededFiles.length === 0) {
         UIHelper.showSuccess('All files are within the line limit!');

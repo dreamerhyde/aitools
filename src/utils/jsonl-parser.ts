@@ -366,7 +366,7 @@ export class JSONLParser {
             console.log(`Empty file (no valid messages): ${file.split('/').pop()}`);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         failedFiles++;
         console.warn(`Failed to parse file ${file.split('/').pop()}:`, error.message);
         // Continue processing other files

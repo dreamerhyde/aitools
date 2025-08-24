@@ -97,7 +97,6 @@ export class UsageAnalyzer {
     
     // Count unique conversations per day
     const conversationsByDay = new Map<string, Set<string>>();
-    let todayConversationsCount = 0;
     
     messages.forEach(msg => {
       if (msg.conversation_id) {
@@ -106,13 +105,6 @@ export class UsageAnalyzer {
           conversationsByDay.set(date, new Set());
         }
         conversationsByDay.get(date)!.add(msg.conversation_id);
-        
-        // Debug: Count today's unique conversations
-        if (process.env.DEBUG && msg.timestamp.startsWith('2025-08-24')) {
-          if (!conversationsByDay.get(date)!.has(msg.conversation_id)) {
-            todayConversationsCount++;
-          }
-        }
       }
     });
     
