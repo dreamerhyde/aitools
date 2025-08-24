@@ -299,10 +299,39 @@ export function setupHooksCommand(program: Command): void {
     .option('-l, --limit <lines>', 'Line limit threshold', '500')
     .action(async (options) => {
       try {
+        // Try to read tool input from stdin to get the edited file
+        let editedFile: string | undefined;
+        if (!process.stdin.isTTY) {
+          try {
+            const chunks: Buffer[] = [];
+            process.stdin.setEncoding('utf8');
+            
+            const timeoutPromise = new Promise<string>((_, reject) => {
+              setTimeout(() => reject(new Error('Stdin read timeout')), 100);
+            });
+            
+            const readPromise = (async () => {
+              for await (const chunk of process.stdin) {
+                chunks.push(Buffer.from(chunk));
+              }
+              return Buffer.concat(chunks).toString();
+            })();
+            
+            const stdinData = await Promise.race([readPromise, timeoutPromise]) as string;
+            if (stdinData.trim()) {
+              const toolData = JSON.parse(stdinData);
+              editedFile = toolData.tool_input?.file_path || toolData.file_path;
+            }
+          } catch {
+            // Ignore stdin errors
+          }
+        }
+        
         const { LinesCommand } = await import('../commands/lines-command.js');
         const linesCommand = new LinesCommand();
         await linesCommand.executeForAI({
-          limit: parseInt(options.limit)
+          limit: parseInt(options.limit),
+          targetFile: editedFile
         });
       } catch (error) {
         // Hooks should never fail - just log if DEBUG is set

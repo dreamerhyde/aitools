@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import * as fsSync from 'fs';
 import path from 'path';
 import { UIHelper } from '../utils/ui.js';
 import chalk from 'chalk';
@@ -197,10 +198,36 @@ export class LinesCommand {
   }
 
 
-  async executeForAI(options: { limit?: number } = {}): Promise<void> {
+  async executeForAI(options: { limit?: number; targetFile?: string } = {}): Promise<void> {
     this.lineLimit = options.limit || 500;
     
     try {
+      // If a specific file is provided, only check that file
+      if (options.targetFile) {
+        const filePath = path.resolve(options.targetFile);
+        if (fsSync.existsSync(filePath) && fsSync.statSync(filePath).isFile()) {
+          const content = fsSync.readFileSync(filePath, 'utf-8');
+          const lines = content.split('\n').length;
+          
+          if (lines > this.lineLimit) {
+            const relativePath = path.relative(process.cwd(), filePath);
+            const excess = lines - this.lineLimit;
+            
+            // Output to stdout for AI to see
+            console.log(`File Length Warning:`);
+            console.log(`- ${relativePath} (${lines} lines) exceeds limit by ${excess} lines`);
+            console.log('\nPlease consider extracting utility functions, splitting into modules, or refactoring this file to improve maintainability.');
+            
+            // Also output to stderr for user to see in Claude Code terminal
+            console.error(chalk.yellow('\n⚠ File Length Warning'));
+            console.error(chalk.gray(`  ${relativePath}: ${lines} lines (${excess} over limit)`));
+          }
+          // Don't output anything if the file is within limits - AI doesn't need to know
+        }
+        return;
+      }
+      
+      // Default behavior: scan all files
       // Load gitignore
       await this.gitignoreParser.load();
       

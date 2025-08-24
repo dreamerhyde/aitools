@@ -426,6 +426,16 @@ export class CheckCommand {
       console.log('No issues found - code quality is good.');
     } else {
       console.log('\nPlease run `aitools lint --fix` to auto-fix ESLint issues, then manually fix remaining TypeScript errors.');
+      
+      // Also output summary to stderr for user to see in Claude Code terminal
+      const totalIssues = tsResult.errors + tsResult.warnings + eslintResult.errors + eslintResult.warnings;
+      console.error(chalk.yellow('\n⚠ Code Quality Issues'));
+      if (tsResult.errors > 0) {
+        console.error(chalk.red(`  TypeScript: ${tsResult.errors} errors`));
+      }
+      if (eslintResult.errors > 0 || eslintResult.warnings > 0) {
+        console.error(chalk.gray(`  ESLint: ${eslintResult.errors} errors, ${eslintResult.warnings} warnings`));
+      }
     }
   }
   
