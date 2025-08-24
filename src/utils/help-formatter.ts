@@ -150,21 +150,7 @@ export class HelpFormatter {
         helpLeader = ' '.repeat(helpSpaceNeeded);
       }
       
-      output.push(`${helpLeftColored}${helpLeader}${chalk.gray('Show command help')}`);
-      
-      const subHelpLeftColored = `   ${chalk.gray('└─')} ${chalk.yellow('<command>')}`;
-      const subHelpLeftPlain = this.stripAnsi(subHelpLeftColored);
-      const subHelpVisibleLength = subHelpLeftPlain.length;
-      const subHelpSpaceNeeded = descStartCol - subHelpVisibleLength;
-      let subHelpLeader = '';
-      
-      if (subHelpSpaceNeeded > 2) {
-        subHelpLeader = ' ' + chalk.hex('#404040')('─'.repeat(subHelpSpaceNeeded - 2)) + ' ';
-      } else if (subHelpSpaceNeeded > 0) {
-        subHelpLeader = ' '.repeat(subHelpSpaceNeeded);
-      }
-      
-      output.push(`${subHelpLeftColored}${subHelpLeader}${chalk.gray('Detailed command help')}`);
+      output.push(`${helpLeftColored}${helpLeader}${chalk.gray('Show this help message')}`);
     }
     
     // Add global options
@@ -177,13 +163,11 @@ export class HelpFormatter {
     output.push('');
     output.push(chalk.bold('Quick Start:'));
     output.push('');
-    output.push('  ' + chalk.green('ai status') + '         ' + chalk.gray('# Check system health'));
-    output.push('  ' + chalk.green('ai hooks -k') + '       ' + chalk.gray('# Kill stuck hooks'));
-    output.push('  ' + chalk.green('ai git') + '            ' + chalk.gray('# View git changes'));
-    output.push('  ' + chalk.green('ai claude hooks --info') + '  ' + chalk.gray('# Setup Claude Code hooks'));
-    output.push('');
-    output.push(chalk.gray('For detailed help: ') + chalk.cyan('ai help <command>'));
-    output.push(chalk.gray('Interactive mode: ') + chalk.cyan('ai hooks -i'));
+    output.push('  ' + chalk.green('ai cost') + '           ' + chalk.gray('# Check Claude Code usage costs'));
+    output.push('  ' + chalk.green('ai lint') + '           ' + chalk.gray('# Run code quality checks'));
+    output.push('  ' + chalk.green('ai changes') + '        ' + chalk.gray('# View git change statistics'));
+    output.push('  ' + chalk.green('ai hooks init') + '     ' + chalk.gray('# Setup Claude Code hooks'));
+    output.push('  ' + chalk.green('ai process hooks') + '  ' + chalk.gray('# Check hook-related processes'));
     output.push('');
     
     return output.join('\n');
