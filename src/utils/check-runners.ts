@@ -209,28 +209,16 @@ export class ESLintRunner {
       
       // Check ESLint version and configuration
       // execSync imported at top
-      let eslintVersion = '8';
-      try {
-        const versionOutput = execSync(`${localEslintPath} --version`, { encoding: 'utf8' });
-        eslintVersion = versionOutput.includes('v9.') ? '9' : '8';
-      } catch (e) {
-        // Default to version 8
-      }
+      // Note: Version detection removed as it's not currently used
+      // Can be re-enabled when needed for version-specific features
       
       // Check if project has ESLint config or package.json lint script
       const configFiles = ['.eslintrc.js', '.eslintrc.json', '.eslintrc.yml', 'eslint.config.js', 'eslint.config.mjs'];
       const hasConfig = configFiles.some(file => fs.existsSync(path.join(process.cwd(), file)));
       
       // Also check for package.json lint script
-      const packageJsonPath = path.join(process.cwd(), 'package.json');
-      let hasLintScript = false;
-      
-      try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-        hasLintScript = !!(packageJson.scripts && packageJson.scripts.lint);
-      } catch {
-        // No package.json
-      }
+      // Note: Package script detection removed as usePackageScript is hardcoded to false
+      // Can be re-enabled when package script support is implemented
       
       if (!hasConfig) {
         if (!silent) {
@@ -305,7 +293,7 @@ export class ESLintRunner {
         if (spinner) spinner.text = `ESLint: Processing... (${lines} issues found so far)`;
       });
       
-      eslint.stderr.on('data', (_data) => {
+      eslint.stderr.on('data', () => {
         // Handle stderr if needed but don't store it since it's not used
       });
       
@@ -341,7 +329,7 @@ export class ESLintRunner {
         const errorCount = files.filter(f => f.severity === 'error').length;
         const warningCount = files.filter(f => f.severity === 'warning').length;
         
-        if (code === 0) {
+        if (code === 0 && warningCount === 0) {
           spinner?.succeed(chalk.green('ESLint check passed'));
           resolve({
             tool: 'ESLint',
@@ -349,6 +337,17 @@ export class ESLintRunner {
             errors: 0,
             warnings: 0,
             files: [],
+            duration
+          });
+        } else if (code === 0 && warningCount > 0) {
+          // ESLint returns 0 when only warnings exist
+          spinner?.warn(chalk.yellow(`ESLint found ${warningCount} warnings`));
+          resolve({
+            tool: 'ESLint',
+            status: 'warning',
+            errors: 0,
+            warnings: warningCount,
+            files,
             duration
           });
         } else if (errorCount > 0) {
@@ -391,7 +390,7 @@ export class ESLintRunner {
           column: parseInt(column),
           severity: level as 'error' | 'warning',
           message: message.trim(),
-          rule: rule.replace(/[@\[\]]/g, '')
+          rule: rule.replace(/[@[\]]/g, '')
         });
       }
     }
@@ -463,7 +462,7 @@ export class BuildRunner {
       const build = spawn(runner, ['run', 'build']);
       let errorOutput = '';
       
-      build.stdout.on('data', (_data) => {
+      build.stdout.on('data', () => {
         // Handle stdout if needed
       });
       

@@ -22,7 +22,7 @@ export class HealthDisplay {
   private readonly CRITICAL_THRESHOLD = 1000;
   private readonly COMPLEXITY_THRESHOLD = 10;
 
-  displayReport(report: HealthReport, _format: string, _threshold: number): void {
+  displayReport(report: HealthReport): void {
     console.log();
     
     // Health Score with cleaner format

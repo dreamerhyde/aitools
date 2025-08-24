@@ -245,7 +245,7 @@ export function setupProcessCommand(program: Command): void {
     .command('hooks')
     .description('Show hook-related processes')
     .option('--all', 'Show all hook processes including normal ones')
-    .action(async (_options) => {
+    .action(async () => {
       try {
         const processMonitor = new ProcessMonitor();
         const processes = await processMonitor.getAllProcesses();

@@ -104,8 +104,6 @@ export class CheckCommand {
   }
   
   async executeForAI(options: { targetFile?: string; showWarnings?: boolean } = {}): Promise<void> {
-    console.log('Code Quality Issues:\n');
-    
     const tsResult = await this.tsRunner.run(options.targetFile, true); // Pass silent=true for AI mode
     const eslintResult = await this.eslintRunner.run(false, options.targetFile, true); // Pass silent=true for AI mode
     
@@ -119,6 +117,21 @@ export class CheckCommand {
 
     const filteredTsIssues = filterIssues(tsResult.files);
     const filteredEslintIssues = filterIssues(eslintResult.files);
+    
+    // Check if we have any issues to report
+    const hasErrors = filteredTsIssues.some(i => i.severity === 'error') || 
+                     filteredEslintIssues.some(i => i.severity === 'error');
+    const hasWarnings = options.showWarnings && 
+                       (filteredTsIssues.some(i => i.severity === 'warning') || 
+                        filteredEslintIssues.some(i => i.severity === 'warning'));
+    
+    // If no issues at all, output nothing for AI
+    if (!hasErrors && !hasWarnings) {
+      return;
+    }
+    
+    // Only output if there are issues
+    console.log('Code Quality Issues:\n');
     
     // TypeScript Errors
     if (filteredTsIssues.length > 0) {
@@ -158,35 +171,25 @@ export class CheckCommand {
       console.log();
     }
     
-    const hasErrors = filteredTsIssues.some(i => i.severity === 'error') || 
-                     filteredEslintIssues.some(i => i.severity === 'error');
-    const hasWarnings = options.showWarnings && 
-                       (filteredTsIssues.some(i => i.severity === 'warning') || 
-                        filteredEslintIssues.some(i => i.severity === 'warning'));
+    // For AI: plain text suggestion without formatting
+    SuggestionFormatter.show(SuggestionFormatter.LINT_FIX, false);
     
-    if (!hasErrors && !hasWarnings) {
-      console.log('No issues found - code quality is good.');
-    } else {
-      // For AI: plain text without formatting
-      SuggestionFormatter.show(SuggestionFormatter.LINT_FIX, false);
-      
-      // Also output summary to stderr for user to see in Claude Code terminal
-      console.error(chalk.yellow('\n⚠ Code Quality Issues'));
-      
-      const tsErrors = filteredTsIssues.filter(i => i.severity === 'error').length;
-      if (tsErrors > 0) {
-        console.error(chalk.red(`  TypeScript: ${tsErrors} error${tsErrors !== 1 ? 's' : ''}`));
-      }
-      
-      const eslintErrors = filteredEslintIssues.filter(i => i.severity === 'error').length;
-      const eslintWarnings = filteredEslintIssues.filter(i => i.severity === 'warning').length;
-      
-      if (eslintErrors > 0 || (options.showWarnings && eslintWarnings > 0)) {
-        const parts = [];
-        if (eslintErrors > 0) parts.push(`${eslintErrors} error${eslintErrors !== 1 ? 's' : ''}`);
-        if (options.showWarnings && eslintWarnings > 0) parts.push(`${eslintWarnings} warning${eslintWarnings !== 1 ? 's' : ''}`);
-        console.error(chalk.gray(`  ESLint: ${parts.join(', ')}`));
-      }
+    // Also output summary to stderr for user to see in Claude Code terminal
+    console.error(chalk.yellow('\n⚠ Code Quality Issues'));
+    
+    const tsErrors = filteredTsIssues.filter(i => i.severity === 'error').length;
+    if (tsErrors > 0) {
+      console.error(chalk.red(`  TypeScript: ${tsErrors} error${tsErrors !== 1 ? 's' : ''}`));
+    }
+    
+    const eslintErrors = filteredEslintIssues.filter(i => i.severity === 'error').length;
+    const eslintWarnings = filteredEslintIssues.filter(i => i.severity === 'warning').length;
+    
+    if (eslintErrors > 0 || (options.showWarnings && eslintWarnings > 0)) {
+      const parts = [];
+      if (eslintErrors > 0) parts.push(`${eslintErrors} error${eslintErrors !== 1 ? 's' : ''}`);
+      if (options.showWarnings && eslintWarnings > 0) parts.push(`${eslintWarnings} warning${eslintWarnings !== 1 ? 's' : ''}`);
+      console.error(chalk.gray(`  ESLint: ${parts.join(', ')}`));
     }
   }
   

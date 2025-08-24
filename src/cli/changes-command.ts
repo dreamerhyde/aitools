@@ -12,7 +12,7 @@ export function setupChangesCommand(program: Command): void {
     .option('--since <date>', 'Show changes since date (e.g., "1 week ago")')
     .option('--author <name>', 'Filter by author')
     .option('--no-color', 'Disable colored output')
-    .action(async (_options) => {
+    .action(async () => {
       const command = new GitStatsCommand();
       await command.execute();
     });

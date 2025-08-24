@@ -90,7 +90,7 @@ export function setupHooksCommand(program: Command): void {
     .command('list')
     .description('List all configured Claude Code hooks')
     .option('-v, --verbose', 'Show hook commands and matchers')
-    .action(async (_options) => {
+    .action(async () => {
       try {
         const fs = await import('fs/promises');
         const path = await import('path');
