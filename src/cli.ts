@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import { setupBasicCommands } from './cli/basic-commands.js';
 import { setupHooksCommand } from './cli/hooks-command.js';
-import { setupGitCommand } from './cli/git-command.js';
 import { setupCostCommand } from './cli/cost-command.js';
 import { setupCompletionCommand } from './cli/completion-command.js';
 import { setupTreeCommand } from './cli/tree-command.js';
@@ -11,13 +10,27 @@ import { setupInitCommand } from './cli/init-command.js';
 import { setupChangesCommand } from './cli/changes-command.js';
 import { setupLintCommand } from './cli/lint-command.js';
 import { setupLinesCommand } from './cli/lines-command.js';
-import { setupTestColorsCommand } from './cli/test-colors-command.js';
-import { setupConfigCommand } from './cli/config-command.js';
-import { setupTestNotificationCommand } from './cli/test-notification-command.js';
-import { setupNotifyCommand } from './cli/notify-command.js';
+import { setupProcessCommand } from './cli/process-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Read version from package.json dynamically
+let version = '1.0.0';
+try {
+  const packagePath = join(__dirname, '..', 'package.json');
+  const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+  version = packageJson.version;
+} catch (error) {
+  // Fallback to default if package.json cannot be read
+  console.warn('Warning: Could not read package.json for version');
+}
 
 const program = new Command();
 
@@ -27,7 +40,7 @@ AutoUpdateChecker.checkInBackground();
 program
   .name('aitools')
   .description('Vibe Coding Toolkit - Keep your AI-assisted development flow smooth')
-  .version('1.0.0')
+  .version(version)
   .configureHelp({
     formatHelp: () => HelpFormatter.formatRootHelpAligned(program)
   });
@@ -35,7 +48,6 @@ program
 // Setup all commands using the extracted modules (in order of importance)
 // Core commands
 setupInitCommand(program);
-setupConfigCommand(program);  // config management
 setupCostCommand(program);
 setupTreeCommand(program);    // tree + files
 setupChangesCommand(program); // git changes
@@ -44,13 +56,8 @@ setupLinesCommand(program);   // line limit checks
 
 // Supporting commands
 setupHooksCommand(program);
+setupProcessCommand(program);
 setupCompletionCommand(program);
-setupNotifyCommand(program);
-setupTestColorsCommand(program);
-setupTestNotificationCommand(program);
-
-// Legacy commands (keep for backward compatibility)
-setupGitCommand(program);     // legacy git command
 
 // Basic commands
 setupBasicCommands(program);

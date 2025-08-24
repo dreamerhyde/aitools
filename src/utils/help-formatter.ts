@@ -164,6 +164,13 @@ export class HelpFormatter {
       output.push(`${subHelpLeftColored}${subHelpLeader}${chalk.gray('Detailed command help')}`);
     }
     
+    // Add global options
+    output.push('');
+    output.push(chalk.bold('Options:'));
+    output.push('');
+    output.push('  ' + chalk.yellow('-V, --version') + '     ' + chalk.gray('Display version number'));
+    output.push('  ' + chalk.yellow('-h, --help') + '        ' + chalk.gray('Display help for command'));
+    
     output.push('');
     output.push(chalk.bold('Quick Start:'));
     output.push('');

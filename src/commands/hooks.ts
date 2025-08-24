@@ -2,6 +2,7 @@ import { ProcessMonitor } from '../utils/process-monitor.js';
 import { UIHelper } from '../utils/ui.js';
 import { ProcessInfo } from '../types/index.js';
 import inquirer from 'inquirer';
+import chalk from 'chalk';
 
 export class HooksCommand {
   private monitor: ProcessMonitor;
@@ -69,41 +70,56 @@ export class HooksCommand {
   private async handleInteractive(hooks: ProcessInfo[]): Promise<void> {
     if (hooks.length === 0) return;
     
-    const { action } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'action',
-        message: 'What would you like to do?',
-        choices: [
-          { name: 'Kill all hooks', value: 'kill-all' },
-          { name: 'Select hooks to kill', value: 'select' },
-          { name: 'Exit', value: 'exit' }
-        ]
-      }
-    ]);
-    
-    if (action === 'kill-all') {
-      await this.killAllHooks(hooks);
-    } else if (action === 'select') {
-      const { selected } = await inquirer.prompt([
+    try {
+      const { action } = await inquirer.prompt([
         {
-          type: 'checkbox',
-          name: 'selected',
-          message: 'Select hooks to terminate:',
-          choices: hooks.map(proc => ({
-            name: `[PID: ${proc.pid}] ${proc.command.substring(0, 80)}`,
-            value: proc.pid
-          }))
+          type: 'list',
+          name: 'action',
+          message: 'What would you like to do? (CTRL+C to cancel)',
+          choices: [
+            { name: 'Kill all hooks', value: 'kill-all' },
+            { name: 'Select hooks to kill', value: 'select' },
+            { name: 'Exit', value: 'exit' }
+          ],
+          loop: false
         }
       ]);
       
-      for (const pid of selected) {
-        const success = await this.monitor.killProcess(pid);
-        if (success) {
-          UIHelper.showSuccess(`Terminated process ${pid}`);
+      if (action === 'kill-all') {
+        await this.killAllHooks(hooks);
+      } else if (action === 'select') {
+        const { selected } = await inquirer.prompt([
+          {
+            type: 'checkbox',
+            name: 'selected',
+            message: 'Select hooks to terminate (CTRL+C to cancel):',
+            choices: hooks.map(proc => ({
+              name: `[PID: ${proc.pid}] ${proc.command.substring(0, 80)}`,
+              value: proc.pid
+            })),
+            loop: false
+          }
+        ]);
+        
+        if (selected && selected.length > 0) {
+          for (const pid of selected) {
+            const success = await this.monitor.killProcess(pid);
+            if (success) {
+              UIHelper.showSuccess(`Terminated process ${pid}`);
+            } else {
+              UIHelper.showError(`Failed to terminate process ${pid}`);
+            }
+          }
         } else {
-          UIHelper.showError(`Failed to terminate process ${pid}`);
+          console.log(chalk.gray('No processes selected'));
         }
+      }
+    } catch (error: any) {
+      // User cancelled with Ctrl+C
+      if (error.name === 'ExitPromptError' || !error.name) {
+        console.log(chalk.gray('\nOperation cancelled'));
+      } else {
+        throw error;
       }
     }
   }

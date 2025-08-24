@@ -7,42 +7,52 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function setupCompletionCommand(program: Command): void {
-  program
+  const completion = program
     .command('completion')
-    .description('Generate shell completion script')
-    .option('--shell <type>', 'Shell type (bash, zsh, fish)', 'bash')
-    .option('--install', 'Auto-install completion to shell config')
+    .description('Manage shell completion for AI Tools');
+
+  // Install subcommand
+  completion
+    .command('install')
+    .description('Install shell completion')
+    .option('--shell <type>', 'Shell type (bash, zsh, fish)', detectShell())
     .action((options) => {
-      if (options.install) {
-        installCompletion(options.shell);
-      } else {
-        const completionScript = generateCompletionScript(program, options.shell);
-        console.log(completionScript);
-        console.log();
-        console.log(chalk.green('# To install completion:'));
-        
-        switch (options.shell) {
-          case 'bash':
-            console.log(chalk.gray('# Add to ~/.bashrc:'));
-            console.log(chalk.cyan('eval "$(ai completion)"'));
-            console.log(chalk.gray('# Or auto-install:'));
-            console.log(chalk.cyan('ai completion --install'));
-            break;
-          case 'zsh':
-            console.log(chalk.gray('# Add to ~/.zshrc:'));
-            console.log(chalk.cyan('eval "$(ai completion --shell zsh)"'));
-            console.log(chalk.gray('# Or auto-install:'));
-            console.log(chalk.cyan('ai completion --shell zsh --install'));
-            break;
-          case 'fish':
-            console.log(chalk.gray('# Add to ~/.config/fish/config.fish:'));
-            console.log(chalk.cyan('ai completion --shell fish | source'));
-            console.log(chalk.gray('# Or auto-install:'));
-            console.log(chalk.cyan('ai completion --shell fish --install'));
-            break;
-        }
-      }
+      installCompletion(options.shell);
     });
+
+  // Uninstall subcommand
+  completion
+    .command('uninstall')
+    .description('Uninstall shell completion')
+    .option('--shell <type>', 'Shell type (bash, zsh, fish)', detectShell())
+    .action((options) => {
+      uninstallCompletion(options.shell);
+    });
+
+  // Show completion script (default action)
+  completion
+    .command('show')
+    .description('Show shell completion script')
+    .option('--shell <type>', 'Shell type (bash, zsh, fish)', detectShell())
+    .action((options) => {
+      const completionScript = generateCompletionScript(program, options.shell);
+      console.log(completionScript);
+      console.log();
+      console.log(chalk.green('# To install completion:'));
+      console.log(chalk.cyan('ai completion install'));
+    });
+
+  // Default action when no subcommand is specified
+  completion.action(() => {
+    completion.outputHelp();
+  });
+}
+
+function detectShell(): string {
+  const shell = process.env.SHELL || '';
+  if (shell.includes('zsh')) return 'zsh';
+  if (shell.includes('fish')) return 'fish';
+  return 'bash'; // Default to bash
 }
 
 function installCompletion(shell: string): void {
@@ -55,17 +65,17 @@ function installCompletion(shell: string): void {
     case 'bash':
       configFile = path.join(home, '.bashrc');
       marker = '# AI Tools Completion';
-      completionLine = 'eval "$(ai completion)"';
+      completionLine = 'eval "$(ai completion show)"';
       break;
     case 'zsh':
       configFile = path.join(home, '.zshrc');
       marker = '# AI Tools Completion';
-      completionLine = 'eval "$(ai completion --shell zsh)"';
+      completionLine = 'eval "$(ai completion show --shell zsh)"';
       break;
     case 'fish':
       configFile = path.join(home, '.config', 'fish', 'config.fish');
       marker = '# AI Tools Completion';
-      completionLine = 'ai completion --shell fish | source';
+      completionLine = 'ai completion show --shell fish | source';
       break;
     default:
       console.log(chalk.red('Unsupported shell type'));
@@ -110,6 +120,76 @@ ${completionLine}
     console.log(chalk.gray(`  Error: ${error.message}`));
     console.log(chalk.gray('  You can manually add to your shell config:'));
     console.log(chalk.cyan(`  ${completionLine}`));
+  }
+}
+
+function uninstallCompletion(shell: string): void {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  let configFile: string;
+  let marker: string;
+  
+  switch (shell) {
+    case 'bash':
+      configFile = path.join(home, '.bashrc');
+      marker = '# AI Tools Completion';
+      break;
+    case 'zsh':
+      configFile = path.join(home, '.zshrc');
+      marker = '# AI Tools Completion';
+      break;
+    case 'fish':
+      configFile = path.join(home, '.config', 'fish', 'config.fish');
+      marker = '# AI Tools Completion';
+      break;
+    default:
+      console.log(chalk.red('Unsupported shell type'));
+      return;
+  }
+  
+  try {
+    // Check if config file exists
+    if (!fs.existsSync(configFile)) {
+      console.log(chalk.yellow(`▪ Config file not found: ${configFile}`));
+      return;
+    }
+    
+    // Read existing content
+    const content = fs.readFileSync(configFile, 'utf-8');
+    
+    // Check if completion is installed
+    if (!content.includes(marker)) {
+      console.log(chalk.yellow('▪ Completion not found in shell config'));
+      return;
+    }
+    
+    // Remove completion lines
+    const lines = content.split('\n');
+    const newLines: string[] = [];
+    let skipNext = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(marker)) {
+        skipNext = true;
+        continue;
+      }
+      if (skipNext) {
+        skipNext = false;
+        continue;
+      }
+      newLines.push(lines[i]);
+    }
+    
+    // Write back
+    fs.writeFileSync(configFile, newLines.join('\n'));
+    
+    console.log(chalk.green('✓ Completion uninstalled successfully'));
+    console.log(chalk.gray(`  Removed from: ${configFile}`));
+    console.log(chalk.gray('  Restart your shell or run:'));
+    console.log(chalk.cyan(`  source ${configFile}`));
+    
+  } catch (error: any) {
+    console.log(chalk.red('✗ Failed to uninstall completion'));
+    console.log(chalk.gray(`  Error: ${error.message}`));
   }
 }
 

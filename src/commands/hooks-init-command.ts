@@ -54,7 +54,7 @@ export class HooksInitCommand {
       if (config.slack_webhook_url && !config.slack_webhook_url.includes('YOUR/WEBHOOK/URL')) {
         console.log(chalk.green(`  • Slack notifications enabled`));
       } else {
-        console.log(chalk.yellow(`  • Slack webhook not configured (run "ai config set-keys")`));
+        console.log(chalk.yellow(`  • Slack webhook not configured (set SLACK_WEBHOOK_URL env var)`));
       }
 
       console.log();
@@ -64,7 +64,7 @@ export class HooksInitCommand {
       console.log(chalk.cyan(`   ai lines --check`));
       console.log();
       console.log(chalk.gray(`2. When tasks complete, Claude Code will run:`));
-      console.log(chalk.cyan(`   ai notify --task-complete`));
+      console.log(chalk.cyan(`   ai hooks notify --task-complete`));
       console.log();
       console.log(chalk.gray(`Settings location: ${settingsPath}`));
 
@@ -174,18 +174,20 @@ export class HooksInitCommand {
     // Add notification hook (directly call aitools command)
     const notificationHook = {
       type: 'command',
-      command: 'ai notify --task-complete 2>/dev/null || true'
+      command: 'ai hooks notify --task-complete 2>/dev/null || true'
     };
 
     // Remove existing notification hook if force flag is set
     if (options.force) {
       stopEntry.hooks = stopEntry.hooks.filter((hook: any) => 
+        !hook.command?.includes('ai hooks notify') &&
         !hook.command?.includes('ai notify')
       );
     }
 
     // Add notification hook if it doesn't exist
     const notifyExists = stopEntry.hooks.some((h: any) => 
+      h.command?.includes('ai hooks notify') ||
       h.command?.includes('ai notify')
     );
     

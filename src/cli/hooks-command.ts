@@ -129,4 +129,84 @@ export function setupHooksCommand(program: Command): void {
         process.exit(1);
       }
     });
+
+  // hooks notify subcommand - Send notifications
+  hooksCommand
+    .command('notify')
+    .description('Send Slack notifications for AI Tools events')
+    .option('--task-complete', 'Send task completion notification')
+    .option('--task-error <message>', 'Send error notification')
+    .option('--message <text>', 'Custom message to include')
+    .option('--silent', 'Suppress console output')
+    .action(async (options) => {
+      try {
+        const { NotificationManager } = await import('../utils/notification-manager.js');
+        const notificationManager = new NotificationManager();
+        
+        if (options.taskComplete) {
+          // This is called by the Claude Code hook
+          const message = options.message || 'Task completed successfully';
+          await notificationManager.sendTaskComplete(message);
+          
+          if (!options.silent) {
+            console.log(chalk.gray('✓ Task completion notification sent'));
+          }
+        } else if (options.taskError) {
+          // Send error notification
+          await notificationManager.sendTaskError(options.taskError);
+          
+          if (!options.silent) {
+            console.log(chalk.gray('✓ Error notification sent'));
+          }
+        } else {
+          // Default: send a generic notification
+          const message = options.message || 'AI Tools notification';
+          await notificationManager.sendTaskComplete(message);
+          
+          if (!options.silent) {
+            console.log(chalk.gray('✓ Notification sent'));
+          }
+        }
+      } catch (error) {
+        if (!options.silent) {
+          // Don't fail loudly in hooks
+          console.error(chalk.gray(`Notification failed: ${error}`));
+        }
+        // Exit gracefully
+        process.exit(0);
+      }
+    });
+
+  // hooks lint subcommand - AI-readable lint output
+  hooksCommand
+    .command('lint')
+    .description('Run lint checks and output AI-readable format')
+    .action(async () => {
+      try {
+        const { CheckCommand } = await import('../commands/check-command.js');
+        const checkCommand = new CheckCommand();
+        await checkCommand.executeForAI();
+      } catch (error) {
+        UIHelper.showError(`Lint check failed: ${error}`);
+        process.exit(1);
+      }
+    });
+
+  // hooks lines subcommand - AI-readable lines check output
+  hooksCommand
+    .command('lines')
+    .description('Check file line counts and output AI-readable format')
+    .option('-l, --limit <lines>', 'Line limit threshold', '500')
+    .action(async (options) => {
+      try {
+        const { LinesCommand } = await import('../commands/lines-command.js');
+        const linesCommand = new LinesCommand();
+        await linesCommand.executeForAI({
+          limit: parseInt(options.limit)
+        });
+      } catch (error) {
+        UIHelper.showError(`Lines check failed: ${error}`);
+        process.exit(1);
+      }
+    });
 }

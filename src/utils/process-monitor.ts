@@ -165,6 +165,13 @@ export class ProcessMonitor {
   }
 
   private isLikelyHook(command: string): boolean {
+    // Exclude aitools itself from hook detection
+    if (command.includes('aitools/dist/cli.js') || 
+        command.includes('ai ps hooks') ||
+        command.includes('ai process hooks')) {
+      return false;
+    }
+    
     const hookPatterns = [
       /hook/i,
       /claude.*code/i,

@@ -1,71 +1,71 @@
 {
-  "name": "@dreamerhyde/aitools",
-  "version": "1.0.5",
-  "description": "Essential CLI toolkit for Vibe Coding - keep your AI-assisted development flow smooth by managing processes and optimizing your coding environment",
-  "type": "module",
-  "main": "./dist/cli.js",
-  "bin": {
-    "aitools": "./dist/cli.js",
-    "ai": "./dist/cli.js"
-  },
-  "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target node",
-    "dev": "bun src/cli.ts",
-    "start": "bun dist/cli.js",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build",
-    "postinstall": "node -e \"console.log('\\n▪ AI Tools installed! Use \\'ai\\' or \\'aitools\\' to get started.\\n▪ For shell completion, run: ai completion --help\\n')\" 2>/dev/null || true",
-    "release": "./scripts/release.sh",
-    "release:patch": "./scripts/release.sh patch",
-    "release:minor": "./scripts/release.sh minor",
-    "release:major": "./scripts/release.sh major"
-  },
-  "keywords": [
-    "cli",
-    "vibe-coding",
-    "ai-development",
-    "claude-code",
-    "copilot",
-    "cursor",
-    "process-management",
-    "development-tools",
-    "debugging",
-    "flow-state"
-  ],
-  "author": "Albert Liu",
-  "license": "MIT",
-  "dependencies": {
-    "@clack/prompts": "^0.7.0",
-    "@types/glob": "^9.0.0",
-    "@types/inquirer": "^9.0.9",
-    "chalk": "^5.3.0",
-    "cli-table3": "^0.6.5",
-    "commander": "^11.1.0",
-    "dotenv": "^17.2.1",
-    "glob": "^11.0.3",
-    "ignore": "^7.0.5",
-    "inquirer": "^12.9.3",
-    "ora": "^7.0.1",
-    "smol-toml": "^1.4.2",
-    "table": "^6.8.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
-    "bun-types": "latest",
-    "eslint": "^8.56.0",
-    "typescript": "^5.3.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "packageManager": "bun@1.0.0",
-  "files": [
-    "dist/",
-    "docs/images/",
-    "README.md",
-    "LICENSE"
-  ]
+    "name": "@dreamerhyde/aitools",
+    "version": "1.0.5",
+    "description": "Essential CLI toolkit for Vibe Coding - keep your AI-assisted development flow smooth by managing processes and optimizing your coding environment",
+    "type": "module",
+    "main": "./dist/cli.js",
+    "bin": {
+        "aitools": "./dist/cli.js",
+        "ai": "./dist/cli.js"
+    },
+    "scripts": {
+        "build": "bun build src/cli.ts --outdir dist --target node",
+        "dev": "bun src/cli.ts",
+        "start": "bun dist/cli.js",
+        "lint": "eslint src --ext .ts",
+        "typecheck": "tsc --noEmit",
+        "prepublishOnly": "bun run build",
+        "postinstall": "node -e \"console.log('\\n▪ AI Tools installed! Use \\'ai\\' or \\'aitools\\' to get started.\\n▪ For shell completion, run: ai completion --help\\n')\" 2>/dev/null || true",
+        "release": "./scripts/release.sh",
+        "release:patch": "./scripts/release.sh patch",
+        "release:minor": "./scripts/release.sh minor",
+        "release:major": "./scripts/release.sh major"
+    },
+    "keywords": [
+        "cli",
+        "vibe-coding",
+        "ai-development",
+        "claude-code",
+        "copilot",
+        "cursor",
+        "process-management",
+        "development-tools",
+        "debugging",
+        "flow-state"
+    ],
+    "author": "Albert Liu",
+    "license": "MIT",
+    "dependencies": {
+        "@clack/prompts": "^0.7.0",
+        "@types/glob": "^9.0.0",
+        "@types/inquirer": "^9.0.9",
+        "chalk": "^5.3.0",
+        "cli-table3": "^0.6.5",
+        "commander": "^11.1.0",
+        "dotenv": "^17.2.1",
+        "glob": "^11.0.3",
+        "ignore": "^7.0.5",
+        "inquirer": "^12.9.3",
+        "ora": "^7.0.1",
+        "smol-toml": "^1.4.2",
+        "table": "^6.8.1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@typescript-eslint/eslint-plugin": "^6.15.0",
+        "@typescript-eslint/parser": "^6.15.0",
+        "bun-types": "latest",
+        "eslint": "^8.56.0",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "packageManager": "bun@1.0.0",
+    "files": [
+        "dist/",
+        "docs/images/",
+        "README.md",
+        "LICENSE"
+    ]
 }

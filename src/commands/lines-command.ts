@@ -236,4 +236,47 @@ export class LinesCommand {
       return 'Review and extract complex logic';
     }
   }
+
+  async executeForAI(options: { limit?: number } = {}): Promise<void> {
+    this.lineLimit = options.limit || 500;
+    
+    try {
+      // Load gitignore
+      await this.gitignoreParser.load();
+      
+      // Scan files
+      const files = await this.scanFiles(process.cwd());
+      
+      // Filter files exceeding limit
+      const exceededFiles = files.filter(f => f.exceedsLimit);
+      
+      if (exceededFiles.length === 0) {
+        console.log('All files are within the line limit.');
+        return;
+      }
+      
+      console.log(`Files Exceeding ${this.lineLimit} Lines:`);
+      exceededFiles
+        .sort((a, b) => b.lines - a.lines)
+        .forEach(file => {
+          const relativePath = path.relative(process.cwd(), file.path);
+          const excess = file.lines - this.lineLimit;
+          console.log(`- ${relativePath} (${file.lines} lines) - needs ${excess} line reduction`);
+        });
+      
+      console.log('\nRefactoring Recommendations:');
+      let recommendationNum = 1;
+      exceededFiles
+        .sort((a, b) => b.lines - a.lines)
+        .slice(0, 5)
+        .forEach(file => {
+          const relativePath = path.relative(process.cwd(), file.path);
+          const recommendation = this.getRefactoringRecommendation(file);
+          console.log(`${recommendationNum}. ${recommendation} for ${relativePath}`);
+          recommendationNum++;
+        });
+    } catch (error) {
+      console.log(`Error checking line counts: ${error}`);
+    }
+  }
 }

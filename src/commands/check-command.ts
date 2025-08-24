@@ -396,6 +396,36 @@ export class CheckCommand {
     return issues;
   }
   
+  async executeForAI(): Promise<void> {
+    console.log('Project Quality Issues:\n');
+    
+    const tsResult = await this.checkTypeScript();
+    const eslintResult = await this.checkESLint();
+    
+    // TypeScript Errors
+    if (tsResult.errors > 0 || tsResult.warnings > 0) {
+      console.log(`TypeScript Errors (${tsResult.errors + tsResult.warnings}):`);
+      tsResult.files.forEach(issue => {
+        console.log(`- ${issue.file}${issue.line ? ':' + issue.line : ''}: ${issue.message}`);
+      });
+      console.log();
+    }
+    
+    // ESLint Issues
+    if (eslintResult.errors > 0 || eslintResult.warnings > 0) {
+      console.log(`ESLint Issues (${eslintResult.errors + eslintResult.warnings}):`);
+      eslintResult.files.forEach(issue => {
+        console.log(`- ${issue.file}${issue.line ? ':' + issue.line : ''}: ${issue.message}`);
+      });
+      console.log();
+    }
+    
+    if (tsResult.errors === 0 && eslintResult.errors === 0 && 
+        tsResult.warnings === 0 && eslintResult.warnings === 0) {
+      console.log('No issues found - code quality is good.');
+    }
+  }
+  
   private displaySummary(): void {
     console.log('\n' + chalk.bold('Check Summary'));
     console.log(chalk.hex('#303030')('─'.repeat(30)));

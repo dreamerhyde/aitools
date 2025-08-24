@@ -59,7 +59,8 @@ export class ClaudeUsageCommand {
             { name: '⏱️ Billing Blocks (5-hour windows)', value: 'blocks' },
             { name: '📈 Overall Summary', value: 'summary' },
             { name: '🔄 Live Monitor', value: 'live' }
-          ]
+          ],
+          loop: false
         }]);
 
         switch (mode) {
@@ -187,7 +188,8 @@ export class ClaudeUsageCommand {
         } - ${new Date(session.startTime).toLocaleString()}`,
         value: session
       })),
-      pageSize: 10
+      pageSize: 10,
+      loop: false
     }]);
 
     if (selectedSessions.length > 0) {
