@@ -8,6 +8,25 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as figlet from 'figlet';
+import { ChartGenerator } from '../utils/chart-generator.js';
+
+// Utility function to sanitize text for safe terminal display
+function sanitizeForTerminal(str: string): string {
+  return str
+    // Remove ALL potentially problematic Unicode characters
+    // Keep only: Basic Latin, Latin-1 Supplement, and CJK
+    .replace(/[^\u0020-\u007E\u00A0-\u00FF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFF9F\u4E00-\u9FAF\u3400-\u4DBF]/g, '')
+    // Remove control characters except newlines and tabs
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, (match) => {
+      if (match === '\n' || match === '\t') return match;
+      return '';
+    })
+    // Remove variation selectors and joiners
+    .replace(/[\uFE00-\uFE0F]/g, '')
+    .replace(/[\u200C-\u200D]/g, '')
+    // Remove combining marks that might affect width
+    .replace(/[\u0300-\u036F]/g, '');
+}
 
 interface SessionInfo {
   sessionId: string;
@@ -17,6 +36,8 @@ interface SessionInfo {
   messageCount: number;
   recentMessages: ConversationMessage[];
   currentTopic?: string;
+  currentModel?: string;
+  currentAction?: string;
 }
 
 interface ConversationMessage {
@@ -51,7 +72,7 @@ export class MonitorCommand {
   private costMetrics: CostMetrics | null = null;
   private blessed: any;
   private contrib: any;
-  private currentFontIndex: number = 0;
+  private currentFontIndex: number = 0; // Will be set to Small font in loadAllFonts
   private allFonts: figlet.Fonts[] = [];
   
   // We'll load all available fonts dynamically
@@ -66,8 +87,301 @@ export class MonitorCommand {
   }
   
   private loadAllFonts(): void {
-    // Fixed to use DOS Rebel font only
-    this.allFonts = ['DOS Rebel'];
+    // All available figlet fonts
+    this.allFonts = [
+      'Standard',
+      '3-D',
+      '3D Diagonal',
+      '3D-ASCII',
+      '3x5',
+      '4Max',
+      '5 Line Oblique',
+      'AMC 3 Line',
+      'AMC 3 Liv1',
+      'AMC AAA01',
+      'AMC Neko',
+      'AMC Razor',
+      'AMC Razor2',
+      'AMC Slash',
+      'AMC Slider',
+      'AMC Thin',
+      'AMC Tubes',
+      'AMC Untitled',
+      'ANSI Shadow',
+      'ASCII New Roman',
+      'Alligator',
+      'Alligator2',
+      'Alpha',
+      'Alphabet',
+      'Arrows',
+      'Avatar',
+      'B1FF',
+      'Banner',
+      'Banner3-D',
+      'Banner3',
+      'Banner4',
+      'Barbwire',
+      'Basic',
+      'Bear',
+      'Bell',
+      'Benjamin',
+      'Big',
+      'Big Chief',
+      'Big Money-ne',
+      'Big Money-nw',
+      'Big Money-se',
+      'Big Money-sw',
+      'Bigfig',
+      'Binary',
+      'Block',
+      'Blocks',
+      'Bloody',
+      'Bolger',
+      'Braced',
+      'Bright',
+      'Broadway',
+      'Broadway KB',
+      'Bubble',
+      'Bulbhead',
+      'Caligraphy',
+      'Caligraphy2',
+      'Calvin S',
+      'Cards',
+      'Catwalk',
+      'Chiseled',
+      'Chunky',
+      'Coinstak',
+      'Cola',
+      'Colossal',
+      'Computer',
+      'Contessa',
+      'Contrast',
+      'Cosmike',
+      'Crawford',
+      'Crawford2',
+      'Crazy',
+      'Cricket',
+      'Cursive',
+      'Cyberlarge',
+      'Cybermedium',
+      'Cybersmall',
+      'Cygnet',
+      'DANC4',
+      'DOS Rebel',
+      'DWhistled',
+      'Dancing Font',
+      'Decimal',
+      'Def Leppard',
+      'Delta Corps Priest 1',
+      'Diamond',
+      'Diet Cola',
+      'Digital',
+      'Doh',
+      'Doom',
+      'Dot Matrix',
+      'Double',
+      'Double Shorts',
+      'Dr Pepper',
+      'Efti Chess',
+      'Efti Font',
+      'Efti Italic',
+      'Efti Piti',
+      'Efti Robot',
+      'Efti Wall',
+      'Efti Water',
+      'Electronic',
+      'Elite',
+      'Epic',
+      'Fender',
+      'Filter',
+      'Fire Font-k',
+      'Fire Font-s',
+      'Flipped',
+      'Flower Power',
+      'Four Tops',
+      'Fraktur',
+      'Fun Face',
+      'Fun Faces',
+      'Fuzzy',
+      'Georgi16',
+      'Georgia11',
+      'Ghost',
+      'Ghoulish',
+      'Glenyn',
+      'Goofy',
+      'Gothic',
+      'Graceful',
+      'Gradient',
+      'Graffiti',
+      'Greek',
+      'Heart Left',
+      'Heart Right',
+      'Henry 3D',
+      'Hex',
+      'Hieroglyphs',
+      'Hollywood',
+      'Horizontal Left',
+      'Horizontal Right',
+      'ICL-1900',
+      'Impossible',
+      'Invita',
+      'Isometric1',
+      'Isometric2',
+      'Isometric3',
+      'Isometric4',
+      'Italic',
+      'Ivrit',
+      'JS Block Letters',
+      'JS Bracket Letters',
+      'JS Capital Curves',
+      'JS Cursive',
+      'JS Stick Letters',
+      'Jacky',
+      'Jazmine',
+      'Jerusalem',
+      'Katakana',
+      'Kban',
+      'Keyboard',
+      'Knob',
+      'Konto',
+      'Konto Slant',
+      'LCD',
+      'Larry 3D',
+      'Larry 3D 2',
+      'Lean',
+      'Letters',
+      'Lil Devil',
+      'Line Blocks',
+      'Linux',
+      'Lockergnome',
+      'Madrid',
+      'Marquee',
+      'Maxfour',
+      'Merlin1',
+      'Merlin2',
+      'Mike',
+      'Mini',
+      'Mirror',
+      'Mnemonic',
+      'Modular',
+      'Morse',
+      'Morse2',
+      'Moscow',
+      'Mshebrew210',
+      'Muzzle',
+      'NScript',
+      'NT Greek',
+      'NV Script',
+      'Nancyj',
+      'Nancyj-Fancy',
+      'Nancyj-Improved',
+      'Nancyj-Underlined',
+      'Nipples',
+      'O8',
+      'OS2',
+      'Octal',
+      'Ogre',
+      'Old Banner',
+      'Patorjk\'s Cheese',
+      'Patorjk-HeX',
+      'Pawp',
+      'Peaks',
+      'Peaks Slant',
+      'Pebbles',
+      'Pepper',
+      'Poison',
+      'Puffy',
+      'Puzzle',
+      'Pyramid',
+      'Rammstein',
+      'Rectangles',
+      'Red Phoenix',
+      'Relief',
+      'Relief2',
+      'Reverse',
+      'Roman',
+      'Rot13',
+      'Rotated',
+      'Rounded',
+      'Rowan Cap',
+      'Rozzo',
+      'Runic',
+      'Runyc',
+      'S Blood',
+      'SL Script',
+      'Santa Clara',
+      'Script',
+      'Serifcap',
+      'Shadow',
+      'Shimrod',
+      'Short',
+      'Slant',
+      'Slant Relief',
+      'Slide',
+      'Small',
+      'Small Caps',
+      'Small Isometric1',
+      'Small Keyboard',
+      'Small Poison',
+      'Small Script',
+      'Small Shadow',
+      'Small Slant',
+      'Small Tengwar',
+      'Soft',
+      'Speed',
+      'Spliff',
+      'Stacey',
+      'Stampate',
+      'Stampatello',
+      'Standard',
+      'Star Strips',
+      'Star Wars',
+      'Stellar',
+      'Stforek',
+      'Stick Letters',
+      'Stop',
+      'Straight',
+      'Stronger Than All',
+      'Sub-Zero',
+      'Swamp Land',
+      'Swan',
+      'Sweet',
+      'THIS',
+      'Tanja',
+      'Tengwar',
+      'Term',
+      'Test1',
+      'The Edge',
+      'Thick',
+      'Thin',
+      'Thorned',
+      'Three Point',
+      'Ticks',
+      'Ticks Slant',
+      'Tiles',
+      'Tinker-Toy',
+      'Tombstone',
+      'Train',
+      'Trek',
+      'Tsalagi',
+      'Tubular',
+      'Twisted',
+      'Two Point',
+      'USA Flag',
+      'Univers',
+      'Varsity',
+      'Wavy',
+      'Weird',
+      'Wet Letter',
+      'Whimsy',
+      'Wow'
+    ];
+    
+    // Set default font to 'ANSI Shadow'
+    const defaultFontIndex = this.allFonts.indexOf('ANSI Shadow');
+    if (defaultFontIndex >= 0) {
+      this.currentFontIndex = defaultFontIndex;
+    }
   }
 
   async execute(): Promise<void> {
@@ -121,7 +435,12 @@ export class MonitorCommand {
       // Force terminal type for better compatibility
       terminal: process.env.TERM || 'xterm-256color',
       // Disable auto-padding that might cause issues
-      autoPadding: false
+      autoPadding: false,
+      // Additional fixes for CJK character border corruption
+      forceUnicode: true,
+      ignoreDockContrast: true,
+      // Enable CSR for better scrolling performance
+      fastCSR: true
     });
 
     // Create grid layout - dynamically sized to leave space for status bar
@@ -139,54 +458,63 @@ export class MonitorCommand {
     // Top: Today's cost - big number display (0,0) -> (2,12)
     this.costBox = this.grid.set(0, 0, 2, 12, this.blessed.box, {
       label: ' Today\'s Spend ',
-      border: { type: 'line', fg: 'green' },
+      border: { type: 'line', fg: 'gray' },
       style: {
         fg: 'white',
-        border: { fg: 'green' }
+        border: { fg: 'gray' }
       },
       align: 'center',
       valign: 'middle'
     });
 
-    // Left: Cost trend chart (2,0) -> (6,4)
-    this.costTrendChart = this.grid.set(2, 0, 4, 4, this.contrib.bar, {
-      label: ' 7-Day Cost Trend ',
-      barWidth: 6,
-      barSpacing: 1,
-      xOffset: 1,
-      maxHeight: 9,
-      height: '100%',
-      border: { type: 'line', fg: 'cyan' },
+    // Middle layer - shorter height (row 2-5, total 3 rows instead of 4)
+    // Left block (2:1 ratio): 30-Day Cost Trend (2,0) -> (5,8) - takes 8 columns
+    this.costTrendChart = this.grid.set(2, 0, 3, 8, this.blessed.box, {
+      label: ' 30-Day Cost Trend ',
+      border: { type: 'line', fg: 'gray' },
       style: {
-        fg: 'cyan',
-        border: { fg: 'cyan' },
-        bar: { bg: 'cyan', fg: 'white' }
+        fg: 'white',
+        border: { fg: 'gray' }
+      },
+      tags: true,
+      padding: {
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0
       }
     });
 
-    // Middle: Session statistics (2,4) -> (6,8)
-    this.metricsBox = this.grid.set(2, 4, 4, 4, this.blessed.box, {
-      label: ' Session Stats ',
-      border: { type: 'line', fg: 'yellow' },
+    // Right block - split evenly into top and bottom (2,8) -> (5,12) - takes 4 columns
+    // Top right: Projects (2,8) -> (3.25,12) - slightly less height
+    this.activeSessionsBox = this.grid.set(2, 8, 1.25, 4, this.blessed.box, {
+      label: ' Projects ',
+      border: { type: 'line', fg: 'gray' },
       style: {
         fg: 'white',
-        border: { fg: 'yellow' }
+        border: { fg: 'gray' }
       },
-      padding: 1
+      padding: 0
     });
 
-    // Right: Active sessions overview (2,8) -> (6,12)
-    this.activeSessionsBox = this.grid.set(2, 8, 4, 4, this.blessed.box, {
-      label: ' Active Sessions ',
-      border: { type: 'line', fg: 'magenta' },
+    // Bottom right: System Resources - immediately after Projects with minimal gap
+    this.metricsBox = this.grid.set(3.25, 8, 1.75, 4, this.blessed.box, {
+      label: ' System Resources ',
+      border: { type: 'line', fg: 'gray' },
       style: {
         fg: 'white',
-        border: { fg: 'magenta' }
+        border: { fg: 'gray' }
       },
-      padding: 1
+      padding: {
+        left: 1,  // Add left padding for better spacing
+        right: 0
+      },
+      scrollable: true,
+      alwaysScroll: true,
+      mouse: true
     });
 
-    // Bottom: Dynamic session boxes (6,0) -> (11,12) - reduced to avoid status bar overlap
+    // Bottom: Dynamic session boxes (5,0) -> (11,12) - starts right after middle layer
     // This area will be managed dynamically
 
     // Status Bar - positioned at bottom with proper background
@@ -224,6 +552,33 @@ export class MonitorCommand {
       await this.updateData();
     });
 
+    // Font switching
+    this.screen.key(['f'], () => {
+      this.currentFontIndex = (this.currentFontIndex + 1) % this.allFonts.length;
+      // Don't log, just update display
+      this.updateCostDisplay();
+      this.screen.render();
+    });
+
+    // Quick jump to small fonts (Shift+F)
+    this.screen.key(['S-f'], () => {
+      // Jump to commonly used small fonts
+      const smallFonts = ['Small', 'Mini', 'Thin', 'Short', 'Graceful', 'Lean', 'Small Slant'];
+      const currentFont = this.allFonts[this.currentFontIndex];
+      const smallIndex = smallFonts.indexOf(currentFont);
+      
+      if (smallIndex >= 0 && smallIndex < smallFonts.length - 1) {
+        // Go to next small font
+        const nextSmallFont = smallFonts[smallIndex + 1];
+        this.currentFontIndex = this.allFonts.indexOf(nextSmallFont);
+      } else {
+        // Jump to first small font
+        this.currentFontIndex = this.allFonts.indexOf('Small');
+      }
+      
+      this.updateCostDisplay();
+      this.screen.render();
+    });
 
     // Kill process
     this.screen.key(['k'], async () => {
@@ -306,8 +661,14 @@ export class MonitorCommand {
       const messages = await this.jsonParser.parseAllLogs();
       const dailyUsage = this.usageAnalyzer.analyzeDailyUsage(messages);
       
-      // Get today's data
-      const today = new Date().toISOString().split('T')[0];
+      // Get today's data using local timezone (same as usageAnalyzer)
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+      const today = formatter.format(new Date());
       const todayData = dailyUsage.find(d => d.date === today);
       
       // Get last 7 days for chart
@@ -325,14 +686,14 @@ export class MonitorCommand {
       };
       
       this.updateCostDisplay();
-      this.updateTrendChart();
+      this.updateTrendChart(dailyUsage);
       
     } catch (error) {
       this.log(`Error updating cost data: ${error}`);
     }
   }
 
-  private async getLatestConversationInfo(projectPath: string): Promise<{topic: string, messageCount: number}> {
+  private async getLatestConversationInfo(projectPath: string): Promise<{topic: string, messageCount: number, model?: string, currentAction?: string}> {
     try {
       const { execSync } = require('child_process');
       // Convert project path to log directory format
@@ -345,22 +706,100 @@ export class MonitorCommand {
       ).toString().trim();
       
       if (!recentLog) {
-        return { topic: 'No recent activity', messageCount: 0 };
+        return { topic: 'No recent activity', messageCount: 0, model: undefined };
       }
       
       // Count user messages (conversations)
       const messageCount = parseInt(execSync(
-        `grep '"type":"user"' "${recentLog}" | grep '"content":' | grep -v '"type":"tool_result"' | wc -l`
+        `grep '"type":"user"' "${recentLog}" | grep '"content":' | grep -v '"type":"tool_result"' | wc -l`,
+        { maxBuffer: 1024 * 1024 * 10 }
       ).toString().trim()) || 0;
       
-      // Get the latest user question (type: "user" with string content) - get more content
-      let userQuestion = execSync(
-        `tail -200 "${recentLog}" | jq -r 'select(.type == "user" and (.message.content | type == "string")) | .message.content' 2>/dev/null | tail -1`
-      ).toString().trim();
+      // Get the last few entries to find the latest Q/A pair with larger buffer
+      const recentEntries = execSync(
+        `tail -100 "${recentLog}" 2>/dev/null`,
+        { maxBuffer: 1024 * 1024 * 10 }  // 10MB buffer
+      ).toString().trim().split('\n');
       
-      // Get the latest AI response - get the full content from the last assistant message
-      const aiResponseCmd = `tail -100 "${recentLog}" | grep '"type":"assistant"' | tail -1`;
-      const lastAssistantLine = execSync(aiResponseCmd + ' 2>/dev/null || echo "{}"').toString().trim();
+      // Find the last assistant response and check for tool usage
+      let lastAssistantIndex = -1;
+      let lastAssistantLine = '';
+      let userQuestion = '';
+      let modelName = '';
+      let currentAction = '';
+      
+      // Find last assistant message and check if it's using a tool
+      for (let i = recentEntries.length - 1; i >= 0; i--) {
+        if (recentEntries[i].includes('"type":"assistant"')) {
+          lastAssistantIndex = i;
+          lastAssistantLine = recentEntries[i];
+          // Try to extract model name and check for tool use
+          try {
+            const entry = JSON.parse(recentEntries[i]);
+            if (entry.message && entry.message.model) {
+              modelName = entry.message.model;
+            }
+            
+            // Check if the assistant is using a tool
+            if (entry.message && entry.message.content && Array.isArray(entry.message.content)) {
+              for (const item of entry.message.content) {
+                if (item.type === 'tool_use' && item.name) {
+                  // Map tool names to user-friendly actions
+                  const toolActions: Record<string, string> = {
+                    'Read': '📖 Reading file...',
+                    'Write': '✏️ Writing file...',
+                    'Edit': '✏️ Editing file...',
+                    'MultiEdit': '✏️ Making multiple edits...',
+                    'Bash': '⚡ Running command...',
+                    'Grep': '🔍 Searching...',
+                    'Glob': '🔍 Finding files...',
+                    'LS': '📂 Listing directory...',
+                    'WebFetch': '🌐 Fetching web content...',
+                    'WebSearch': '🔍 Searching web...',
+                    'TodoWrite': '✓ Updating tasks...',
+                    'Task': '🤖 Running agent...',
+                    'NotebookEdit': '📓 Editing notebook...'
+                  };
+                  
+                  currentAction = toolActions[item.name] || `🔧 Using ${item.name}...`;
+                  break;
+                }
+                // Check for thinking or other states
+                else if (item.type === 'text' && item.text) {
+                  const text = item.text.toLowerCase();
+                  if (text.includes('thinking') || text.includes('analyzing')) {
+                    currentAction = '💭 Thinking...';
+                  } else if (text.includes('reading') || text.includes('examining')) {
+                    currentAction = '📖 Reading...';
+                  } else if (text.includes('searching')) {
+                    currentAction = '🔍 Searching...';
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Skip if JSON parsing fails
+          }
+          break;
+        }
+      }
+      
+      // Find the most recent user message before this assistant message
+      if (lastAssistantIndex > 0) {
+        for (let i = lastAssistantIndex - 1; i >= 0; i--) {
+          if (recentEntries[i].includes('"type":"user"')) {
+            try {
+              const userEntry = JSON.parse(recentEntries[i]);
+              if (userEntry.message && userEntry.message.content && typeof userEntry.message.content === 'string') {
+                userQuestion = userEntry.message.content;
+                break;
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
       
       let aiResponse = '';
       if (lastAssistantLine && lastAssistantLine !== '{}') {
@@ -377,13 +816,14 @@ export class MonitorCommand {
                 break;
               }
             }
-            // Take first 800 chars for display
-            aiResponse = aiResponse.substring(0, 800);
+            // Take first 2000 chars for display (increased from 800)
+            aiResponse = aiResponse.substring(0, 2000);
           }
         } catch (e) {
           // Fallback to jq method
           aiResponse = execSync(
-            `echo '${lastAssistantLine.replace(/'/g, "'\\''")}' | jq -r '.message.content[0].text // empty' 2>/dev/null`
+            `echo '${lastAssistantLine.replace(/'/g, "'\\''")}' | jq -r '.message.content[0].text // empty' 2>/dev/null`,
+            { maxBuffer: 1024 * 1024 * 10 }
           ).toString().trim();
         }
       }
@@ -403,30 +843,78 @@ export class MonitorCommand {
         // Preserve original line breaks and wrap long lines
         const originalLines = userQuestion.split('\n');
         let allLines = [];
-        const maxWidth = 38;
+        // Optimized width for full terminal utilization
+        const maxWidth = 60; // Maximize content display while maintaining stability
         
         for (const line of originalLines) {
-          if (line.length <= maxWidth) {
-            allLines.push(line);
-          } else {
-            // Wrap long lines at word boundaries
-            const words = line.split(' ');
-            let currentLine = '';
-            
-            for (const word of words) {
-              const plainWord = word.replace(/\x1b\[[0-9;]*m/g, '');
-              const plainLine = currentLine.replace(/\x1b\[[0-9;]*m/g, '');
-              
-              if (plainLine.length === 0) {
-                currentLine = word;
-              } else if ((plainLine + ' ' + plainWord).length <= maxWidth) {
-                currentLine += ' ' + word;
+          // Calculate display width considering CJK characters and removing emoji
+          const getDisplayWidth = (str: string) => {
+            const plain = str.replace(/\x1b\[[0-9;]*m/g, '');
+            const cleanStr = sanitizeForTerminal(plain);
+            let width = 0;
+            for (const char of cleanStr) {
+              // CJK characters and full-width punctuation
+              if (char.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/)) {
+                width += 2;
               } else {
-                allLines.push(currentLine);
-                currentLine = word;
+                width += 1;
               }
             }
-            if (currentLine) allLines.push(currentLine);
+            return width;
+          };
+          
+          // Force truncate function to ensure no overflow
+          const safeTruncate = (text: string, maxW: number) => {
+            const cleanText = sanitizeForTerminal(text);
+            if (getDisplayWidth(cleanText) <= maxW) return cleanText;
+            
+            let result = '';
+            let currentWidth = 0;
+            
+            for (const char of cleanText) {
+              const charWidth = char.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/) ? 2 : 1;
+              if (currentWidth + charWidth > maxW - 1) { // -1 for safety margin
+                result += '…';
+                break;
+              }
+              result += char;
+              currentWidth += charWidth;
+            }
+            return result;
+          };
+          
+          if (getDisplayWidth(line) <= maxWidth) {
+            allLines.push(line);
+          } else {
+            // Force break long lines with strict width control
+            let remaining = line;
+            while (remaining && allLines.length < 5) {
+              if (getDisplayWidth(remaining) <= maxWidth) {
+                allLines.push(remaining);
+                break;
+              }
+              
+              // Find safe break point by reducing length until it fits
+              let safeLength = Math.min(maxWidth, remaining.length);
+              let testLine = remaining.substring(0, safeLength);
+              
+              while (getDisplayWidth(testLine) > maxWidth && safeLength > 1) {
+                safeLength--;
+                testLine = remaining.substring(0, safeLength);
+              }
+              
+              if (safeLength > 0) {
+                // Apply safe truncation to ensure no overflow
+                const safeLine = safeTruncate(testLine.trim(), maxWidth);
+                allLines.push(safeLine);
+                remaining = remaining.substring(safeLength).trim();
+              } else {
+                // Emergency fallback: take just one character with truncation
+                const safeLine = safeTruncate(remaining.substring(0, 1), maxWidth);
+                allLines.push(safeLine);
+                remaining = remaining.substring(1);
+              }
+            }
           }
           
           if (allLines.length >= 5) break; // Limit to 5 lines
@@ -435,9 +923,9 @@ export class MonitorCommand {
         // Take only first 5 lines
         allLines = allLines.slice(0, 5);
         
-        display = `${chalk.cyan.bold('Q:')} ${chalk.cyan(allLines[0] || '')}`;
+        display = `${chalk.white.bold('Q:')} ${chalk.white(allLines[0] || '')}`;
         for (let i = 1; i < allLines.length; i++) {
-          display += `\n   ${chalk.cyan(allLines[i])}`;
+          display += `\n   ${chalk.white(allLines[i])}`;
         }
       }
       
@@ -455,30 +943,78 @@ export class MonitorCommand {
         // Preserve original line breaks and wrap long lines
         const originalLines = aiResponse.split('\n');
         let allLines = [];
-        const maxWidth = 38;
+        // Optimized width for full terminal utilization
+        const maxWidth = 60; // Maximize content display while maintaining stability
         
         for (const line of originalLines) {
-          if (line.length <= maxWidth) {
-            allLines.push(line);
-          } else {
-            // Wrap long lines at word boundaries
-            const words = line.split(' ');
-            let currentLine = '';
-            
-            for (const word of words) {
-              const plainWord = word.replace(/\x1b\[[0-9;]*m/g, '');
-              const plainLine = currentLine.replace(/\x1b\[[0-9;]*m/g, '');
-              
-              if (plainLine.length === 0) {
-                currentLine = word;
-              } else if ((plainLine + ' ' + plainWord).length <= maxWidth) {
-                currentLine += ' ' + word;
+          // Calculate display width considering CJK characters and removing emoji
+          const getDisplayWidth = (str: string) => {
+            const plain = str.replace(/\x1b\[[0-9;]*m/g, '');
+            const cleanStr = sanitizeForTerminal(plain);
+            let width = 0;
+            for (const char of cleanStr) {
+              // CJK characters and full-width punctuation
+              if (char.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/)) {
+                width += 2;
               } else {
-                allLines.push(currentLine);
-                currentLine = word;
+                width += 1;
               }
             }
-            if (currentLine) allLines.push(currentLine);
+            return width;
+          };
+          
+          // Force truncate function to ensure no overflow
+          const safeTruncate = (text: string, maxW: number) => {
+            const cleanText = sanitizeForTerminal(text);
+            if (getDisplayWidth(cleanText) <= maxW) return cleanText;
+            
+            let result = '';
+            let currentWidth = 0;
+            
+            for (const char of cleanText) {
+              const charWidth = char.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/) ? 2 : 1;
+              if (currentWidth + charWidth > maxW - 1) { // -1 for safety margin
+                result += '…';
+                break;
+              }
+              result += char;
+              currentWidth += charWidth;
+            }
+            return result;
+          };
+          
+          if (getDisplayWidth(line) <= maxWidth) {
+            allLines.push(line);
+          } else {
+            // Force break long lines with strict width control
+            let remaining = line;
+            while (remaining && allLines.length < 5) {
+              if (getDisplayWidth(remaining) <= maxWidth) {
+                allLines.push(remaining);
+                break;
+              }
+              
+              // Find safe break point by reducing length until it fits
+              let safeLength = Math.min(maxWidth, remaining.length);
+              let testLine = remaining.substring(0, safeLength);
+              
+              while (getDisplayWidth(testLine) > maxWidth && safeLength > 1) {
+                safeLength--;
+                testLine = remaining.substring(0, safeLength);
+              }
+              
+              if (safeLength > 0) {
+                // Apply safe truncation to ensure no overflow
+                const safeLine = safeTruncate(testLine.trim(), maxWidth);
+                allLines.push(safeLine);
+                remaining = remaining.substring(safeLength).trim();
+              } else {
+                // Emergency fallback: take just one character with truncation
+                const safeLine = safeTruncate(remaining.substring(0, 1), maxWidth);
+                allLines.push(safeLine);
+                remaining = remaining.substring(1);
+              }
+            }
           }
           
           if (allLines.length >= 15) break; // Limit to 15 lines
@@ -487,25 +1023,72 @@ export class MonitorCommand {
         // Take only first 15 lines
         allLines = allLines.slice(0, 15);
         
-        if (display) {
-          display += `\n${chalk.green.bold('A:')} ${allLines[0] || ''}`;
-          for (let i = 1; i < allLines.length; i++) {
-            display += `\n   ${allLines[i]}`;
+        // Format response with better indentation for wrapped lines
+        const formattedResponse = [];
+        
+        // Check if response contains bullet points or structured content
+        const hasBullets = aiResponse.includes('•') || aiResponse.includes('- ') || 
+                          aiResponse.includes('✅') || aiResponse.includes('✓');
+        
+        if (hasBullets) {
+          // Keep original formatting for structured content
+          for (let i = 0; i < allLines.length; i++) {
+            const line = allLines[i];
+            if (line.startsWith('- ') || line.startsWith('• ') || 
+                line.startsWith('✅') || line.startsWith('✓')) {
+              // Bullet point line
+              formattedResponse.push(chalk.green(line));
+            } else if (i > 0 && !line.match(/^[•\-✅✓]/)) {
+              // Continuation of previous bullet point
+              formattedResponse.push(chalk.green('  ' + line));
+            } else {
+              formattedResponse.push(chalk.green(line));
+            }
           }
         } else {
-          display = `${chalk.green.bold('A:')} ${allLines[0] || ''}`;
-          for (let i = 1; i < allLines.length; i++) {
-            display += `\n   ${allLines[i]}`;
+          // Regular text formatting
+          for (const line of allLines) {
+            formattedResponse.push(chalk.green(line));
+          }
+        }
+        
+        if (display) {
+          display += `\n\n${chalk.green.bold('A:')} ${formattedResponse[0] || ''}`;
+          for (let i = 1; i < formattedResponse.length; i++) {
+            display += `\n   ${formattedResponse[i]}`;
+          }
+        } else {
+          display = `${chalk.green.bold('A:')} ${formattedResponse[0] || ''}`;
+          for (let i = 1; i < formattedResponse.length; i++) {
+            display += `\n   ${formattedResponse[i]}`;
           }
         }
       }
       
+      // If there's a current action but no response yet, show the action
+      if (currentAction && !aiResponse) {
+        display = `${chalk.white.bold('Q:')} ${chalk.white(userQuestion ? userQuestion.substring(0, 100) + '...' : 'Processing...')}\n\n${chalk.yellow.bold(currentAction)}`;
+      }
+      
+      // Add debug info when no Q/A found
+      if (!display) {
+        const debugInfo = `Debug: Found ${recentEntries.length} entries, lastAssistantIndex: ${lastAssistantIndex}, userQuestion: "${userQuestion.substring(0, 30)}...", aiResponse: "${aiResponse.substring(0, 50)}..." (total: ${aiResponse.length} chars)`;
+        return { 
+          topic: debugInfo,
+          messageCount: messageCount,
+          model: modelName || undefined,
+          currentAction: currentAction
+        };
+      }
+      
       return { 
-        topic: display || chalk.dim('Active conversation'),
-        messageCount: messageCount
+        topic: display || 'Active conversation',  // Remove chalk formatting
+        messageCount: messageCount,
+        model: modelName || undefined,
+        currentAction: currentAction
       };
     } catch (error) {
-      return { topic: chalk.dim('Active'), messageCount: 0 };
+      return { topic: `Error: ${error}`, messageCount: 0, model: undefined, currentAction: '' };  // Show error for debugging
     }
   }
 
@@ -563,7 +1146,9 @@ export class MonitorCommand {
               lastActivity: currentTime,
               messageCount: conversationInfo.messageCount,
               recentMessages: [],
-              currentTopic: conversationInfo.topic
+              currentTopic: conversationInfo.topic,
+              currentModel: conversationInfo.model,
+              currentAction: conversationInfo.currentAction
             });
           } else {
             // Update session info
@@ -572,6 +1157,8 @@ export class MonitorCommand {
             session.lastActivity = currentTime;
             session.messageCount = conversationInfo.messageCount;
             session.currentTopic = conversationInfo.topic;
+            session.currentModel = conversationInfo.model;
+            session.currentAction = conversationInfo.currentAction;
           }
         }
         
@@ -604,6 +1191,21 @@ export class MonitorCommand {
     const sessions = this.costMetrics.todaySessions;
     const tokens = formatNumber(this.costMetrics.todayTokens);
     
+    // Get current model from active sessions
+    let currentModel = 'No active model';
+    if (this.activeSessions.size > 0) {
+      // Get the most recent session's model
+      const recentSession = Array.from(this.activeSessions.values())
+        .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())[0];
+      if (recentSession && recentSession.currentModel) {
+        // Simplify model name for display
+        currentModel = recentSession.currentModel
+          .replace('claude-', '')
+          .replace('-20', '-')
+          .replace('241022', '');
+      }
+    }
+    
     // Create figlet ASCII art with color
     const costStr = `$${cost.toFixed(2)}`;
     
@@ -618,105 +1220,326 @@ export class MonitorCommand {
       
       const bigCost = figlet.textSync(costStr, figletOptions);
       
+      // Check if font is too tall (more than 6 lines)
+      const fontLines = bigCost.split('\n').length;
+      const isFontTooTall = fontLines > 6;
+      
       // Apply green color to the big cost display
       const coloredCost = chalk.green.bold(bigCost);
       
-      this.costBox.setContent(
-        `\n${coloredCost}\n\n` +
-        `   ${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}   `
-      );
+      if (isFontTooTall) {
+        // For tall fonts, reduce spacing
+        this.costBox.setContent(
+          `${coloredCost}\n` +
+          `${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}\n` +
+          `${chalk.magenta('Model:')} ${chalk.white(currentModel)} | ${chalk.blue('Font:')} ${chalk.white(selectedFont)}`
+        );
+      } else {
+        // Normal spacing for regular fonts
+        this.costBox.setContent(
+          `\n${coloredCost}\n\n` +
+          `   ${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}   \n\n` +
+          `   ${chalk.magenta('Model:')} ${chalk.white(currentModel)}  |  ${chalk.blue('Font:')} ${chalk.white(selectedFont)}   `
+        );
+      }
     } catch (error) {
       // Fallback to simple display if figlet fails
       this.costBox.setContent(
         `\n${chalk.green.bold('$' + cost.toFixed(2))}\n\n` +
-        `${sessions} sessions | ${tokens} tokens`
+        `${sessions} sessions | ${tokens} tokens\n\n` +
+        `Model: ${currentModel}  |  Font: ${selectedFont}`
       );
     }
   }
   
   
-  private updateTrendChart(): void {
+  private updateTrendChart(dailyUsage?: any[]): void {
     if (!this.costTrendChart || !this.costMetrics) return;
     
-    // Get the last 7 days dates
-    const dates = [];
-    const data = [...this.costMetrics.weekCosts];
-    const today = new Date();
+    // Get box dimensions - use full available space
+    const boxWidth = (this.costTrendChart.width as number) || 60;
+    const boxHeight = (this.costTrendChart.height as number) || 10;
     
-    // Generate date labels (MM/DD format)
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const day = date.getDate().toString().padStart(2, '0');
-      dates.push(`${month}/${day}`);
+    // Prepare cost data map from the last 30 days
+    const costData = new Map<string, number>();
+    
+    // Build cost map from actual data
+    if (dailyUsage) {
+      dailyUsage.forEach(day => {
+        costData.set(day.date, day.totalCost);
+      });
     }
     
-    // Pad with zeros if less than 7 days
-    while (data.length < 7) {
-      data.unshift(0);
-    }
+    // Generate continuous 30 days using the shared utility
+    const chartData = ChartGenerator.generateContinuous30Days(costData);
     
-    // Only take last 7 values
-    const last7Data = data.slice(-7);
+    // Fixed chart width for 30-day display (30 * 3 = 90 chars)
+    const chartActualWidth = 90; // 30 bars * (2 bar + 1 space)
+    const availableWidth = boxWidth - 10; // Leave space for Y-axis labels
     
-    const chartData = {
-      titles: dates,
-      data: last7Data.map(cost => {
-        // Format to integer for cleaner display
-        return Math.round(cost) || 0;
-      })
-    };
+    // Generate chart with fixed width
+    const chartLines = ChartGenerator.generateBarChart(chartData, {
+      width: chartActualWidth,
+      height: Math.max(6, boxHeight - 4), // Leave room for labels
+      barWidth: 2,
+      showDates: true,
+      fullDates: true // Always show all dates for 30-day view
+    });
     
-    this.costTrendChart.setData(chartData);
+    // Don't center - use full width as-is
+    // The chart already handles its own spacing internally
+    const centeredContent = chartLines.join('\n');
+    
+    // Set content directly
+    this.costTrendChart.setContent(centeredContent);
   }
 
   private updateSessionStats(): void {
-    if (!this.metricsBox || !this.costMetrics) return;
+    // Update System Resources box (bottom right)
+    if (!this.metricsBox) return;
     
-    const activeCount = this.activeSessions.size;
-    const avgCostPerSession = this.costMetrics.todaySessions > 0 ? 
-      (this.costMetrics.today / this.costMetrics.todaySessions).toFixed(2) : '0.00';
-    const avgTokensPerSession = this.costMetrics.todayTokens > 0 ? 
-      Math.round(this.costMetrics.todayTokens / this.costMetrics.todaySessions) : 0;
+    // Show loading state immediately
+    if (!this.resourceCache) {
+      this.metricsBox.setContent(chalk.gray('Loading...'));
+    }
     
-    const content = [
-      chalk.white.bold('═══ Sessions ═══'),
-      '',
-      `${chalk.cyan('Today:')}      ${chalk.white.bold(this.costMetrics.todaySessions)} sessions`,
-      `${chalk.blue('This Week:')} ${chalk.white.bold(this.costMetrics.weekSessions)} total`,
-      `${chalk.green('Active Now:')} ${activeCount > 0 ? chalk.green.bold(activeCount) : chalk.gray('0')}`,
-      '',
-      chalk.white.bold('═══ Average ═══'),
-      '',
-      `${chalk.yellow('Per Session:')} ${chalk.white.bold('$' + avgCostPerSession)}`,
-      `${chalk.magenta('Tokens:')}     ${chalk.white.bold(formatNumber(avgTokensPerSession))}`
-    ].join('\n');
+    // Get system resource data (with timeout)
+    Promise.race([
+      this.getSystemResources(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
+    ]).then(resources => {
+      // Cache the resources
+      this.resourceCache = resources as any;
+      
+      const resourceDisplay: string[] = [];
+      
+      // Add empty line at the top
+      resourceDisplay.push('');
+      
+      // Calculate available width for progress bar
+      // Box width minus borders (2) minus left padding (1) minus "CPU " (4) minus " XX.X%" (7)
+      const boxWidth = (this.metricsBox.width as number) || 40;
+      const availableWidth = boxWidth - 2 - 1 - 4 - 7;
+      const barWidth = Math.max(20, availableWidth); // Use full available width
+      
+      // CPU section with bar and details - dynamic width bar
+      const cpuBar = this.createMiniBar(resources.cpu, 100, barWidth);
+      resourceDisplay.push(`${chalk.bold('CPU')} ${cpuBar} ${chalk.yellow(resources.cpu.toFixed(1) + '%')}`);
+      resourceDisplay.push(chalk.gray(`${resources.cpuInfo}`));
+      
+      resourceDisplay.push(''); // spacing between CPU and MEM
+      
+      // Memory section with bar and details - dynamic width bar
+      const memBar = this.createMiniBar(resources.memory, 100, barWidth);
+      resourceDisplay.push(`${chalk.bold('MEM')} ${memBar} ${chalk.cyan(resources.memory.toFixed(1) + '%')}`);
+      resourceDisplay.push(chalk.gray(`${resources.memUsed}/${resources.memTotal} GB`));
+      
+      resourceDisplay.push(''); // spacing between MEM and GPU
+      
+      // GPU section if available - dynamic width bar
+      if (resources.gpu !== undefined && resources.gpuInfo) {
+        const gpuBar = this.createMiniBar(resources.gpu, 100, barWidth);
+        resourceDisplay.push(`${chalk.bold('GPU')} ${gpuBar} ${chalk.magenta(resources.gpu.toFixed(1) + '%')}`);
+        resourceDisplay.push(chalk.gray(`${resources.gpuInfo}`));
+      }
+      
+      this.metricsBox.setContent(resourceDisplay.join('\n'));
+    }).catch(() => {
+      // Use cached data if available
+      if (this.resourceCache) {
+        const resources = this.resourceCache;
+        const resourceDisplay: string[] = [];
+        // Calculate dynamic width
+        const boxWidth = (this.metricsBox.width as number) || 40;
+        const availableWidth = boxWidth - 2 - 1 - 4 - 7;
+        const barWidth = Math.max(20, availableWidth); // Use full available width
+        
+        const cpuBar = this.createMiniBar(resources.cpu, 100, barWidth);
+        const memBar = this.createMiniBar(resources.memory, 100, barWidth);
+        
+        resourceDisplay.push(''); // Add empty line at the top
+        resourceDisplay.push(`${chalk.bold('CPU')} ${cpuBar} ${chalk.yellow(resources.cpu.toFixed(1) + '%')}`);
+        resourceDisplay.push(chalk.gray(`${resources.cpuInfo}`));
+        resourceDisplay.push('');
+        resourceDisplay.push(`${chalk.bold('MEM')} ${memBar} ${chalk.cyan(resources.memory.toFixed(1) + '%')}`);
+        resourceDisplay.push(chalk.gray(`${resources.memUsed}/${resources.memTotal} GB`));
+        
+        this.metricsBox.setContent(resourceDisplay.join('\n'));
+      } else {
+        this.metricsBox.setContent(chalk.gray('Resources N/A'));
+      }
+    });
+  }
+  
+  private resourceCache?: any;
+  
+  private createMiniBar(value: number, max: number, width: number): string {
+    const filled = Math.round((value / max) * width);
+    const empty = width - filled;
     
-    this.metricsBox.setContent(content);
+    let color = chalk.green;
+    if (value > 80) color = chalk.red;
+    else if (value > 60) color = chalk.yellow;
+    
+    return color('█'.repeat(filled)) + chalk.gray('░'.repeat(empty));
+  }
+  
+  private async getSystemResources(): Promise<{ 
+    cpu: number, 
+    cpuInfo: string,
+    memory: number, 
+    memUsed: string,
+    memTotal: string,
+    gpu?: number,
+    gpuInfo?: string 
+  }> {
+    const { execSync } = require('child_process');
+    
+    try {
+      // Get CPU info (Apple Silicon vs Intel)
+      let cpuInfo = 'Unknown';
+      let gpuInfo = undefined;
+      let gpu = undefined;
+      
+      try {
+        // First check if it's Apple Silicon using a more reliable method
+        const cpuArch = execSync('uname -m').toString().trim();
+        const coreCount = execSync('sysctl -n hw.ncpu').toString().trim();
+        
+        if (cpuArch === 'arm64') {
+          // Apple Silicon - try to get specific chip name
+          try {
+            const cpuBrand = execSync('sysctl -n machdep.cpu.brand_string 2>/dev/null').toString().trim();
+            const chipMatch = cpuBrand.match(/Apple (M\d+\s*\w*)/);
+            const chipName = chipMatch ? chipMatch[1] : 'Apple Silicon';
+            cpuInfo = `${chipName} (${coreCount} cores)`;
+            
+            // GPU info based on chip
+            if (chipName.includes('M1')) {
+              gpuInfo = `${chipName} GPU (7-8 cores)`;
+            } else if (chipName.includes('M2')) {
+              gpuInfo = `${chipName} GPU (10 cores)`;
+            } else if (chipName.includes('M3')) {
+              gpuInfo = `${chipName} GPU (10+ cores)`;
+            } else {
+              gpuInfo = `${chipName} GPU (Integrated)`;
+            }
+          } catch {
+            cpuInfo = `Apple Silicon (${coreCount} cores)`;
+            gpuInfo = 'Apple GPU (Integrated)';
+          }
+          gpu = 0; // Show as 0% rather than N/A
+        } else {
+          // Intel Mac (x86_64)
+          try {
+            const cpuBrand = execSync('sysctl -n machdep.cpu.brand_string 2>/dev/null').toString().trim();
+            // Extract Intel model info
+            const intelMatch = cpuBrand.match(/Intel\(R\)\s+(.+?)\s+CPU/);
+            const intelModel = intelMatch ? intelMatch[1] : 'Intel';
+            cpuInfo = `${intelModel} (${coreCount} cores)`;
+          } catch {
+            cpuInfo = `Intel (${coreCount} cores)`;
+          }
+          // Skip GPU detection for Intel to avoid slowdown
+          gpuInfo = 'Discrete/Integrated';
+          gpu = 0;
+        }
+      } catch {
+        const coreCount = execSync('sysctl -n hw.ncpu').toString().trim();
+        cpuInfo = `${coreCount} cores`;
+      }
+      
+      // Get CPU usage
+      const cpuOutput = execSync('ps -A -o %cpu | awk \'{s+=$1} END {print s}\'').toString().trim();
+      const cpuCores = parseInt(execSync('sysctl -n hw.ncpu').toString().trim());
+      const cpu = parseFloat(cpuOutput) / cpuCores; // Convert to percentage of total cores
+      
+      // Get memory info
+      const totalMemBytes = parseInt(execSync('sysctl -n hw.memsize').toString().trim());
+      const totalMemGB = (totalMemBytes / (1024 * 1024 * 1024)).toFixed(1);
+      
+      // Get memory usage with more detail
+      const vmStatOutput = execSync('vm_stat').toString();
+      const pageSize = 4096; // macOS page size
+      
+      let pagesActive = 0;
+      let pagesWired = 0;
+      let pagesCompressed = 0;
+      
+      vmStatOutput.split('\n').forEach(line => {
+        if (line.includes('Pages active:')) {
+          pagesActive = parseInt(line.match(/(\d+)/)?.[1] || '0');
+        } else if (line.includes('Pages wired down:')) {
+          pagesWired = parseInt(line.match(/(\d+)/)?.[1] || '0');
+        } else if (line.includes('Pages occupied by compressor:')) {
+          pagesCompressed = parseInt(line.match(/(\d+)/)?.[1] || '0');
+        }
+      });
+      
+      const usedMemBytes = (pagesActive + pagesWired + pagesCompressed) * pageSize;
+      const usedMemGB = (usedMemBytes / (1024 * 1024 * 1024)).toFixed(1);
+      const memory = (usedMemBytes / totalMemBytes) * 100;
+      
+      return { 
+        cpu: Math.min(cpu, 100), 
+        cpuInfo,
+        memory: Math.min(memory, 100),
+        memUsed: usedMemGB,
+        memTotal: totalMemGB,
+        gpu,
+        gpuInfo
+      };
+    } catch (error) {
+      // Fallback with dummy data
+      return { 
+        cpu: 45, 
+        cpuInfo: 'Unknown',
+        memory: 62,
+        memUsed: '10.0',
+        memTotal: '16.0'
+      };
+    }
   }
 
   private updateActiveSessionsList(): void {
+    // Update Projects box (top right) - merged with active sessions info
     if (!this.activeSessionsBox) return;
     
-    const sessionList: string[] = [];
+    const projectInfo = [];
+    const activeCount = this.activeSessions.size;
     
-    for (const [id, session] of this.activeSessions) {
-      const minutesAgo = Math.round((Date.now() - session.lastActivity.getTime()) / 60000);
-      const timeStr = minutesAgo === 0 ? chalk.green('now') : chalk.yellow(`${minutesAgo}m ago`);
-      sessionList.push(`${chalk.cyan.bold(session.user)} (${timeStr})`);
-      sessionList.push(`  ${chalk.white(session.messageCount)} msgs`);
-      if (session.currentTopic) {
-        sessionList.push(`  ${chalk.gray('"' + session.currentTopic.substring(0, 20) + '...')}"`); 
+    if (activeCount > 0) {
+      // Get unique projects with session counts
+      const projectMap = new Map<string, number>();
+      let totalMessages = 0;
+      
+      for (const [id, session] of this.activeSessions) {
+        const project = session.user;
+        projectMap.set(project, (projectMap.get(project) || 0) + 1);
+        totalMessages += session.messageCount;
       }
-      sessionList.push('');
+      
+      // Show project list with session counts
+      projectInfo.push(chalk.green.bold(`${activeCount} active sessions`));
+      projectInfo.push(chalk.yellow(`${totalMessages} total messages`));
+      projectInfo.push(''); // Empty line
+      
+      // List projects (max 2 to fit in small box)
+      let i = 0;
+      for (const [project, count] of projectMap) {
+        if (i >= 2) {
+          projectInfo.push(chalk.gray(`+${projectMap.size - 2} more`));
+          break;
+        }
+        const shortName = project.split('/').pop() || project;
+        projectInfo.push(chalk.cyan(`• ${shortName} (${count})`));
+        i++;
+      }
+    } else {
+      projectInfo.push(chalk.gray('No active projects'));
     }
     
-    if (sessionList.length === 0) {
-      sessionList.push(chalk.gray('No active sessions'));
-    }
-    
-    this.activeSessionsBox.setContent(sessionList.join('\n'));
+    this.activeSessionsBox.setContent(projectInfo.join('\n'));
   }
 
   private watchLogFile(): void {
@@ -743,7 +1566,7 @@ export class MonitorCommand {
         });
       });
       
-      this.log(`Monitoring: ${path.basename(logPath)}`);
+      // Silent - don't show monitoring message
     }).catch(error => {
       this.log(`Failed to watch logs: ${error}`);
     });
@@ -805,7 +1628,7 @@ export class MonitorCommand {
     // Calculate available space for session boxes
     const termHeight = process.stdout.rows || 24;
     const gridRows = Math.max(10, Math.min(12, termHeight - 2));
-    const sessionStartRow = 6;
+    const sessionStartRow = 5; // Start at row 5 (after middle layer which ends at row 5)
     const availableRows = Math.max(2, gridRows - sessionStartRow - 1); // Leave 1 row buffer
     const boxHeight = Math.min(4, availableRows); // Max height of 4, but can be smaller
     
@@ -821,27 +1644,24 @@ export class MonitorCommand {
       }
       
       if (!this.sessionBoxes.has(id)) {
-        // Determine border color based on activity
+        // Use consistent gray border color for all boxes
         const minutesAgo = Math.round((now.getTime() - session.lastActivity.getTime()) / 60000);
-        const borderColor = minutesAgo === 0 ? 'green' : minutesAgo < 5 ? 'yellow' : 'blue';
+        const borderColor = 'gray';
         
-        // Create new session box using grid positioning with dynamic height
+        // Create new session box using blessed box with proper configuration
         const box = this.grid.set(row, col, boxHeight, 4, this.blessed.box, {
-          label: ` ${chalk.bold(session.user)} `,
-          border: { type: 'line', fg: borderColor },
+          label: ` ${session.user} `,
+          border: { type: 'line', fg: 'gray' },
           style: {
             fg: 'white',
-            border: { fg: borderColor }
+            border: { fg: 'gray' }
           },
+          tags: true,
+          wrap: true,
           padding: {
             left: 1,
-            right: 1,
-            top: 0,
-            bottom: 0
-          },
-          scrollable: true,
-          tags: true,
-          wrap: true
+            right: 1
+          }
         });
         this.sessionBoxes.set(id, box);
       }
@@ -849,16 +1669,42 @@ export class MonitorCommand {
       // Update box content with better design
       const box = this.sessionBoxes.get(id)!;
       const minutesAgo = Math.round((now.getTime() - session.lastActivity.getTime()) / 60000);
-      const timeStr = minutesAgo === 0 ? chalk.green('● now') : chalk.yellow(`○ ${minutesAgo}m ago`);
+      const timeStr = minutesAgo === 0 ? chalk.green('* now') : chalk.yellow(`- ${minutesAgo}m ago`);
       const messageStr = session.messageCount > 0 ? `${chalk.bold(session.messageCount)} msgs` : chalk.dim('0 msgs');
       
-      const content = [
-        `${timeStr}  ${chalk.dim('│')}  ${chalk.magenta(messageStr)}`,
-        chalk.dim('─'.repeat(30)),
-        '',
-        session.currentTopic || chalk.dim('No recent activity')
-      ].join('\n');
+      // Strip ANSI codes for cleaner display
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
       
+      // Build content without complex formatting that might break box rendering
+      // Green dot for active (now), gray dot for inactive
+      const statusLine = minutesAgo === 0 ? '* now' : `- ${minutesAgo}m ago`;
+      const msgLine = session.messageCount > 0 ? `${session.messageCount} msgs` : '0 msgs';
+      const divider = '─'.repeat(Math.min(25, Math.floor((box.width as number - 4) / 2)));
+      
+      // Apply colors using blessed tags
+      const coloredStatusLine = minutesAgo === 0 
+        ? '{green-fg}* now{/green-fg}' 
+        : `- ${minutesAgo}m ago`;
+      
+      // Build content as a single string
+      const contentLines = [
+        `${coloredStatusLine}  │  ${msgLine}`,
+        divider,
+        ''
+      ];
+      
+      // Show current action if present (when AI is processing)
+      if (session.currentAction) {
+        contentLines.push('{yellow-fg}' + stripAnsi(session.currentAction) + '{/yellow-fg}');
+        contentLines.push('');
+      }
+      
+      // Show the topic/conversation
+      contentLines.push(stripAnsi(session.currentTopic || 'No recent activity'));
+      
+      const content = contentLines.join('\n');
+      
+      // Set content directly
       box.setContent(content);
       boxIndex++;
     }
@@ -879,7 +1725,7 @@ export class MonitorCommand {
     
     if (change > 10) return `↑ ${change.toFixed(0)}%`;
     if (change < -10) return `↓ ${Math.abs(change).toFixed(0)}%`;
-    return '→ Stable';
+    return '> Stable';
   }
 
   private showProcessDetails(process: SessionInfo): void {

@@ -40,7 +40,7 @@ export class UsageAnalyzer {
     const dailyMap = new Map<string, DailyUsage>();
     
     // Debug: Count today's messages using same formatting logic
-    const todayDate = this.formatDate('2025-08-24T12:00:00.000Z'); // Use noon to avoid timezone edge cases
+    const todayDate = this.formatDate(new Date().toISOString()); // Use current date
     const todayMessages = messages.filter(m => this.formatDate(m.timestamp) === todayDate);
     if (process.env.DEBUG) {
       console.log(`analyzeDailyUsage: Processing ${messages.length} total messages, ${todayMessages.length} from today (${todayDate})`);
@@ -109,7 +109,7 @@ export class UsageAnalyzer {
     });
     
     if (process.env.DEBUG) {
-      const todayDate = this.formatDate('2025-08-24T12:00:00.000Z');
+      const todayDate = this.formatDate(new Date().toISOString());
       const todayConversations = conversationsByDay.get(todayDate);
       console.log(`Today (${todayDate}) conversations: ${todayConversations?.size || 0}`);
     }

@@ -46,6 +46,7 @@ Keyboard Controls:
   q         - Quit
   k         - Kill selected process
   r         - Refresh data
+  f         - Switch font for cost display
   ↑/↓       - Navigate processes
   Enter     - View process details
   
