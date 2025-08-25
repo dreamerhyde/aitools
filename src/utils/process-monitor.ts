@@ -66,6 +66,15 @@ export class ProcessMonitor {
     }
   }
 
+  async findSuspiciousProcesses(): Promise<ProcessInfo[]> {
+    const result = await this.detectSuspiciousHooks();
+    return [
+      ...result.suspiciousProcesses,
+      ...result.highCpuProcesses,
+      ...result.longRunningBash
+    ];
+  }
+
   async detectSuspiciousHooks(): Promise<HookDetectionResult> {
     const processes = await this.getAllProcesses();
     const systemStats = await this.getSystemStats();

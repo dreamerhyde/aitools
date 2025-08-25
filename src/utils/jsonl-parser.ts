@@ -8,8 +8,10 @@ import { PricingFetcher } from './pricing-fetcher.js';
 export class JSONLParser {
   private logDirs: string[];
   private pricingFetcher: PricingFetcher;
+  private silent: boolean = false;
 
-  constructor(logDir?: string, useDynamicPricing: boolean = true) {
+  constructor(logDir?: string, useDynamicPricing: boolean = true, silent: boolean = false) {
+    this.silent = silent;
     // Match ccusage's logic for finding Claude data
     const home = process.env.HOME || '';
     this.pricingFetcher = new PricingFetcher(!useDynamicPricing);
@@ -373,8 +375,8 @@ export class JSONLParser {
       }
     }
 
-    // Debug info (only if there's a significant discrepancy)
-    if (process.env.DEBUG || (totalFiles > 10 && processedFiles < totalFiles * 0.7)) {
+    // Debug info (only if DEBUG mode and not silent)
+    if (!this.silent && (process.env.DEBUG || (totalFiles > 10 && processedFiles < totalFiles * 0.7))) {
       console.log(`Processed ${processedFiles}/${totalFiles} files (${emptyFiles} empty, ${failedFiles} failed), got ${allMessages.length} messages`);
       if (globalDuplicates > 0) {
         console.log(`Cross-file duplicates removed: ${globalDuplicates}`);

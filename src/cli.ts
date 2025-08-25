@@ -12,6 +12,8 @@ import { setupLintCommand } from './cli/lint-command.js';
 import { setupLinesCommand } from './cli/lines-command.js';
 import { setupProcessCommand } from './cli/process-command.js';
 import { setupPricingCommand } from './cli/pricing-command.js';
+import { setupMonitorCommand } from './cli/monitor-command.js';
+import { setupSupabaseCommand } from './cli/supabase-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
@@ -50,6 +52,7 @@ program
 // Core commands
 setupInitCommand(program);
 setupCostCommand(program);
+setupMonitorCommand(program);  // real-time monitor
 setupTreeCommand(program);    // tree + files
 setupChangesCommand(program); // git changes
 setupLintCommand(program);    // quality checks
@@ -59,6 +62,7 @@ setupLinesCommand(program);   // line limit checks
 setupHooksCommand(program);
 setupProcessCommand(program);
 setupPricingCommand(program);
+setupSupabaseCommand(program);
 setupCompletionCommand(program);
 
 // Basic commands
