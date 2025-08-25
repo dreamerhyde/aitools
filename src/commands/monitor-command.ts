@@ -478,7 +478,7 @@ export class MonitorCommand {
       },
       tags: true,
       padding: {
-        left: 0,
+        left: 0,  // No left padding - let chart use full width
         right: 0,
         top: 0,
         bottom: 0
@@ -1273,25 +1273,21 @@ export class MonitorCommand {
     // Generate continuous 30 days using the shared utility
     const chartData = ChartGenerator.generateContinuous30Days(costData);
     
-    // Fixed chart width for 30-day display (30 * 3 = 90 chars)
-    const chartActualWidth = 90; // 30 bars * (2 bar + 1 space)
-    const availableWidth = boxWidth - 10; // Leave space for Y-axis labels
+    // Calculate chart width to fill the entire box
+    // Box width minus borders (2) minus Y-axis area (6 chars: "$XXX | ")
+    const chartWidth = Math.max(30, boxWidth - 2 - 6);
     
-    // Generate chart with fixed width
+    // Generate chart with full width
     const chartLines = ChartGenerator.generateBarChart(chartData, {
-      width: chartActualWidth,
+      width: chartWidth,
       height: Math.max(6, boxHeight - 4), // Leave room for labels
-      barWidth: 2,
+      barWidth: 2, // Fixed 2-char width bars
       showDates: true,
       fullDates: true // Always show all dates for 30-day view
     });
     
-    // Don't center - use full width as-is
-    // The chart already handles its own spacing internally
-    const centeredContent = chartLines.join('\n');
-    
-    // Set content directly
-    this.costTrendChart.setContent(centeredContent);
+    // Set content directly without extra padding
+    this.costTrendChart.setContent(chartLines.join('\n'));
   }
 
   private updateSessionStats(): void {

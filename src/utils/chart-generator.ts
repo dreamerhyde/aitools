@@ -6,34 +6,28 @@ export interface ChartData {
 }
 
 export interface ChartOptions {
-  width?: number;      // Chart width (default: auto)
-  height?: number;     // Chart height (default: 10)
-  barWidth?: number;   // Width of each bar (default: 2)
-  showDates?: boolean; // Show date labels (default: true)
-  fullDates?: boolean; // Show all dates vs key dates only (default: false)
+  width?: number;
+  height?: number;
+  barWidth?: number;
+  showDates?: boolean;
+  fullDates?: boolean;
 }
 
 export class ChartGenerator {
-  /**
-   * Generate continuous 30 days of data, filling gaps with zeros
-   */
   static generateContinuous30Days(data: Map<string, number>): ChartData[] {
     const result: ChartData[] = [];
-    const today = new Date();
+    const now = new Date();
     
-    // Generate 30 consecutive days ending today
+    // Generate dates for the last 30 days
     for (let i = 29; i >= 0; i--) {
-      const date = new Date(today);
+      const date = new Date(now);
       date.setDate(date.getDate() - i);
       
-      // Format date using user's timezone
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      });
-      const dateStr = formatter.format(date);
+      // Format date as YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
       result.push({
         date: dateStr,
@@ -44,25 +38,19 @@ export class ChartGenerator {
     return result;
   }
 
-  /**
-   * Generate ASCII bar chart
-   */
   static generateBarChart(data: ChartData[], options: ChartOptions = {}): string[] {
     const {
       height = 10,
       barWidth = 2,
       showDates = true,
       fullDates = false,
-      width
+      width = 90
     } = options;
     
     const dataCount = data.length; // Should be 30 for 30-day chart
     
-    // Simple fixed spacing like ai cost command
-    // Each bar takes 3 characters: 2 for bar, 1 for space
-    const actualBarWidth = 2; // Standard bar width
-    const barTotalWidth = 3; // barWidth(2) + spacing(1)
-    const chartWidth = Math.min(dataCount * barTotalWidth, width || 120);
+    // Calculate space per bar to evenly distribute across width
+    const spacePerBar = width / dataCount;
     
     // Find max value for scaling (ensure it's not zero)
     const maxValue = Math.max(0.01, Math.max(...data.map(d => d.value)));
@@ -70,39 +58,40 @@ export class ChartGenerator {
     // Create chart array
     const chart: string[][] = [];
     for (let i = 0; i < height; i++) {
-      chart[i] = new Array(chartWidth).fill(' ');
+      chart[i] = new Array(width).fill(' ');
     }
     
-    // Draw bars with fixed spacing (like ai cost)
+    // Draw bars evenly distributed across the width
     data.forEach((item, index) => {
-      const barHeight = item.value > 0 
-        ? Math.max(1, Math.ceil((item.value / maxValue) * (height - 1)))
-        : 0;
+      if (item.value === 0) return; // Skip zero values
       
-      // Simple position calculation: each bar at index * 3
-      const x = index * barTotalWidth;
+      const barHeight = Math.max(1, Math.ceil((item.value / maxValue) * (height - 1)));
       
+      // Calculate x position for this bar (evenly distributed)
+      const centerX = (index + 0.5) * spacePerBar;
+      const barStartX = Math.floor(centerX - barWidth / 2);
+      
+      // Choose color based on value relative to max
+      let barChar = '█';
+      let coloredBar = '';
+      if (item.value > maxValue * 0.8) {
+        coloredBar = '{red-fg}█{/red-fg}';
+      } else if (item.value > maxValue * 0.5) {
+        coloredBar = '{yellow-fg}█{/yellow-fg}';
+      } else {
+        coloredBar = '{green-fg}█{/green-fg}';
+      }
+      
+      // Draw the bar
       for (let y = 0; y < barHeight; y++) {
         const chartY = height - 1 - y;
-        if (x < chartWidth) {
-          // Choose color based on value relative to max
-          let barChar = '█';
-          if (item.value > maxValue * 0.8) {
-            barChar = '{red-fg}█{/red-fg}';
-          } else if (item.value > maxValue * 0.5) {
-            barChar = '{yellow-fg}█{/yellow-fg}';
-          } else if (item.value > 0) {
-            barChar = '{green-fg}█{/green-fg}';
-          }
-          
-          // Draw bar with actual width (3 characters)
-          for (let w = 0; w < Math.min(actualBarWidth, chartWidth - x); w++) {
-            chart[chartY][x + w] = barChar;
+        for (let w = 0; w < barWidth; w++) {
+          const x = barStartX + w;
+          if (x >= 0 && x < width) {
+            chart[chartY][x] = coloredBar || barChar;
           }
         }
       }
-      
-      // Don't show anything for zero values - leave empty
     });
     
     // Build output lines
@@ -111,64 +100,70 @@ export class ChartGenerator {
     // Add Y-axis labels and chart
     for (let i = 0; i < height; i++) {
       const value = Math.round(((height - i) / height * maxValue));
-      const label = `$ ${value}`;
-      const paddedLabel = label.padStart(6);
-      lines.push(`{gray-fg}${paddedLabel}{/gray-fg} {gray-fg}│{/gray-fg}${chart[i].join('')}`);
+      const label = `$${value}`;
+      const paddedLabel = label.padStart(4);
+      
+      // Join chart characters, handling colored bars
+      let chartLine = '';
+      for (let j = 0; j < chart[i].length; j++) {
+        const char = chart[i][j];
+        if (char.includes('{')) {
+          // It's a colored bar, add it as-is
+          chartLine += char;
+        } else {
+          // Regular character
+          chartLine += char;
+        }
+      }
+      
+      lines.push(`{gray-fg}${paddedLabel}{/gray-fg} {gray-fg}│{/gray-fg}${chartLine}`);
     }
     
-    // Add X-axis with proper spacing (7 spaces for Y-axis area + └)
-    lines.push('{gray-fg}       └' + '─'.repeat(chartWidth) + '{/gray-fg}');
+    // Add X-axis
+    lines.push('{gray-fg}     └' + '─'.repeat(width) + '{/gray-fg}');
     
     // Add date labels
     if (showDates) {
-      const dateRow = '        '; // 8 spaces for Y-axis alignment
-      let dateLabel = dateRow;
+      const dateRow = '      '; // 6 spaces for Y-axis alignment
       
       if (fullDates) {
-        // Show all dates - aligned with bars
-        const dateChars: string[] = new Array(chartWidth + 1).fill(' ');
+        // Show all dates evenly distributed
+        const dateChars: string[] = new Array(width).fill(' ');
         
+        // Show all 30 dates
         data.forEach((item, index) => {
-          // Same position as bars
-          const x = index * barTotalWidth;
+          const centerX = (index + 0.5) * spacePerBar;
+          const dateX = Math.floor(centerX - 1); // Center the 2-digit date
           
-          if (x < chartWidth) {
-            const dayNum = item.date.substring(8, 10);
-            // Place date at bar position (2 chars wide)
-            if (x < dateChars.length) {
-              dateChars[x] = dayNum[0];
-            }
-            if (x + 1 < dateChars.length) {
-              dateChars[x + 1] = dayNum[1];
+          const dayNum = item.date.substring(8, 10);
+          if (dateX >= 0 && dateX < width - 1) {
+            dateChars[dateX] = dayNum[0];
+            if (dateX + 1 < width) {
+              dateChars[dateX + 1] = dayNum[1];
             }
           }
         });
         
-        dateLabel = dateRow + dateChars.join('');
+        lines.push('{gray-fg}' + dateRow + dateChars.join('') + '{/gray-fg}');
       } else {
-        // Show only key dates (1st, 10th, 20th, 30th)
-        const keyDates = [0, 9, 19, 29];
-        const dateChars: string[] = new Array(chartWidth + 1).fill(' ');
+        // Show only first and last dates
+        const dateChars: string[] = new Array(width).fill(' ');
         
-        keyDates.forEach(i => {
-          if (i < data.length) {
-            const x = i * barTotalWidth;
-            if (x < chartWidth) {
-              const dayNum = data[i].date.substring(8, 10);
-              if (x < dateChars.length) {
-                dateChars[x] = dayNum[0];
-              }
-              if (x + 1 < dateChars.length) {
-                dateChars[x + 1] = dayNum[1];
-              }
-            }
-          }
-        });
+        // First date
+        const firstDay = data[0].date.substring(8, 10);
+        dateChars[0] = firstDay[0];
+        dateChars[1] = firstDay[1];
         
-        dateLabel = dateRow + dateChars.join('');
+        // Last date
+        const lastDay = data[data.length - 1].date.substring(8, 10);
+        const lastPos = width - 2;
+        if (lastPos > 0) {
+          dateChars[lastPos] = lastDay[0];
+          dateChars[lastPos + 1] = lastDay[1];
+        }
+        
+        lines.push('{gray-fg}' + dateRow + dateChars.join('') + '{/gray-fg}');
       }
-      
-      lines.push('{gray-fg}' + dateLabel + '{/gray-fg}');
     }
     
     return lines;
