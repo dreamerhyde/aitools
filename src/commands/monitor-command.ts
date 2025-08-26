@@ -4,11 +4,11 @@ import { JSONLParser } from '../utils/jsonl-parser.js';
 import { UsageAnalyzer } from '../utils/usage-analyzer.js';
 import { formatCost, formatNumber } from '../utils/formatters.js';
 import chalk from 'chalk';
+import * as figlet from 'figlet';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as figlet from 'figlet';
 import { ChartGenerator } from '../utils/chart-generator.js';
 
 // Utility function to sanitize text for safe terminal display
@@ -74,10 +74,8 @@ export class MonitorCommand {
   private costMetrics: CostMetrics | null = null;
   private blessed: any;
   private contrib: any;
-  private currentFontIndex: number = 0; // Will be set to Small font in loadAllFonts
+  private currentFontIndex: number = 0;
   private allFonts: figlet.Fonts[] = [];
-  
-  // We'll load all available fonts dynamically
 
   constructor() {
     this.processMonitor = new ProcessMonitor();
@@ -85,307 +83,17 @@ export class MonitorCommand {
     this.jsonParser = new JSONLParser(undefined, true, true); // silent mode for TUI
     this.usageAnalyzer = new UsageAnalyzer();
     
-    // Load all available figlet fonts
-    this.loadAllFonts();
+    // Load fonts but default to a simple one
+    this.loadFonts();
+    
   }
   
-  private loadAllFonts(): void {
-    // All available figlet fonts
-    this.allFonts = [
-      'Standard',
-      '3-D',
-      '3D Diagonal',
-      '3D-ASCII',
-      '3x5',
-      '4Max',
-      '5 Line Oblique',
-      'AMC 3 Line',
-      'AMC 3 Liv1',
-      'AMC AAA01',
-      'AMC Neko',
-      'AMC Razor',
-      'AMC Razor2',
-      'AMC Slash',
-      'AMC Slider',
-      'AMC Thin',
-      'AMC Tubes',
-      'AMC Untitled',
-      'ANSI Shadow',
-      'ASCII New Roman',
-      'Alligator',
-      'Alligator2',
-      'Alpha',
-      'Alphabet',
-      'Arrows',
-      'Avatar',
-      'B1FF',
-      'Banner',
-      'Banner3-D',
-      'Banner3',
-      'Banner4',
-      'Barbwire',
-      'Basic',
-      'Bear',
-      'Bell',
-      'Benjamin',
-      'Big',
-      'Big Chief',
-      'Big Money-ne',
-      'Big Money-nw',
-      'Big Money-se',
-      'Big Money-sw',
-      'Bigfig',
-      'Binary',
-      'Block',
-      'Blocks',
-      'Bloody',
-      'Bolger',
-      'Braced',
-      'Bright',
-      'Broadway',
-      'Broadway KB',
-      'Bubble',
-      'Bulbhead',
-      'Caligraphy',
-      'Caligraphy2',
-      'Calvin S',
-      'Cards',
-      'Catwalk',
-      'Chiseled',
-      'Chunky',
-      'Coinstak',
-      'Cola',
-      'Colossal',
-      'Computer',
-      'Contessa',
-      'Contrast',
-      'Cosmike',
-      'Crawford',
-      'Crawford2',
-      'Crazy',
-      'Cricket',
-      'Cursive',
-      'Cyberlarge',
-      'Cybermedium',
-      'Cybersmall',
-      'Cygnet',
-      'DANC4',
-      'DOS Rebel',
-      'DWhistled',
-      'Dancing Font',
-      'Decimal',
-      'Def Leppard',
-      'Delta Corps Priest 1',
-      'Diamond',
-      'Diet Cola',
-      'Digital',
-      'Doh',
-      'Doom',
-      'Dot Matrix',
-      'Double',
-      'Double Shorts',
-      'Dr Pepper',
-      'Efti Chess',
-      'Efti Font',
-      'Efti Italic',
-      'Efti Piti',
-      'Efti Robot',
-      'Efti Wall',
-      'Efti Water',
-      'Electronic',
-      'Elite',
-      'Epic',
-      'Fender',
-      'Filter',
-      'Fire Font-k',
-      'Fire Font-s',
-      'Flipped',
-      'Flower Power',
-      'Four Tops',
-      'Fraktur',
-      'Fun Face',
-      'Fun Faces',
-      'Fuzzy',
-      'Georgi16',
-      'Georgia11',
-      'Ghost',
-      'Ghoulish',
-      'Glenyn',
-      'Goofy',
-      'Gothic',
-      'Graceful',
-      'Gradient',
-      'Graffiti',
-      'Greek',
-      'Heart Left',
-      'Heart Right',
-      'Henry 3D',
-      'Hex',
-      'Hieroglyphs',
-      'Hollywood',
-      'Horizontal Left',
-      'Horizontal Right',
-      'ICL-1900',
-      'Impossible',
-      'Invita',
-      'Isometric1',
-      'Isometric2',
-      'Isometric3',
-      'Isometric4',
-      'Italic',
-      'Ivrit',
-      'JS Block Letters',
-      'JS Bracket Letters',
-      'JS Capital Curves',
-      'JS Cursive',
-      'JS Stick Letters',
-      'Jacky',
-      'Jazmine',
-      'Jerusalem',
-      'Katakana',
-      'Kban',
-      'Keyboard',
-      'Knob',
-      'Konto',
-      'Konto Slant',
-      'LCD',
-      'Larry 3D',
-      'Larry 3D 2',
-      'Lean',
-      'Letters',
-      'Lil Devil',
-      'Line Blocks',
-      'Linux',
-      'Lockergnome',
-      'Madrid',
-      'Marquee',
-      'Maxfour',
-      'Merlin1',
-      'Merlin2',
-      'Mike',
-      'Mini',
-      'Mirror',
-      'Mnemonic',
-      'Modular',
-      'Morse',
-      'Morse2',
-      'Moscow',
-      'Mshebrew210',
-      'Muzzle',
-      'NScript',
-      'NT Greek',
-      'NV Script',
-      'Nancyj',
-      'Nancyj-Fancy',
-      'Nancyj-Improved',
-      'Nancyj-Underlined',
-      'Nipples',
-      'O8',
-      'OS2',
-      'Octal',
-      'Ogre',
-      'Old Banner',
-      'Patorjk\'s Cheese',
-      'Patorjk-HeX',
-      'Pawp',
-      'Peaks',
-      'Peaks Slant',
-      'Pebbles',
-      'Pepper',
-      'Poison',
-      'Puffy',
-      'Puzzle',
-      'Pyramid',
-      'Rammstein',
-      'Rectangles',
-      'Red Phoenix',
-      'Relief',
-      'Relief2',
-      'Reverse',
-      'Roman',
-      'Rot13',
-      'Rotated',
-      'Rounded',
-      'Rowan Cap',
-      'Rozzo',
-      'Runic',
-      'Runyc',
-      'S Blood',
-      'SL Script',
-      'Santa Clara',
-      'Script',
-      'Serifcap',
-      'Shadow',
-      'Shimrod',
-      'Short',
-      'Slant',
-      'Slant Relief',
-      'Slide',
-      'Small',
-      'Small Caps',
-      'Small Isometric1',
-      'Small Keyboard',
-      'Small Poison',
-      'Small Script',
-      'Small Shadow',
-      'Small Slant',
-      'Small Tengwar',
-      'Soft',
-      'Speed',
-      'Spliff',
-      'Stacey',
-      'Stampate',
-      'Stampatello',
-      'Standard',
-      'Star Strips',
-      'Star Wars',
-      'Stellar',
-      'Stforek',
-      'Stick Letters',
-      'Stop',
-      'Straight',
-      'Stronger Than All',
-      'Sub-Zero',
-      'Swamp Land',
-      'Swan',
-      'Sweet',
-      'THIS',
-      'Tanja',
-      'Tengwar',
-      'Term',
-      'Test1',
-      'The Edge',
-      'Thick',
-      'Thin',
-      'Thorned',
-      'Three Point',
-      'Ticks',
-      'Ticks Slant',
-      'Tiles',
-      'Tinker-Toy',
-      'Tombstone',
-      'Train',
-      'Trek',
-      'Tsalagi',
-      'Tubular',
-      'Twisted',
-      'Two Point',
-      'USA Flag',
-      'Univers',
-      'Varsity',
-      'Wavy',
-      'Weird',
-      'Wet Letter',
-      'Whimsy',
-      'Wow'
-    ];
-    
-    // Set default font to 'ANSI Shadow'
-    const defaultFontIndex = this.allFonts.indexOf('ANSI Shadow');
-    if (defaultFontIndex >= 0) {
-      this.currentFontIndex = defaultFontIndex;
-    }
+  private loadFonts(): void {
+    // Use a small set of suitable fonts
+    this.allFonts = ['ANSI Shadow', 'Big', 'Standard', 'Small', 'Slant'];
+    this.currentFontIndex = 0; // Default to ANSI Shadow
   }
+  
 
   async execute(): Promise<void> {
     // Check if running in a proper TTY environment
@@ -555,71 +263,7 @@ export class MonitorCommand {
       await this.updateData();
     });
 
-    // Font switching
-    this.screen.key(['f'], () => {
-      this.currentFontIndex = (this.currentFontIndex + 1) % this.allFonts.length;
-      // Don't log, just update display
-      this.updateCostDisplay();
-      this.screen.render();
-    });
 
-    // Quick jump to small fonts (Shift+F)
-    this.screen.key(['S-f'], () => {
-      // Jump to commonly used small fonts
-      const smallFonts = ['Small', 'Mini', 'Thin', 'Short', 'Graceful', 'Lean', 'Small Slant'];
-      const currentFont = this.allFonts[this.currentFontIndex];
-      const smallIndex = smallFonts.indexOf(currentFont);
-      
-      if (smallIndex >= 0 && smallIndex < smallFonts.length - 1) {
-        // Go to next small font
-        const nextSmallFont = smallFonts[smallIndex + 1];
-        this.currentFontIndex = this.allFonts.indexOf(nextSmallFont);
-      } else {
-        // Jump to first small font
-        this.currentFontIndex = this.allFonts.indexOf('Small');
-      }
-      
-      this.updateCostDisplay();
-      this.screen.render();
-    });
-
-    // Kill process
-    this.screen.key(['k'], async () => {
-      if (this.processes.length > 0 && this.selectedProcessIndex < this.processes.length) {
-        const process = this.processes[this.selectedProcessIndex];
-        this.log(`Killing process ${process.pid}: ${process.command}`);
-        try {
-          await this.killProcess(process.pid);
-          this.log(`Successfully killed process ${process.pid}`);
-          await this.updateData();
-        } catch (error) {
-          this.log(`Failed to kill process ${process.pid}: ${error}`);
-        }
-      }
-    });
-
-    // Navigation
-    this.screen.key(['up'], () => {
-      if (this.selectedProcessIndex > 0) {
-        this.selectedProcessIndex--;
-        this.updateProcessTable();
-      }
-    });
-
-    this.screen.key(['down'], () => {
-      if (this.selectedProcessIndex < this.processes.length - 1) {
-        this.selectedProcessIndex++;
-        this.updateProcessTable();
-      }
-    });
-
-    // Enter for details
-    this.screen.key(['enter'], () => {
-      if (this.processes.length > 0 && this.selectedProcessIndex < this.processes.length) {
-        const process = this.processes[this.selectedProcessIndex];
-        this.showProcessDetails(process);
-      }
-    });
   }
 
   private async startMonitoring(): Promise<void> {
@@ -677,12 +321,12 @@ export class MonitorCommand {
       // Get last 7 days for chart
       const last7Days = dailyUsage.slice(-7);
       const weekCosts = last7Days.map(d => d.totalCost);
-      const weekSessions = last7Days.reduce((sum, d) => sum + d.sessions, 0);
+      const weekSessions = last7Days.reduce((sum, d) => sum + d.conversations, 0);
       
       this.costMetrics = {
         today: todayData?.totalCost || 0,
         todayTokens: todayData?.totalTokens || 0,
-        todaySessions: todayData?.sessions || 0,
+        todaySessions: todayData?.conversations || 0,
         week: weekCosts.reduce((sum, cost) => sum + cost, 0),
         weekSessions,
         weekCosts
@@ -1145,7 +789,7 @@ export class MonitorCommand {
             this.activeSessions.set(sessionId, {
               sessionId,
               user: displayName,
-              startTime: new Date(project.lastAccessed || currentTime),
+              startTime: new Date((project as any).lastAccessed || currentTime),
               lastActivity: currentTime,
               messageCount: conversationInfo.messageCount,
               recentMessages: [],
@@ -1209,48 +853,34 @@ export class MonitorCommand {
       }
     }
     
-    // Create figlet ASCII art with color
-    const costStr = `$${cost.toFixed(2)}`;
+    // Create figlet ASCII art with space between $ and amount
+    const costStr = `$ ${cost.toFixed(2)}`;
     
     try {
       // Use current selected font
       const selectedFont = this.allFonts[this.currentFontIndex];
       const figletOptions = {
-        font: selectedFont,
+        font: selectedFont as figlet.Fonts,
         horizontalLayout: 'default' as figlet.KerningMethods,
         verticalLayout: 'default' as figlet.KerningMethods
       };
       
       const bigCost = figlet.textSync(costStr, figletOptions);
       
-      // Check if font is too tall (more than 6 lines)
-      const fontLines = bigCost.split('\n').length;
-      const isFontTooTall = fontLines > 6;
-      
       // Apply green color to the big cost display
       const coloredCost = chalk.green.bold(bigCost);
       
-      if (isFontTooTall) {
-        // For tall fonts, reduce spacing
-        this.costBox.setContent(
-          `${coloredCost}\n` +
-          `${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}\n` +
-          `${chalk.magenta('Model:')} ${chalk.white(currentModel)} | ${chalk.blue('Font:')} ${chalk.white(selectedFont)}`
-        );
-      } else {
-        // Normal spacing for regular fonts
-        this.costBox.setContent(
-          `\n${coloredCost}\n\n` +
-          `   ${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}   \n\n` +
-          `   ${chalk.magenta('Model:')} ${chalk.white(currentModel)}  |  ${chalk.blue('Font:')} ${chalk.white(selectedFont)}   `
-        );
-      }
+      this.costBox.setContent(
+        `\n${coloredCost}\n\n` +
+        `   ${chalk.cyan(sessions + ' sessions')} | ${chalk.yellow(tokens + ' tokens')}   \n\n` +
+        `   ${chalk.magenta('Model:')} ${chalk.white(currentModel)}   `
+      );
     } catch (error) {
       // Fallback to simple display if figlet fails
       this.costBox.setContent(
-        `\n${chalk.green.bold('$' + cost.toFixed(2))}\n\n` +
+        `\n${chalk.green.bold('$ ' + cost.toFixed(2))}\n\n` +
         `${sessions} sessions | ${tokens} tokens\n\n` +
-        `Model: ${currentModel}  |  Font: ${selectedFont}`
+        `Model: ${currentModel}`
       );
     }
   }
@@ -1306,9 +936,9 @@ export class MonitorCommand {
     Promise.race([
       this.getSystemResources(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000)) // Increased from 1000ms
-    ]).then(resources => {
+    ]).then((resources: any) => {
       // Cache the resources
-      this.resourceCache = resources as any;
+      this.resourceCache = resources;
       
       const resourceDisplay: string[] = [];
       
@@ -1347,7 +977,7 @@ export class MonitorCommand {
     }).catch(() => {
       // Use cached data if available
       if (this.resourceCache) {
-        const resources = this.resourceCache;
+        const resources = this.resourceCache as any;
         const resourceDisplay: string[] = [];
         // Calculate dynamic width
         const boxWidth = (this.metricsBox.width as number) || 40;
@@ -1808,48 +1438,6 @@ export class MonitorCommand {
     return '> Stable';
   }
 
-  private showProcessDetails(process: SessionInfo): void {
-    const detailBox = this.blessed.box({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: '40%',
-      content: [
-        ` Process Details `,
-        '',
-        ` PID:     ${process.pid}`,
-        ` Command: ${process.command}`,
-        ` CPU:     ${process.cpu.toFixed(2)}%`,
-        ` Memory:  ${process.memory.toFixed(2)}%`,
-        ` Time:    ${process.time}`,
-        ` Status:  ${process.status}`,
-        '',
-        ' Press [Esc] to close'
-      ].join('\n'),
-      border: {
-        type: 'line',
-        fg: 'cyan'
-      },
-      style: {
-        fg: 'white',
-        bg: 'black',
-        border: {
-          fg: 'cyan'
-        }
-      },
-      padding: 1,
-      keys: true
-    });
-
-    detailBox.key(['escape'], () => {
-      detailBox.destroy();
-      this.screen?.render();
-    });
-
-    detailBox.focus();
-    this.screen?.render();
-  }
 
   private async killProcess(pid: number): Promise<void> {
     return new Promise((resolve, reject) => {
