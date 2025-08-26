@@ -45,8 +45,40 @@ export class SessionManager {
       }
     }
 
-    // Track current action
-    if (entry.action || entry.tool) {
+    // Track current action based on tool usage
+    if (entry.type === 'assistant' && entry.message?.content && Array.isArray(entry.message.content)) {
+      for (const item of entry.message.content) {
+        if (item.type === 'tool_use' && item.name) {
+          const toolActions: Record<string, string> = {
+            'Read': 'Reading file',
+            'Write': 'Writing file',
+            'Edit': 'Editing file',
+            'MultiEdit': 'Editing multiple files',
+            'Bash': 'Running command',
+            'Grep': 'Searching',
+            'Glob': 'Finding files',
+            'LS': 'Listing directory',
+            'WebFetch': 'Fetching web content',
+            'WebSearch': 'Searching web',
+            'Task': 'Running agent',
+            'TodoWrite': 'Updating todos',
+            'ExitPlanMode': 'Planning',
+            // Generic puttering for other tools
+            'default': 'Puttering'
+          };
+          session.currentAction = toolActions[item.name] || toolActions['default'];
+          break;
+        } else if (item.type === 'text') {
+          // Clear action when assistant sends text response
+          session.currentAction = undefined;
+          break;
+        }
+      }
+    } else if (entry.type === 'user') {
+      // Clear action when user sends a new message
+      session.currentAction = undefined;
+    } else if (entry.action || entry.tool) {
+      // Fallback to direct action/tool fields
       session.currentAction = entry.action || `Using ${entry.tool}`;
     }
   }

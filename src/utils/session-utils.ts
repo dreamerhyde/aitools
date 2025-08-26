@@ -172,12 +172,20 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
               'Read': 'Reading file',
               'Write': 'Writing file',
               'Edit': 'Editing file',
+              'MultiEdit': 'Editing multiple files',
               'Bash': 'Running command',
               'Grep': 'Searching',
+              'Glob': 'Finding files',
+              'LS': 'Listing directory',
               'WebFetch': 'Fetching web content',
-              'Task': 'Running agent'
+              'WebSearch': 'Searching web',
+              'Task': 'Running agent',
+              'TodoWrite': 'Updating todos',
+              'ExitPlanMode': 'Planning',
+              // Generic puttering for other tools
+              'default': 'Puttering'
             };
-            currentAction = toolActions[item.name] || `Using ${item.name}`;
+            currentAction = toolActions[item.name] || toolActions['default'];
             break;
           }
         }
