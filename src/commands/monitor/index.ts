@@ -42,6 +42,15 @@ export class MonitorCommand {
       process.exit(1);
     }
 
+    // Set up signal handlers for immediate exit
+    process.on('SIGINT', () => {
+      this.quickExit();
+    });
+    
+    process.on('SIGTERM', () => {
+      this.quickExit();
+    });
+
     try {
       await this.initializeScreen();
       this.createLayout();
@@ -325,6 +334,17 @@ export class MonitorCommand {
     if (screen) {
       screen.debug(message);
     }
+  }
+
+  private quickExit(): void {
+    // Quick cleanup for immediate exit
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
+    if (this.screenManager) {
+      this.screenManager.destroy();
+    }
+    process.exit(0);
   }
 
   private cleanup(): void {

@@ -3,10 +3,36 @@
 import chalk from 'chalk';
 
 /**
+ * Strip blessed tags for length calculation
+ */
+function stripBlessedTags(text: string): string {
+  return text.replace(/\{[^}]+\}/g, '');
+}
+
+/**
+ * Calculate actual display length (excluding blessed tags)
+ */
+function getDisplayLength(text: string): number {
+  return stripBlessedTags(text).length;
+}
+
+/**
  * Truncate text to a maximum length with ellipsis
+ * Correctly handles blessed tags by not counting them in length
  */
 export function truncateText(text: string, maxLength: number, addEllipsis: boolean = true): string {
-  if (!text || text.length <= maxLength) {
+  if (!text) return text;
+  
+  const displayLength = getDisplayLength(text);
+  if (displayLength <= maxLength) {
+    return text;
+  }
+  
+  // For text with blessed tags, we need to be more careful
+  // Simple approach: if text has tags, don't truncate (to avoid breaking tags)
+  if (text.includes('{') && text.includes('}')) {
+    // If text has blessed tags, return as-is to avoid breaking them
+    // This is safer than trying to truncate with tags
     return text;
   }
   
@@ -16,6 +42,7 @@ export function truncateText(text: string, maxLength: number, addEllipsis: boole
 
 /**
  * Wrap text to fit within a specific width, breaking at word boundaries
+ * Correctly handles blessed tags by not counting them in width calculations
  */
 export function wrapText(text: string, maxWidth: number): string[] {
   if (!text || maxWidth <= 0) {
@@ -27,19 +54,23 @@ export function wrapText(text: string, maxWidth: number): string[] {
   let currentLine = '';
   
   for (const word of words) {
+    const wordDisplayLength = getDisplayLength(word);
+    
     // If single word is longer than max width, truncate it
-    if (word.length > maxWidth) {
+    if (wordDisplayLength > maxWidth) {
       if (currentLine) {
         lines.push(currentLine.trim());
         currentLine = '';
       }
-      lines.push(truncateText(word, maxWidth));
+      // For words with tags, we need smarter truncation
+      lines.push(word); // Keep the word as-is if it has tags
       continue;
     }
     
     const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testLineLength = getDisplayLength(testLine);
     
-    if (testLine.length <= maxWidth) {
+    if (testLineLength <= maxWidth) {
       currentLine = testLine;
     } else {
       if (currentLine) {

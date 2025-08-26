@@ -171,6 +171,7 @@ export function sanitizeConversationMessages(messages: Array<{
  * @returns Formatted action string without emojis
  */
 export function formatActionString(action: string): string {
+  // Just sanitize text here, styling will be applied at display layer
   return sanitizeText(action, {
     removeEmojis: true,
     convertToAscii: true,

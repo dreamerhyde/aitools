@@ -10,6 +10,7 @@ import {
 } from '../utils/text-formatter.js';
 import { sanitizeText, formatActionString } from '../../../utils/text-sanitizer.js';
 import { QAStyleType, getQAStyle, formatQAMessage } from '../utils/qa-styles.js';
+import { formatActionStatus, parseMarkdown } from '../utils/style-system.js';
 
 export class SessionBoxesView {
   private sessionBoxes: any[] = []; // Fixed 4 boxes
@@ -132,10 +133,9 @@ export class SessionBoxesView {
         
         // Show current action if present (like "Puttering..." when AI is working)
         if (session.currentAction && session.currentAction.trim() !== '') {
-          // Add a pulsing indicator for active work
-          const actionIndicator = '✽ ';
           const sanitizedAction = formatActionString(session.currentAction);
-          contentLines.push(`{#d77757-fg}${actionIndicator}${sanitizedAction}... (esc to interrupt){/#d77757-fg}`);
+          // Use the new formatActionStatus with code block style
+          contentLines.push(formatActionStatus(sanitizedAction));
           contentLines.push('');
         }
         
@@ -162,7 +162,10 @@ export class SessionBoxesView {
               preserveWhitespace: false
             });
             
-            const truncatedContent = truncateText(cleanContent, boxWidth * 4); // Allow more content
+            // Apply Markdown parsing for rich formatting
+            const richContent = parseMarkdown(cleanContent);
+            
+            const truncatedContent = truncateText(richContent, boxWidth * 4); // Allow more content
             const wrappedLines = wrapText(truncatedContent, boxWidth - 5); // Account for badge + space
             
             // Use the style system to format the message - allow up to 4 lines per message

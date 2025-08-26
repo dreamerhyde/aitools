@@ -226,6 +226,11 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           } else if (item.type === 'text' && item.text) {
             // Text response found - may indicate tool completed
             lastTextResponseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+            
+            // Check if text contains code blocks that might confuse our parsing
+            if (process.env.DEBUG_SESSIONS && item.text.includes('```')) {
+              console.log(`[Text contains code block] Length: ${item.text.length}`);
+            }
           }
         }
       }
@@ -344,6 +349,10 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       }
     } else if (currentAction) {
       display = formatActionString(currentAction);
+    }
+    
+    if (process.env.DEBUG_SESSIONS) {
+      console.log(`[Final] currentAction="${currentAction}", topic="${display}"`);
     }
     
     return { 

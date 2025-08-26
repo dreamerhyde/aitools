@@ -79,8 +79,15 @@ export class ScreenManager {
       throw new Error('Screen not initialized');
     }
 
-    // Default handlers
-    this.screen.key(['escape', 'q', 'C-c'], () => {
+    // Default handlers - immediate exit on Ctrl+C
+    this.screen.key(['C-c'], () => {
+      // Immediate cleanup and exit
+      this.screen.destroy();
+      process.exit(0);
+    });
+    
+    // Graceful exit on 'q' or 'escape'
+    this.screen.key(['escape', 'q'], () => {
       if (handlers.quit) {
         handlers.quit();
       }
