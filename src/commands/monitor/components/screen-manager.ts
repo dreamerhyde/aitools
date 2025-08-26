@@ -6,6 +6,8 @@ export class ScreenManager {
   private contrib: any;
   private currentFontIndex: number = 0;
   private allFonts: figlet.Fonts[] = ['ANSI Shadow', 'Big', 'Standard', 'Small', 'Slant'];
+  private escPressCount: number = 0;
+  private lastEscPress: number = 0;
 
   async initialize(): Promise<void> {
     // Dynamically import blessed modules
@@ -36,9 +38,41 @@ export class ScreenManager {
     };
     
     // Immediately set up exit handlers after screen creation
-    this.screen.key(['C-c', 'escape', 'q'], () => {
+    this.screen.key(['C-c', 'q'], () => {
       process.exit(0);
     });
+    
+    // Smart ESC detection - exit if pressed 3 times within 2 seconds
+    const handleEscPress = () => {
+      const now = Date.now();
+      
+      // Reset count if more than 2 seconds since last press
+      if (now - this.lastEscPress > 2000) {
+        this.escPressCount = 0;
+      }
+      
+      this.escPressCount++;
+      this.lastEscPress = now;
+      
+      // Force exit after 3 rapid presses
+      if (this.escPressCount >= 3) {
+        // Force immediate exit
+        process.exit(0);
+      }
+      
+      // Try normal exit first
+      try {
+        process.exit(0);
+      } catch (e) {
+        // If normal exit fails, force it
+        process.kill(process.pid, 'SIGKILL');
+      }
+    };
+    
+    // ESC key needs multiple bindings for different terminals
+    this.screen.key(['escape'], handleEscPress);
+    this.screen.key(['C-['], handleEscPress);
+    this.screen.key(['\u001b'], handleEscPress);
     
     // Override SIGINT for immediate exit
     process.on('SIGINT', () => {

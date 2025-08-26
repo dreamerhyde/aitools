@@ -273,8 +273,38 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
               // Generic puttering for other tools
               'default': 'Puttering'
             };
-            // Update current action to the latest tool being used
-            currentAction = formatActionString(toolActions[item.name] || toolActions['default']);
+            // Extract real dynamic action from TodoWrite's activeForm
+            let dynamicAction = toolActions[item.name] || toolActions['default'];
+            
+            // Special handling for TodoWrite to get activeForm from in-progress tasks
+            if (item.name === 'TodoWrite' && item.input && item.input.todos) {
+              const inProgressTask = item.input.todos.find((todo: any) => 
+                todo.status === 'in_progress'
+              );
+              if (inProgressTask && inProgressTask.activeForm) {
+                dynamicAction = inProgressTask.activeForm;
+              }
+            }
+            // For Edit/Write tools, try to extract filename from input
+            else if ((item.name === 'Edit' || item.name === 'Write' || item.name === 'MultiEdit') && item.input) {
+              if (item.input.file_path) {
+                const filename = item.input.file_path.split('/').pop() || 'file';
+                dynamicAction = `Editing ${filename}`;
+              }
+            }
+            // For Read tool, extract filename
+            else if (item.name === 'Read' && item.input && item.input.file_path) {
+              const filename = item.input.file_path.split('/').pop() || 'file';
+              dynamicAction = `Reading ${filename}`;
+            }
+            // For Bash commands, show actual command (truncated)
+            else if (item.name === 'Bash' && item.input && item.input.command) {
+              const cmd = item.input.command.substring(0, 50);
+              dynamicAction = `Running: ${cmd}${item.input.command.length > 50 ? '...' : ''}`;
+            }
+            
+            // Update current action with the dynamic content
+            currentAction = formatActionString(dynamicAction);
             lastToolUseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
             
             if (process.env.DEBUG_SESSIONS) {

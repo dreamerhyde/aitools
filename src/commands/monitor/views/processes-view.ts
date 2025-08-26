@@ -118,7 +118,8 @@ export class ProcessesView {
           // Header: ' CPU%    MEM%   Status  Process'
           // Spacing: space(1) + CPU(6) + space(2) + MEM(6) + space(2) + status(7) + space(2) = 26
           const fixedWidth = 26;
-          const nameWidth = Math.max(Math.min(contentWidth - fixedWidth, 30), 10);
+          // Remove the 30 char limit, let it use all available space
+          const nameWidth = Math.max(contentWidth - fixedWidth, 10);
           const displayName = smartName.length > nameWidth ? 
             smartName.substring(0, nameWidth - 1) + '…' : 
             smartName;

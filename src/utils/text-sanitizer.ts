@@ -337,48 +337,9 @@ export function formatActionString(action: string): string {
  * @param action The action string
  * @returns Color function for the action
  */
-export function getActionColor(action: string): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' {
-  const lowercaseAction = action.toLowerCase();
-  
-  // Thinking and analysis - cyan
-  if (lowercaseAction.includes('thinking') || 
-      lowercaseAction.includes('analyzing') || 
-      lowercaseAction.includes('planning') ||
-      lowercaseAction.includes('orchestrating')) {
-    return 'cyan';
-  }
-  
-  // File operations - green  
-  if (lowercaseAction.includes('reading') ||
-      lowercaseAction.includes('writing') ||
-      lowercaseAction.includes('editing') ||
-      lowercaseAction.includes('file')) {
-    return 'green';
-  }
-  
-  // Commands and execution - yellow
-  if (lowercaseAction.includes('running') ||
-      lowercaseAction.includes('executing') ||
-      lowercaseAction.includes('command')) {
-    return 'yellow';
-  }
-  
-  // Web and network - blue
-  if (lowercaseAction.includes('fetching') ||
-      lowercaseAction.includes('searching') ||
-      lowercaseAction.includes('web')) {
-    return 'blue';
-  }
-  
-  // Development tools - magenta
-  if (lowercaseAction.includes('building') ||
-      lowercaseAction.includes('auditing') ||
-      lowercaseAction.includes('testing')) {
-    return 'magenta';
-  }
-  
-  // Default - cyan
-  return 'cyan';
+export function getActionColor(action: string): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' | 'orange' {
+  // Always return orange for all actions
+  return 'orange';
 }
 
 /**

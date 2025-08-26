@@ -196,12 +196,12 @@ export function getQPrefixForType(type: UserMessageType, baseStyle: QAStyle): st
       return baseStyle.userPrefix; // Green Q badge
       
     case UserMessageType.INTERRUPTION:
-      // Orange Q badge for interruptions
-      return '{#d77757-bg}{black-fg} Q {/black-fg}{/#d77757-bg} {#d77757-fg}';
+      // Green Q badge for interruptions (same as normal)
+      return '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}';
       
     case UserMessageType.FOLLOWUP:
-      // Yellow Q badge for follow-ups
-      return '{yellow-bg}{black-fg} Q {/black-fg}{/yellow-bg} {yellow-fg}';
+      // Green Q badge for follow-ups (same as normal)
+      return '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}';
       
     case UserMessageType.SYSTEM:
       return ''; // No prefix for system messages
@@ -232,9 +232,8 @@ export function formatQAMessage(
       } else {
         // User messages with typed Q badges
         const qPrefix = getQPrefixForType(messageType, style);
-        const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
-                      messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
-                      '{/yellow-fg}';
+        // All message types now use green
+        const suffix = '{/green-fg}';
         lines.push(qPrefix + content[0] + suffix);
       }
       

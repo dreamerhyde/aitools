@@ -33,12 +33,13 @@ export class SessionBoxesView {
     // Fixed areas end at top: 32 (Today's Spend + 30-Day = 20 + 12)
     const startTop = 32;
     
-    // Check if there's enough space for session boxes (minimum height 10)
+    // Check if there's enough space for session boxes (minimum height 10 per box)
     const screenHeight = screen.height;
     const availableHeight = screenHeight - startTop - 1; // -1 for status bar
     const minBoxHeight = 10;
     
     // If not enough space, don't create session boxes
+    // Need at least 20 total height for 2 rows of boxes (10 * 2)
     if (availableHeight < minBoxHeight * 2) {
       return; // Don't create boxes if too small
     }
@@ -163,8 +164,9 @@ export class SessionBoxesView {
         
         // Show recent Q/A messages
         if (session.recentMessages && session.recentMessages.length > 0) {
-          contentLines.push('{cyan-fg}Recent conversation:{/cyan-fg}');
-          contentLines.push(createSeparator(boxWidth));
+          // Remove the "Recent conversation:" label and separator
+          // contentLines.push('{cyan-fg}Recent conversation:{/cyan-fg}');
+          // contentLines.push(createSeparator(boxWidth));
           
           // Display last 3 Q/A pairs
           const messagesToShow = session.recentMessages.slice(-6); // Last 3 Q/A pairs
@@ -193,6 +195,11 @@ export class SessionBoxesView {
             // Use the style system to format the message - allow up to 4 lines per message
             const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 4), this.qaStyle, session.status);
             contentLines.push(...formattedLines);
+            
+            // Add empty line after each question for better spacing
+            if (msg.role === 'user') {
+              contentLines.push(''); // Empty line after question
+            }
             
             // Add separator between Q/A pairs (if style has one)
             if (j < messagesToShow.length - 1 && msg.role === 'assistant' && this.qaStyle.separator) {

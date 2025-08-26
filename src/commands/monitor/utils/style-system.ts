@@ -187,23 +187,13 @@ export function formatActionStatus(action: string, interrupt: boolean = true): s
   // Import color function
   const { getActionColor } = require('../../../utils/text-sanitizer.js');
   
-  const actionText = interrupt ? `${action} (esc to interrupt)` : action;
-  const colorType = getActionColor(action);
-  
-  // Apply dynamic coloring based on action type
-  switch (colorType) {
-    case 'green':
-      return `{green-fg}${actionText}{/green-fg}`;
-    case 'yellow':
-      return `{yellow-fg}${actionText}{/yellow-fg}`;
-    case 'blue':
-      return `{blue-fg}${actionText}{/blue-fg}`;
-    case 'magenta':
-      return `{magenta-fg}${actionText}{/magenta-fg}`;
-    case 'cyan':
-    default:
-      return `{cyan-fg}${actionText}{/cyan-fg}`;
+  // Format with orange action and gray interrupt text
+  if (interrupt) {
+    return `{#FFA500-fg}${action}{/#FFA500-fg} {gray-fg}(esc to interrupt){/gray-fg}`;
   }
+  
+  // Just orange for the action without interrupt text
+  return `{#FFA500-fg}${action}{/#FFA500-fg}`;
 }
 
 /**

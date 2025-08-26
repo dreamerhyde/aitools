@@ -108,7 +108,7 @@ export class MonitorCommand {
       left: 0,
       width: '100%',
       height: 1,
-      content: ' [q] Quit  [r] Refresh  [k] Kill Process (High CPU)  [↑↓] Navigate Sessions ',
+      content: ' [q/Ctrl+C] Quit ',
       style: {
         fg: 'cyan',
         bg: 'black',
