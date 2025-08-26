@@ -70,7 +70,7 @@ export class UsageAnalyzer {
       }
       
       const daily = dailyMap.get(date)!;
-      daily.totalTokens += msg.usage.input + msg.usage.output;
+      daily.totalTokens += msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0);
       daily.totalCost += msg.cost || 0;
       
       // Update model breakdown
@@ -143,7 +143,7 @@ export class UsageAnalyzer {
       }
       
       const monthly = monthlyMap.get(month)!;
-      monthly.totalTokens += msg.usage.input + msg.usage.output;
+      monthly.totalTokens += msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0);
       monthly.totalCost += msg.cost || 0;
       
       // Update model breakdown
@@ -211,7 +211,7 @@ export class UsageAnalyzer {
       }
       
       const session = sessionMap.get(conversationId)!;
-      session.totalTokens += msg.usage.input + msg.usage.output;
+      session.totalTokens += msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0);
       session.totalCost += msg.cost || 0;
       session.messageCount++;
       
@@ -267,7 +267,7 @@ export class UsageAnalyzer {
       
       // Add message to current block
       if (currentBlock) {
-        currentBlock.totalTokens += msg.usage.input + msg.usage.output;
+        currentBlock.totalTokens += msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0);
         currentBlock.totalCost += msg.cost || 0;
       
         // Track sessions in this block
@@ -276,7 +276,7 @@ export class UsageAnalyzer {
         );
         
         if (existingSession) {
-          existingSession.totalTokens += msg.usage.input + msg.usage.output;
+          existingSession.totalTokens += msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0);
           existingSession.totalCost += msg.cost || 0;
           existingSession.messageCount++;
           if (msgTime > existingSession.endTime) existingSession.endTime = msgTime;
@@ -286,7 +286,7 @@ export class UsageAnalyzer {
             title: msg.title,
             startTime: msgTime,
             endTime: msgTime,
-            totalTokens: msg.usage.input + msg.usage.output,
+            totalTokens: msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0),
             totalCost: msg.cost || 0,
             messageCount: 1,
             models: [msg.model]
@@ -325,7 +325,7 @@ export class UsageAnalyzer {
     
     const totalCost = messages.reduce((sum, msg) => sum + (msg.cost || 0), 0);
     const totalTokens = messages.reduce((sum, msg) => 
-      sum + msg.usage.input + msg.usage.output, 0
+      sum + msg.usage.input + msg.usage.output + (msg.usage.cache_creation || 0) + (msg.usage.cache_read || 0), 0
     );
     
     const conversations = new Set(messages.map(m => m.conversation_id).filter(Boolean));

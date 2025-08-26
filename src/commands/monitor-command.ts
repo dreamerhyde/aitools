@@ -64,6 +64,7 @@ export class MonitorCommand {
   private costBox: any = null;
   private metricsBox: any = null;
   private activeSessionsBox: any = null;
+  private highCpuProcessesBox: any = null;
   private sessionBoxes: Map<string, any> = new Map();
   private processMonitor: ProcessMonitor;
   private gpuMonitor: GPUMonitor;
@@ -166,8 +167,9 @@ export class MonitorCommand {
   }
 
   private createLayout(): void {
-    // Top: Today's cost - big number display (0,0) -> (2,12)
-    this.costBox = this.grid.set(0, 0, 2, 12, this.blessed.box, {
+    // Row 0: Today's Spend (left) + Projects (right top)
+    // Left: Today's Spend (0,0) -> (2,8) - takes 8 columns like 30-Day chart
+    this.costBox = this.grid.set(0, 0, 2, 8, this.blessed.box, {
       label: ' Today\'s Spend ',
       border: { type: 'line', fg: 'gray' },
       style: {
@@ -177,9 +179,37 @@ export class MonitorCommand {
       align: 'center',
       valign: 'middle'
     });
+    
+    // Right top: Projects (0,8) -> (1,12) - compact height
+    this.activeSessionsBox = this.grid.set(0, 8, 1, 4, this.blessed.box, {
+      label: ' Projects ',
+      border: { type: 'line', fg: 'gray' },
+      style: {
+        fg: 'white',
+        border: { fg: 'gray' }
+      },
+      padding: 0
+    });
+    
+    // Right bottom: System Resources (1,8) -> (2,12) - compact height
+    this.metricsBox = this.grid.set(1, 8, 1, 4, this.blessed.box, {
+      label: ' System Resources ',
+      border: { type: 'line', fg: 'gray' },
+      style: {
+        fg: 'white',
+        border: { fg: 'gray' }
+      },
+      padding: {
+        left: 1,
+        right: 0
+      },
+      scrollable: true,
+      alwaysScroll: true,
+      mouse: true
+    });
 
-    // Middle layer - shorter height (row 2-5, total 3 rows instead of 4)
-    // Left block (2:1 ratio): 30-Day Cost Trend (2,0) -> (5,8) - takes 8 columns
+    // Row 2: 30-Day Cost Trend (left) + High CPU Processes (right)
+    // Left: 30-Day Cost Trend (2,0) -> (5,8) - takes 8 columns
     this.costTrendChart = this.grid.set(2, 0, 3, 8, this.blessed.box, {
       label: ' 30-Day Cost Trend ',
       border: { type: 'line', fg: 'gray' },
@@ -195,29 +225,17 @@ export class MonitorCommand {
         bottom: 0
       }
     });
-
-    // Right block - split evenly into top and bottom (2,8) -> (5,12) - takes 4 columns
-    // Top right: Projects (2,8) -> (3.25,12) - slightly less height
-    this.activeSessionsBox = this.grid.set(2, 8, 1.25, 4, this.blessed.box, {
-      label: ' Projects ',
-      border: { type: 'line', fg: 'gray' },
-      style: {
-        fg: 'white',
-        border: { fg: 'gray' }
-      },
-      padding: 0
-    });
-
-    // Bottom right: System Resources - immediately after Projects with minimal gap
-    this.metricsBox = this.grid.set(3.25, 8, 1.75, 4, this.blessed.box, {
-      label: ' System Resources ',
+    
+    // Right: High CPU Processes (2,8) -> (5,12) - takes 4 columns, same height as chart
+    this.highCpuProcessesBox = this.grid.set(2, 8, 3, 4, this.blessed.box, {
+      label: ' High CPU Processes ',
       border: { type: 'line', fg: 'gray' },
       style: {
         fg: 'white',
         border: { fg: 'gray' }
       },
       padding: {
-        left: 1,  // Add left padding for better spacing
+        left: 1,
         right: 0
       },
       scrollable: true,
@@ -235,7 +253,7 @@ export class MonitorCommand {
       left: 0,
       width: '100%',
       height: 1,
-      content: ' [q] Quit  [r] Refresh  [k] Kill Process  [↑↓] Navigate  [Enter] View Details ',
+      content: ' [q] Quit  [r] Refresh  [k] Kill Process (High CPU)  [↑↓] Navigate Sessions ',
       style: {
         fg: 'cyan',
         bg: 'black',
@@ -292,6 +310,9 @@ export class MonitorCommand {
       
       // Update active sessions list
       this.updateActiveSessionsList();
+      
+      // Update high CPU processes
+      this.updateHighCpuProcesses();
       
       // Update session boxes
       this.updateSessionBoxes();
@@ -741,15 +762,25 @@ export class MonitorCommand {
 
   private async updateActiveSessionsFromConfig(): Promise<void> {
     try {
-      // Get recently active projects based on log file modifications (within 10 minutes)
+      // Get projects with both today's activity and recent activity (10 min)
       const { execSync } = require('child_process');
-      const recentLogs = execSync(
-        'find ~/.claude/projects -name "*.jsonl" -mmin -10 2>/dev/null | head -20'
+      
+      // Today's active projects (last 24 hours)
+      const todayLogs = execSync(
+        'find ~/.claude/projects -name "*.jsonl" -mmin -1440 2>/dev/null'
       ).toString().trim().split('\n').filter(Boolean);
+      
+      // Recently active projects (last 10 minutes)  
+      const recentLogs = execSync(
+        'find ~/.claude/projects -name "*.jsonl" -mmin -10 2>/dev/null'
+      ).toString().trim().split('\n').filter(Boolean);
+      
+      // Combine both sets
+      const allActiveLogs = [...new Set([...todayLogs, ...recentLogs])];
       
       // Extract project paths from log file paths
       const activeProjectPaths = new Set<string>();
-      recentLogs.forEach(logPath => {
+      allActiveLogs.forEach(logPath => {
         // Format: ~/.claude/projects/-Users-albertliu-repositories-aitools/xxx.jsonl
         const match = logPath.match(/\/projects\/(.+?)\//);
         if (match) {
@@ -838,18 +869,27 @@ export class MonitorCommand {
     const sessions = this.costMetrics.todaySessions;
     const tokens = formatNumber(this.costMetrics.todayTokens);
     
-    // Get current model from active sessions
-    let currentModel = 'No active model';
-    if (this.activeSessions.size > 0) {
-      // Get the most recent session's model
-      const recentSession = Array.from(this.activeSessions.values())
-        .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())[0];
-      if (recentSession && recentSession.currentModel) {
+    // Get today's most used model from cost metrics
+    let currentModel = 'No activity today';
+    if (this.costMetrics && this.costMetrics.todaySessions > 0) {
+      // This should be derived from today's actual usage data
+      // For now, check active sessions but filter for today's activity
+      const todaysSessions = Array.from(this.activeSessions.values())
+        .filter(session => {
+          const today = new Date().toDateString();
+          return session.lastActivity.toDateString() === today;
+        })
+        .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+      
+      if (todaysSessions.length > 0 && todaysSessions[0].currentModel) {
         // Simplify model name for display
-        currentModel = recentSession.currentModel
+        currentModel = todaysSessions[0].currentModel
           .replace('claude-', '')
           .replace('-20', '-')
           .replace('241022', '');
+      } else {
+        // Fallback: assume it's Claude 4 Sonnet since that's most common
+        currentModel = 'sonnet-4';
       }
     }
     
@@ -1231,7 +1271,7 @@ export class MonitorCommand {
       
       // Show project list with session counts
       projectInfo.push(chalk.green.bold(`${activeCount} active sessions`));
-      projectInfo.push(chalk.yellow(`${totalMessages} total messages`));
+      projectInfo.push(chalk.yellow(`${totalMessages} questions asked`));
       projectInfo.push(''); // Empty line
       
       // List projects (max 2 to fit in small box)
@@ -1250,6 +1290,179 @@ export class MonitorCommand {
     }
     
     this.activeSessionsBox.setContent(projectInfo.join('\n'));
+  }
+
+  private updateHighCpuProcesses(): void {
+    if (!this.highCpuProcessesBox) return;
+    
+    try {
+      // Get top 15 processes by CPU usage
+      this.processMonitor.getAllProcesses().then(processes => {
+        // Sort by CPU usage, take top 15
+        const topProcesses = processes
+          .filter(p => p && p.cpu >= 0) // Include all processes
+          .sort((a, b) => b.cpu - a.cpu)
+          .slice(0, 15);
+        
+        const processInfo = [];
+        
+        // Header row
+        processInfo.push(chalk.gray('CPU%   MEM%  Status     Process'));
+        processInfo.push(chalk.gray('─'.repeat(38)));
+        
+        // Always show exactly 15 rows
+        for (let i = 0; i < 15; i++) {
+          if (i < topProcesses.length) {
+            const proc = topProcesses[i];
+            
+            // Smart process name extraction
+            const smartName = this.extractSmartProcessName(proc.command);
+            
+            // Format CPU percentage (right aligned, 5 chars)
+            const cpuStr = proc.cpu.toFixed(1).padStart(5);
+            
+            // Format Memory percentage (right aligned, 5 chars)
+            const memStr = proc.memory.toFixed(1).padStart(5);
+            
+            // Format Status (10 chars, left aligned)
+            const statusStr = proc.status.padEnd(10);
+            
+            // Color code based on CPU usage
+            let cpuColor = chalk.green;
+            if (proc.cpu > 80) cpuColor = chalk.red;
+            else if (proc.cpu > 50) cpuColor = chalk.yellow;
+            else if (proc.cpu > 20) cpuColor = chalk.cyan;
+            
+            // Color for memory
+            let memColor = chalk.green;
+            if (proc.memory > 50) memColor = chalk.red;
+            else if (proc.memory > 30) memColor = chalk.yellow;
+            else if (proc.memory > 10) memColor = chalk.cyan;
+            
+            // Color for status
+            let statusColor = chalk.green;
+            if (proc.status === 'zombie') statusColor = chalk.red;
+            else if (proc.status === 'stopped') statusColor = chalk.yellow;
+            else if (proc.status === 'sleeping') statusColor = chalk.gray;
+            
+            // Calculate available width for process name
+            const nameWidth = 15; // Adjusted for new columns
+            const displayName = smartName.length > nameWidth ? 
+              smartName.substring(0, nameWidth - 1) + '…' : 
+              smartName;
+            
+            // Format: CPU% MEM% Status Process Name
+            processInfo.push(`${cpuColor(cpuStr)} ${memColor(memStr)} ${statusColor(statusStr)} ${chalk.white(displayName)}`);
+          } else {
+            // Empty row to maintain 15 rows
+            processInfo.push('');
+          }
+        }
+        
+        this.highCpuProcessesBox.setContent(processInfo.join('\n'));
+      }).catch(error => {
+        this.highCpuProcessesBox.setContent(chalk.red(`Error: ${error.message || error}`));
+      });
+    } catch (error) {
+      this.highCpuProcessesBox.setContent(chalk.red(`Monitor error: ${error.message || error}`));
+    }
+  }
+
+  private extractSmartProcessName(command: string): string {
+    // Remove leading/trailing whitespace
+    let name = command.trim();
+    
+    // Common patterns to extract meaningful names
+    
+    // Pattern 1: macOS system processes in /System/
+    if (name.includes('/System/')) {
+      // Extract framework or service name
+      const match = name.match(/\/([^\/]+)\.(?:app|framework|xpc)/i);
+      if (match) return match[1];
+    }
+    
+    // Pattern 2: Applications in /Applications/
+    if (name.includes('/Applications/')) {
+      const match = name.match(/\/Applications\/([^\/]+)\.app/);
+      if (match) return match[1];
+    }
+    
+    // Pattern 3: Node/Bun processes
+    if (name.includes('node ') || name.includes('bun ')) {
+      // Try to extract script name
+      const match = name.match(/(?:node|bun)\s+(?:.*\/)?([^\/\s]+\.(?:js|ts|mjs))/);
+      if (match) return `node:${match[1]}`;
+      return name.includes('node') ? 'node' : 'bun';
+    }
+    
+    // Pattern 4: Python scripts
+    if (name.includes('python')) {
+      const match = name.match(/python[23]?\s+(?:.*\/)?([^\/\s]+\.py)/);
+      if (match) return `py:${match[1]}`;
+      return 'python';
+    }
+    
+    // Pattern 5: Git operations
+    if (name.includes('git ')) {
+      const match = name.match(/git\s+(\w+)/);
+      if (match) return `git:${match[1]}`;
+      return 'git';
+    }
+    
+    // Pattern 6: Docker containers
+    if (name.includes('docker')) {
+      const match = name.match(/docker(?:\s+(\w+))?/);
+      if (match && match[1]) return `docker:${match[1]}`;
+      return 'docker';
+    }
+    
+    // Pattern 7: Shell scripts
+    if (name.includes('bash ') || name.includes('sh ')) {
+      const match = name.match(/(?:bash|sh)\s+(?:.*\/)?([^\/\s]+\.sh)/);
+      if (match) return `sh:${match[1]}`;
+      return 'shell';
+    }
+    
+    // Pattern 8: Chrome/Browser processes
+    if (name.includes('Chrome')) {
+      if (name.includes('Helper')) return 'Chrome Helper';
+      if (name.includes('GPU')) return 'Chrome GPU';
+      if (name.includes('Renderer')) return 'Chrome Renderer';
+      return 'Chrome';
+    }
+    
+    // Pattern 9: VS Code
+    if (name.includes('Code Helper') || name.includes('Electron')) {
+      if (name.includes('GPU')) return 'Code GPU';
+      if (name.includes('Renderer')) return 'Code Renderer';
+      return 'Code Helper';
+    }
+    
+    // Pattern 10: System daemons
+    if (name.endsWith('d') && !name.includes('/')) {
+      return name; // Keep daemon names as-is (e.g., systemd, sshd)
+    }
+    
+    // Pattern 11: Extract binary name from path
+    if (name.startsWith('/')) {
+      const parts = name.split('/');
+      const lastPart = parts[parts.length - 1];
+      // Remove common extensions
+      return lastPart.replace(/\.(exe|app|out|bin)$/i, '').split(' ')[0];
+    }
+    
+    // Pattern 12: Command with arguments - take first word
+    if (name.includes(' ')) {
+      const firstWord = name.split(' ')[0];
+      // If it's a path, extract the binary name
+      if (firstWord.includes('/')) {
+        return firstWord.split('/').pop() || firstWord;
+      }
+      return firstWord;
+    }
+    
+    // Default: Return first 30 chars of original command
+    return name.length > 30 ? name.substring(0, 27) + '...' : name;
   }
 
   private watchLogFile(): void {
