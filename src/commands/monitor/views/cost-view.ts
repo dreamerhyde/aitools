@@ -3,6 +3,7 @@ import * as figlet from 'figlet';
 import { CostMetrics, DailyUsage, SessionInfo } from '../types.js';
 import { formatCost, formatNumber } from '../../../utils/formatters.js';
 import { ChartGenerator } from '../../../utils/chart-generator.js';
+import { sanitizeText } from '../../../utils/text-sanitizer.js';
 
 export class CostView {
   private costBox: any;
@@ -79,12 +80,16 @@ export class CostView {
     
     // Priority 1: Use today's model from metrics if available
     if (metrics.todayModel) {
-      currentModel = metrics.todayModel
+      const cleanModel = metrics.todayModel
         .replace('claude-', '')
         .replace('-20', '-')
         .replace('241022', '')
         .replace('240805', '')  // Remove date stamps
         .replace('20240805', '');  // Remove full date format
+      currentModel = sanitizeText(cleanModel, {
+        removeEmojis: true,
+        convertToAscii: true
+      });
     }
     // Priority 2: Get from active sessions
     else if (activeSessions.size > 0) {
@@ -93,12 +98,16 @@ export class CostView {
         .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())[0];
       
       if (recentSession && recentSession.currentModel) {
-        currentModel = recentSession.currentModel
+        const cleanModel = recentSession.currentModel
           .replace('claude-', '')
           .replace('-20', '-')
           .replace('241022', '')
           .replace('240805', '')
           .replace('20240805', '');
+        currentModel = sanitizeText(cleanModel, {
+          removeEmojis: true,
+          convertToAscii: true
+        });
       }
     }
     // Priority 3: Show activity detected if we have sessions but no model info

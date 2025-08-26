@@ -1,5 +1,6 @@
 import { SessionInfo, ConversationMessage } from '../types.js';
 import { sanitizeForTerminal } from '../utils/sanitizers.js';
+import { sanitizeText, formatActionString } from '../../../utils/text-sanitizer.js';
 
 export class SessionManager {
   private activeSessions: Map<string, SessionInfo> = new Map();
@@ -26,10 +27,15 @@ export class SessionManager {
       session.messageCount++;
       
       if (entry.role && entry.content) {
+        const sanitizedContent = sanitizeText(entry.content, {
+          removeEmojis: true,
+          convertToAscii: true,
+          maxLength: 100
+        });
         const message: ConversationMessage = {
           timestamp: new Date(),
           role: entry.role as 'user' | 'assistant',
-          content: sanitizeForTerminal(entry.content.substring(0, 100)),
+          content: sanitizeForTerminal(sanitizedContent),
           tokens: entry.tokens
         };
         
@@ -40,7 +46,12 @@ export class SessionManager {
         
         // Extract topic from user messages
         if (entry.role === 'user' && entry.content) {
-          session.currentTopic = sanitizeForTerminal(entry.content.substring(0, 50));
+          const sanitizedTopic = sanitizeText(entry.content, {
+            removeEmojis: true,
+            convertToAscii: true,
+            maxLength: 50
+          });
+          session.currentTopic = sanitizeForTerminal(sanitizedTopic);
         }
       }
     }
@@ -66,7 +77,7 @@ export class SessionManager {
             // Generic puttering for other tools
             'default': 'Puttering'
           };
-          session.currentAction = toolActions[item.name] || toolActions['default'];
+          session.currentAction = formatActionString(toolActions[item.name] || toolActions['default']);
           break;
         } else if (item.type === 'text') {
           // Clear action when assistant sends text response
@@ -79,7 +90,8 @@ export class SessionManager {
       session.currentAction = undefined;
     } else if (entry.action || entry.tool) {
       // Fallback to direct action/tool fields
-      session.currentAction = entry.action || `Using ${entry.tool}`;
+      const action = entry.action || `Using ${entry.tool}`;
+      session.currentAction = formatActionString(action);
     }
   }
 

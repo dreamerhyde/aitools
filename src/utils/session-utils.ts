@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
+import { sanitizeText, sanitizeTopic, formatActionString } from './text-sanitizer.js';
 
 export interface RecentMessage {
   timestamp: Date;
@@ -185,7 +186,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
               // Generic puttering for other tools
               'default': 'Puttering'
             };
-            currentAction = toolActions[item.name] || toolActions['default'];
+            currentAction = formatActionString(toolActions[item.name] || toolActions['default']);
             break;
           }
         }
@@ -217,8 +218,12 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           }
         }
         
-        // Clean the content
-        content = content.trim();
+        // Clean and sanitize the content
+        content = sanitizeText(content.trim(), {
+          removeEmojis: true,
+          convertToAscii: true,
+          preserveWhitespace: false
+        });
         
         // Skip empty, meta, or command messages
         if (!content || 
@@ -232,7 +237,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
         recentMessages.unshift({
           timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
           role: 'user',
-          content: content.substring(0, 500),
+          content: sanitizeText(content, { maxLength: 500 }),
           tokens: entry.message.tokens
         });
       } else if (entry.type === 'assistant' && entry.message && entry.message.content) {
@@ -253,7 +258,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           recentMessages.unshift({
             timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
             role: 'assistant',
-            content: textContent.substring(0, 500),
+            content: sanitizeText(textContent, { maxLength: 500 }),
             tokens: entry.message.tokens
           });
         }
@@ -274,13 +279,10 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       // Find the most recent user message
       const lastUserMsg = recentMessages.find(m => m.role === 'user');
       if (lastUserMsg) {
-        const cleanContent = lastUserMsg.content.replace(/\n+/g, ' ').trim();
-        display = cleanContent.length > 100 
-          ? cleanContent.substring(0, 100) + '...' 
-          : cleanContent;
+        display = sanitizeTopic(lastUserMsg.content, 100);
       }
     } else if (currentAction) {
-      display = currentAction;
+      display = formatActionString(currentAction);
     }
     
     return { 

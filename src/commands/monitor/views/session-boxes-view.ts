@@ -8,12 +8,15 @@ import {
   createSeparator,
   formatStatusIndicator
 } from '../utils/text-formatter.js';
+import { sanitizeText, formatActionString } from '../../../utils/text-sanitizer.js';
+import { QAStyleType, getQAStyle, formatQAMessage } from '../utils/qa-styles.js';
 
 export class SessionBoxesView {
   private sessionBoxes: any[] = []; // Fixed 4 boxes
   private screenManager: any;
   private grid: any;
   private blessed: any;
+  private qaStyle = getQAStyle(QAStyleType.HYBRID); // Default to hybrid style (Q badge, A arrow)
 
   constructor(screenManager: any, grid: any, blessed: any) {
     this.screenManager = screenManager;
@@ -131,7 +134,8 @@ export class SessionBoxesView {
         if (session.currentAction) {
           // Add a pulsing indicator for active work
           const actionIndicator = '* ';
-          contentLines.push(`{yellow-fg}${actionIndicator}${session.currentAction}... (esc to interrupt){/yellow-fg}`);
+          const sanitizedAction = formatActionString(session.currentAction);
+          contentLines.push(`{yellow-fg}${actionIndicator}${sanitizedAction}... (esc to interrupt){/yellow-fg}`);
           contentLines.push('');
         }
         
@@ -145,31 +149,29 @@ export class SessionBoxesView {
           
           for (let j = 0; j < messagesToShow.length; j++) {
             const msg = messagesToShow[j];
-            const prefix = msg.role === 'user' ? '{cyan-fg}Q:{/cyan-fg} ' : '{white-fg}A:{/white-fg} ';
             
-            // Clean and truncate the message content
-            const cleanContent = msg.content
-              .replace(/\r\n/g, ' ')
-              .replace(/\n+/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            
-            const truncatedContent = truncateText(cleanContent, boxWidth * 2); // Allow 2 lines worth
-            const wrappedLines = wrapText(truncatedContent, boxWidth - 3); // Account for "Q: " or "A: "
-            
-            // Add first line with prefix
-            if (wrappedLines.length > 0) {
-              contentLines.push(prefix + wrappedLines[0]);
-              
-              // Add remaining wrapped lines with indent
-              for (let k = 1; k < Math.min(wrappedLines.length, 2); k++) {
-                contentLines.push('   ' + wrappedLines[k]);
-              }
+            // Add empty line before each new question (except the first one)
+            if (msg.role === 'user' && j > 0) {
+              contentLines.push(''); // Empty line for visual separation
             }
             
-            // Add separator between Q/A pairs
-            if (j < messagesToShow.length - 1 && msg.role === 'assistant') {
-              contentLines.push('');
+            // Clean, sanitize and truncate the message content
+            const cleanContent = sanitizeText(msg.content, {
+              removeEmojis: true,
+              convertToAscii: true,
+              preserveWhitespace: false
+            });
+            
+            const truncatedContent = truncateText(cleanContent, boxWidth * 2); // Allow 2 lines worth
+            const wrappedLines = wrapText(truncatedContent, boxWidth - 5); // Account for badge + space
+            
+            // Use the style system to format the message
+            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 2), this.qaStyle);
+            contentLines.push(...formattedLines);
+            
+            // Add separator between Q/A pairs (if style has one)
+            if (j < messagesToShow.length - 1 && msg.role === 'assistant' && this.qaStyle.separator) {
+              contentLines.push(this.qaStyle.separator);
             }
           }
         } else if (session.currentTopic) {
@@ -177,7 +179,12 @@ export class SessionBoxesView {
           contentLines.push('{cyan-fg}Topic:{/cyan-fg}');
           contentLines.push(createSeparator(boxWidth));
           
-          const wrappedTopic = wrapText(session.currentTopic, boxWidth);
+          const sanitizedTopic = sanitizeText(session.currentTopic, {
+            removeEmojis: true,
+            convertToAscii: true,
+            preserveWhitespace: false
+          });
+          const wrappedTopic = wrapText(sanitizedTopic, boxWidth);
           for (const line of wrappedTopic.slice(0, 3)) {
             contentLines.push(line);
           }
@@ -194,10 +201,28 @@ export class SessionBoxesView {
     }
   }
 
+  /**
+   * Change the Q/A display style
+   * @param styleType The style to use for Q/A messages
+   */
+  setQAStyle(styleType: QAStyleType): void {
+    this.qaStyle = getQAStyle(styleType);
+  }
+
+  /**
+   * Cycle through available Q/A styles
+   */
+  cycleQAStyle(): void {
+    const styles = Object.values(QAStyleType);
+    const currentIndex = styles.indexOf(this.qaStyle.description as QAStyleType);
+    const nextIndex = (currentIndex + 1) % styles.length;
+    this.setQAStyle(styles[nextIndex]);
+  }
+
   destroy(): void {
-    for (const box of this.sessionBoxes.values()) {
+    for (const box of this.sessionBoxes) {
       box.destroy();
     }
-    this.sessionBoxes.clear();
+    this.sessionBoxes = [];
   }
 }
