@@ -35,7 +35,7 @@ export class SessionsView {
       },
       padding: {
         left: 1,
-        right: 0,
+        right: 1,
         top: 1,
         bottom: 1
       }
@@ -56,7 +56,7 @@ export class SessionsView {
       },
       padding: {
         left: 1,
-        right: 0,
+        right: 1,
         top: 1,
         bottom: 1
       }
@@ -149,38 +149,50 @@ export class SessionsView {
       // Get enhanced status from status tracker
       const sessionCounts = statusTracker.getSessionCounts();
       
+      // Count completed sessions
+      let completedCount = 0;
+      let activeWithActionCount = 0;
+      
       // Update status tracker with current sessions
       for (const [id, session] of activeSessions) {
         statusTracker.updateSessionStatus(id, session.currentAction || null, session.messageCount);
+        
+        // Count sessions by status
+        if (session.status === 'completed') {
+          completedCount++;
+        } else if (session.currentAction && session.currentAction.trim() !== '') {
+          activeWithActionCount++;
+        }
       }
       
-      // Dynamic color based on activity and message count
-      let activeColor = chalk.green;
+      // Dynamic color based on session status (not message count!)
+      let activeColor = chalk.green; // Default green for completed
       let statusText = `${activeCount} active`;
       
-      // Debug: log message count for troubleshooting
+      // Debug: log status for troubleshooting
       if (process.env.DEBUG_SESSIONS) {
-        console.log(`[Sessions View] totalMessages: ${totalMessages}, thinking: ${sessionCounts.thinking}`);
+        console.log(`[Sessions View] completed: ${completedCount}, activeWithAction: ${activeWithActionCount}, thinking: ${sessionCounts.thinking}`);
       }
       
-      if (sessionCounts.thinking > 0) {
+      // Priority order for color determination:
+      // 1. If all sessions are completed -> green
+      // 2. If there are active sessions with actions -> orange
+      // 3. If AI is thinking -> cyan
+      // 4. Otherwise -> green (idle/completed)
+      
+      if (activeWithActionCount > 0) {
+        activeColor = chalk.hex('#d77757'); // Orange for active
+        statusText = `${activeCount} active (${activeWithActionCount} working)`;
+      } else if (sessionCounts.thinking > 0) {
         activeColor = chalk.cyan;
         statusText = `${activeCount} active (${sessionCounts.thinking} thinking)`;
-      } else if (totalMessages > 100) {
-        activeColor = chalk.red;
-        statusText = `${activeCount} active (high activity)`;
-      } else if (totalMessages > 50) {
-        activeColor = chalk.yellow;
-        statusText = `${activeCount} active (moderate)`;
-      }
-      
-      // Lower thresholds for testing
-      if (totalMessages > 20 && totalMessages <= 50) {
-        activeColor = chalk.yellow;
-        statusText = `${activeCount} active (moderate)`;
-      } else if (totalMessages > 10 && totalMessages <= 20) {
-        activeColor = chalk.cyan;
-        statusText = `${activeCount} active (active)`;
+      } else if (completedCount === activeCount && activeCount > 0) {
+        activeColor = chalk.green;
+        statusText = `${activeCount} completed`;
+      } else {
+        // Default to green for idle/completed sessions
+        activeColor = chalk.green;
+        statusText = `${activeCount} active`;
       }
       
       sessionLines.push(activeColor.bold(statusText));

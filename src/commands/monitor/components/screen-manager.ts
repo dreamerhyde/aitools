@@ -34,6 +34,16 @@ export class ScreenManager {
     this.screen.style = {
       bg: 'black'
     };
+    
+    // Immediately set up exit handlers after screen creation
+    this.screen.key(['C-c', 'escape', 'q'], () => {
+      process.exit(0);
+    });
+    
+    // Override SIGINT for immediate exit
+    process.on('SIGINT', () => {
+      process.exit(0);
+    });
   }
 
   createGrid(rows: number, cols: number): any {
@@ -79,24 +89,10 @@ export class ScreenManager {
       throw new Error('Screen not initialized');
     }
 
-    // Default handlers - immediate exit on Ctrl+C
-    this.screen.key(['C-c'], () => {
-      // Immediate cleanup and exit
-      this.screen.destroy();
-      process.exit(0);
-    });
-    
-    // Graceful exit on 'q' or 'escape'
-    this.screen.key(['escape', 'q'], () => {
-      if (handlers.quit) {
-        handlers.quit();
-      }
-      process.exit(0);
-    });
-
-    // Custom handlers
+    // Don't rebind exit keys - they're already set in initialize()
+    // Only bind custom handlers (not quit-related)
     Object.entries(handlers).forEach(([key, handler]) => {
-      if (key !== 'quit') {
+      if (key !== 'quit' && key !== 'q' && key !== 'escape' && key !== 'C-c') {
         this.screen.key(key, handler);
       }
     });

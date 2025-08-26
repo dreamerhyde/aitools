@@ -226,9 +226,9 @@ export class MonitorCommand {
       }
     });
     
-    // Right: High CPU Processes (2,8) -> (5,12) - takes 4 columns, same height as chart
+    // Right: Processes (2,8) -> (5,12) - takes 4 columns, same height as chart
     this.highCpuProcessesBox = this.grid.set(2, 8, 3, 4, this.blessed.box, {
-      label: ' High CPU Processes ',
+      label: ' Processes ',
       border: { type: 'line', fg: 'gray' },
       style: {
         fg: 'white',
@@ -1092,8 +1092,9 @@ export class MonitorCommand {
         
         // Add memory info if available with color coding
         if (gpuData.memory.total > 0) {
+          const memUsedGB = (gpuData.memory.used / 1024).toFixed(1);
+          const memTotalGB = (gpuData.memory.total / 1024).toFixed(1);
           const memPercent = ((gpuData.memory.used / gpuData.memory.total) * 100);
-          const memPercentStr = memPercent.toFixed(0);
           
           // Color code VRAM usage
           let vramColor = chalk.green;
@@ -1105,7 +1106,8 @@ export class MonitorCommand {
             vramColor = chalk.cyan;
           }
           
-          gpuInfo += ` • ${vramColor(memPercentStr + '% VRAM')}`;
+          // Show both GB and percentage: "19.1/128.0 GB"
+          gpuInfo += ` • ${vramColor(`${memUsedGB}/${memTotalGB} GB`)}`;
         }
         
         // Add temperature if available

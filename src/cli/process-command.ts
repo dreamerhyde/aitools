@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../utils/process-monitor.js';
 import { UIHelper } from '../utils/ui.js';
+import { extractSmartProcessName } from '../commands/monitor/utils/sanitizers.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import inquirer from 'inquirer';
@@ -55,7 +56,7 @@ export function setupProcessCommand(program: Command): void {
         
         // Display compact table without fixed widths
         const table = new Table({
-          head: ['PID', 'CPU%', 'MEM%', 'Status', 'Command'],
+          head: ['PID', 'CPU%', 'MEM%', 'Status', 'Process'],
           style: {
             head: ['cyan'],
             border: ['gray']
@@ -64,9 +65,11 @@ export function setupProcessCommand(program: Command): void {
         });
         
         filtered.slice(0, 30).forEach(proc => {
-          const shortCmd = proc.command.length > commandWidth ? 
-            proc.command.substring(0, commandWidth - 3) + '...' : 
-            proc.command;
+          // Use smart process name extraction
+          const smartName = extractSmartProcessName(proc.command);
+          const shortCmd = smartName.length > commandWidth ? 
+            smartName.substring(0, commandWidth - 3) + '...' : 
+            smartName;
           
           // Color code based on CPU usage
           const cpuVal = proc.cpu.toFixed(1);
@@ -167,9 +170,11 @@ export function setupProcessCommand(program: Command): void {
         const commandWidth = Math.max(50, termWidth - 40);
         
         const processOptions = targetProcesses.slice(0, 30).map((proc) => {
-          const shortCmd = proc.command.length > commandWidth ? 
-            proc.command.substring(0, commandWidth - 3) + '...' : 
-            proc.command;
+          // Use smart process name extraction
+          const smartName = extractSmartProcessName(proc.command);
+          const shortCmd = smartName.length > commandWidth ? 
+            smartName.substring(0, commandWidth - 3) + '...' : 
+            smartName;
           
           // Format with fixed widths for consistency
           const pidStr = proc.pid.toString().padStart(7);  // Right align PID
@@ -293,7 +298,7 @@ export function setupProcessCommand(program: Command): void {
         const commandWidth = Math.max(50, termWidth - 40);
         
         const table = new Table({
-          head: ['PID', 'CPU%', 'MEM%', 'Status', 'Command'],
+          head: ['PID', 'CPU%', 'MEM%', 'Status', 'Process'],
           style: {
             head: ['cyan'],
             border: ['gray']
@@ -305,9 +310,11 @@ export function setupProcessCommand(program: Command): void {
         hookProcesses.sort((a, b) => b.cpu - a.cpu);
         
         hookProcesses.forEach(proc => {
-          const shortCmd = proc.command.length > commandWidth ? 
-            proc.command.substring(0, commandWidth - 3) + '...' : 
-            proc.command;
+          // Use smart process name extraction
+          const smartName = extractSmartProcessName(proc.command);
+          const shortCmd = smartName.length > commandWidth ? 
+            smartName.substring(0, commandWidth - 3) + '...' : 
+            smartName;
           
           // Color code based on CPU usage (same as ps)
           const cpuVal = proc.cpu.toFixed(1);

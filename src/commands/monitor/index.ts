@@ -42,14 +42,7 @@ export class MonitorCommand {
       process.exit(1);
     }
 
-    // Set up signal handlers for immediate exit
-    process.on('SIGINT', () => {
-      this.quickExit();
-    });
-    
-    process.on('SIGTERM', () => {
-      this.quickExit();
-    });
+    // Don't set up any signal handlers here - screen-manager handles everything
 
     try {
       await this.initializeScreen();
@@ -169,15 +162,17 @@ export class MonitorCommand {
         
         // Add VRAM info if available
         if (gpuData.memory.total > 0) {
+          const memUsedGB = (gpuData.memory.used / 1024).toFixed(1);
+          const memTotalGB = (gpuData.memory.total / 1024).toFixed(1);
           const memPercent = ((gpuData.memory.used / gpuData.memory.total) * 100);
-          const memPercentStr = memPercent.toFixed(0);
           
           let vramColor = chalk.green;
           if (memPercent > 80) vramColor = chalk.red;
           else if (memPercent > 60) vramColor = chalk.yellow;
           else if (memPercent > 40) vramColor = chalk.cyan;
           
-          gpuInfo += ` • ${vramColor(memPercentStr + '% VRAM')}`;
+          // Show both GB and percentage: "19.1/128.0 GB (15%)"
+          gpuInfo += ` • ${vramColor(`${memUsedGB}/${memTotalGB} GB`)}`;
         }
         
         if (gpuData.temperature !== null) {
@@ -338,13 +333,7 @@ export class MonitorCommand {
   }
 
   private quickExit(): void {
-    // Quick cleanup for immediate exit
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval);
-    }
-    if (this.screenManager) {
-      this.screenManager.destroy();
-    }
+    // Immediate exit without cleanup for SIGTERM
     process.exit(0);
   }
 

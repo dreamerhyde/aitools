@@ -21,8 +21,10 @@ export class ProcessMonitor {
     try {
       const { stdout: vmStat } = await execAsync('vm_stat');
       const { stdout: topOutput } = await execAsync('top -l 1 -n 0 | head -10');
+      // Get actual physical memory from sysctl
+      const { stdout: physicalMemory } = await execAsync('sysctl -n hw.memsize');
       
-      const memoryInfo = this.parseMemoryInfo(vmStat);
+      const memoryInfo = this.parseMemoryInfo(vmStat, parseInt(physicalMemory.trim()));
       const cpuInfo = this.parseCpuInfo(topOutput);
       
       return {
@@ -252,7 +254,7 @@ export class ProcessMonitor {
     return totalSeconds;
   }
 
-  private parseMemoryInfo(vmStat: string): { total: string; free: string; active: string; usedBytes: number; totalBytes: number } {
+  private parseMemoryInfo(vmStat: string, physicalMemoryBytes?: number): { total: string; free: string; active: string; usedBytes: number; totalBytes: number } {
     const lines = vmStat.split('\n');
     const pageSize = 4096; // macOS page size
     
@@ -279,19 +281,29 @@ export class ProcessMonitor {
       }
     });
     
-    const totalPages = freePages + activePages + speculativePages + inactivePages + wiredPages + compressedPages;
     const usedPages = activePages + wiredPages + compressedPages;
     
     const freeMemory = Math.round((freePages + speculativePages) * pageSize / 1024 / 1024);
     const activeMemory = Math.round(activePages * pageSize / 1024 / 1024);
-    const totalMemory = Math.round(totalPages * pageSize / 1024 / 1024);
+    
+    // Use physical memory if provided, otherwise calculate from pages
+    let totalMemory: number;
+    let totalBytes: number;
+    if (physicalMemoryBytes) {
+      totalMemory = Math.round(physicalMemoryBytes / 1024 / 1024);
+      totalBytes = physicalMemoryBytes;
+    } else {
+      const totalPages = freePages + activePages + speculativePages + inactivePages + wiredPages + compressedPages;
+      totalMemory = Math.round(totalPages * pageSize / 1024 / 1024);
+      totalBytes = totalPages * pageSize;
+    }
     
     return {
       total: `${totalMemory}MB`,
       free: `${freeMemory}MB`,
       active: `${activeMemory}MB`,
       usedBytes: usedPages * pageSize,
-      totalBytes: totalPages * pageSize
+      totalBytes
     };
   }
 

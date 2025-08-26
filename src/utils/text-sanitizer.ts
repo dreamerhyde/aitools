@@ -15,83 +15,141 @@ export interface SanitizeOptions {
  * Uses flat symbols instead of emojis (✓、✗、●、○、▪、→ etc.)
  */
 const EMOJI_TO_ASCII: Record<string, string> = {
-  // Emotions
-  '😀': ':)',
-  '😁': ':D',
-  '😂': 'XD',
-  '🤣': 'XD',
-  '😊': ':)',
-  '😢': ':(',
-  '😭': ":'(",
-  '😡': '>:(',
-  '😠': '>:(',
-  '🤔': '(?)',
-  '😎': 'B)',
-  '🙄': ':-/',
+  // Success and failure indicators - using project standard symbols
+  '✅': '✓',
+  '❌': '✗',
+  '✔️': '✓',
+  '❎': '✗',
+  '☑️': '✓',
   
-  // Gestures
-  '👍': '+1',
-  '👎': '-1',
-  '👌': 'OK',
-  '✌️': 'V',
-  '🤝': '[handshake]',
-  '👏': '[clap]',
-  '🙏': '[pray]',
+  // Status indicators - using project standard symbols  
+  '⭐': '●',
+  '🔴': '●',
+  '🟢': '●',
+  '🟡': '●',
+  '🔵': '●',
+  '⚪': '○',
+  '⚫': '●',
+  '🟠': '●',
+  '🟣': '●',
   
-  // Symbols and indicators
-  '❤️': '<3',
-  '💔': '</3',
-  '🔥': '*',
-  '⭐': '*',
-  '✅': '[OK]',
-  '❌': '[X]',
-  '⚠️': '[!]',
-  '📌': '[pin]',
-  '🔗': '[link]',
-  
-  // Arrows and trends
+  // Arrows and directions - keeping Unicode arrows
   '📈': '↗',
   '📉': '↘',
-  '🚀': '^',
+  '🚀': '↑',
   '⬆️': '↑',
   '⬇️': '↓',
   '➡️': '→',
   '⬅️': '←',
   
-  // Status indicators
-  '💡': '[idea]',
-  '💯': '100%',
-  '📝': '[note]',
-  '📁': '[folder]',
-  '📄': '[file]',
-  '💰': '$',
-  '⚡': '!',
-  '✨': '~',
-  '🎉': '***',
-  '🎯': '[target]',
+  // Warning and attention - using project symbols
+  '⚠️': '▪',
+  '❗': '▪',
+  '‼️': '▪',
+  '❓': '▪',
+  '❔': '▪',
   
-  // Development related
+  // Progress and activity
+  '🔧': '→',
+  '⚡': '→',
+  '💡': '→',
+  '🔍': '→',
+  '📝': '→',
+  '📁': '→',
+  '📄': '→',
+  '💻': '→',
+  
+  // Development related - simplified
   '🐛': '[bug]',
-  '🔧': '[fix]',
   '🔨': '[build]',
-  '📦': '[package]',
+  '📦': '[pkg]',
   '🧪': '[test]',
-  '🔍': '[search]',
-  '💻': '[code]',
   
-  // Colors (for status)
-  '🔴': '(red)',
-  '🟡': '(yellow)', 
-  '🟢': '(green)',
-  '🔵': '(blue)',
-  '⚪': '(white)',
-  '⚫': '(black)'
+  // Numbers and lists - remove completely to match UI principles
+  '1️⃣': '',
+  '2️⃣': '',
+  '3️⃣': '',
+  '4️⃣': '',
+  '5️⃣': '',
+  '6️⃣': '',
+  '7️⃣': '',
+  '8️⃣': '',
+  '9️⃣': '',
+  '🔟': '',
+  '0️⃣': '',
+  
+  // Emotions - simplified ASCII
+  '😀': '',
+  '😁': '',
+  '😂': '',
+  '🤣': '',
+  '😊': '',
+  '😢': '',
+  '😭': '',
+  '😡': '',
+  '😠': '',
+  '🤔': '',
+  '😎': '',
+  '🙄': '',
+  
+  // Gestures - remove as not part of flat design
+  '👍': '',
+  '👎': '',
+  '👌': '',
+  '✌️': '',
+  '🤝': '',
+  '👏': '',
+  '🙏': '',
+  
+  // Hearts and celebrations - not needed in CLI
+  '❤️': '',
+  '💔': '',
+  '🔥': '',
+  '✨': '',
+  '🎉': '',
+  '🎯': '',
+  '💯': '',
+  
+  // Additional common emojis - remove or convert
+  '📋': '',
+  '📊': '',
+  '📌': '▪',
+  '💰': '$',
+  '🔗': '',
+  '📮': '',
+  '📬': '',
+  '📭': '',
+  '📯': '',
+  
+  // Media and objects - remove  
+  '🖥️': '',
+  '⌨️': '',
+  '🖱️': '',
+  '🖨️': '',
+  '📱': '',
+  '💿': '',
+  '💾': '',
+  '💽': '',
+  
+  // Time and calendar - remove
+  '⏰': '',
+  '⏲️': '',
+  '⏱️': '',
+  '📅': '',
+  '📆': '',
+  '🗓️': '',
+  
+  // Common activity emojis - use arrows
+  '🏃': '→',
+  '🚶': '→',
+  '💨': '→'
 };
 
 /**
  * Comprehensive emoji regex pattern that catches most emoji characters
+ * Including number emojis, skin tones, and modifier sequences
  */
-const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F0FF}]|[\u{1FA70}-\u{1FAFF}]/gu;
+const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F0FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{FE00}-\u{FE0F}]|[\u{1F1E6}-\u{1F1FF}]|[\u{1F191}-\u{1F251}]|[\u{1F004}]|[\u{1F0CF}]|[\u{1F170}-\u{1F171}]|[\u{1F17E}-\u{1F17F}]|[\u{1F18E}]|[\u{3030}]|[\u{2B50}]|[\u{2B55}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{3297}]|[\u{3299}]|[\u{303D}]|[\u{00A9}]|[\u{00AE}]|[\u{2122}]|[\u{23F3}]|[\u{24C2}]|[\u{23E9}-\u{23EF}]|[\u{25B6}]|[\u{23F8}-\u{23FA}]|[\u{200D}]|[\u{20E3}]/gu;
 
 /**
  * Sanitizes text by removing or converting emojis
@@ -120,6 +178,17 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
   // Remove remaining emojis
   if (removeEmojis) {
     result = result.replace(EMOJI_REGEX, '');
+    
+    // Additional cleanup for specific problematic sequences
+    result = result
+      .replace(/[\u0030-\u0039]\uFE0F?\u20E3/g, '') // Number emojis like 1️⃣ 2️⃣ etc
+      .replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, '') // Flag emojis
+      .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '') // Skin tone modifiers
+      .replace(/\u200D/g, '') // Zero width joiner
+      .replace(/\uFE0F/g, '') // Variation selector
+      .replace(/\u20E3/g, '') // Keycap sequence
+      .replace(/[\u{E0020}-\u{E007F}]/gu, '') // Tag characters
+      .replace(/[\u{1F9B0}-\u{1F9B3}]/gu, ''); // Additional hair emojis
   }
 
   // Clean up whitespace
@@ -220,7 +289,8 @@ const ENHANCED_ACTION_MAPPING: Record<string, string> = {
   // Generic states
   'Puttering': 'Puttering...',
   'Orchestrating': 'Orchestrating...',
-  'Working': 'Working...'
+  'Working': 'Working...',
+  'Processing': 'Processing...'
 };
 
 /**
@@ -236,13 +306,25 @@ export function formatActionString(action: string): string {
     preserveWhitespace: false
   });
   
+  // Check if it's already a formatted status (like from activeForm)
+  // These usually end with "..." or contain "(esc to interrupt)"
+  if (sanitized.includes('(esc to interrupt)') || 
+      sanitized.includes('(ESC to interrupt)')) {
+    // It's already formatted from activeForm, just return it
+    return sanitized;
+  }
+  
   // Apply enhanced mapping if available
   const enhanced = ENHANCED_ACTION_MAPPING[sanitized];
   if (enhanced) {
     sanitized = enhanced;
   } else {
-    // If no direct mapping, add dots for progressive feel if not already present
-    if (!sanitized.endsWith('...') && !sanitized.endsWith('.')) {
+    // For any -ing word, ensure it has dots (dynamic status verbs)
+    if (sanitized.match(/ing\b/i) && !sanitized.endsWith('...')) {
+      sanitized += '...';
+    }
+    // If no direct mapping and not an -ing word, add dots for progressive feel
+    else if (!sanitized.endsWith('...') && !sanitized.endsWith('.')) {
       sanitized += '...';
     }
   }
