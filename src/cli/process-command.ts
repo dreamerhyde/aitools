@@ -4,6 +4,10 @@ import { UIHelper } from '../utils/ui.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import inquirer from 'inquirer';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export function setupProcessCommand(program: Command): void {
   const processCommand = program
@@ -207,18 +211,44 @@ export function setupProcessCommand(program: Command): void {
             
             if (confirm) {
               let killed = 0;
+              let permissionDenied = 0;
+              
               for (const pid of selectedPids) {
-                const success = await processMonitor.killProcess(pid);
-                if (success) {
-                  console.log(chalk.green(`✓ Terminated PID ${pid}`));
-                  killed++;
-                } else {
+                try {
+                  const success = await processMonitor.killProcess(pid);
+                  if (success) {
+                    console.log(chalk.green(`✓ Terminated PID ${pid}`));
+                    killed++;
+                  } else {
+                    // Check if it's a permission error by trying to get process info
+                    try {
+                      await execAsync(`kill -0 ${pid}`);
+                      // Process exists but couldn't be killed
+                      console.log(chalk.red(`✗ Failed to terminate PID ${pid} - Operation not permitted`));
+                      permissionDenied++;
+                    } catch {
+                      // Process doesn't exist or already terminated
+                      console.log(chalk.gray(`○ PID ${pid} no longer exists`));
+                    }
+                  }
+                } catch (error: any) {
+                  // Unexpected error
                   console.log(chalk.red(`✗ Failed to terminate PID ${pid}`));
                 }
               }
               
+              // Display summary
+              const messages = [];
               if (killed > 0) {
-                UIHelper.showSuccess(`Successfully terminated ${killed} process(es)`);
+                messages.push(chalk.green(`✓ Successfully terminated ${killed} process(es)`));
+              }
+              if (permissionDenied > 0) {
+                messages.push(chalk.yellow(`⚠ Permission denied for ${permissionDenied} process(es)` +
+                  (permissionDenied > 0 ? ' (try with sudo)' : '')));
+              }
+              
+              if (messages.length > 0) {
+                console.log('\n' + messages.join('\n'));
               }
             } else {
               console.log(chalk.gray('Operation cancelled'));

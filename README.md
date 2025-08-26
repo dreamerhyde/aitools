@@ -124,6 +124,26 @@ ai fix --aggressive           # More thorough cleanup
 ai fix --dry-run              # Preview without executing
 ```
 
+### System Resource Monitoring
+
+```bash
+# Real-time resource monitoring with color-coded indicators
+ai monitor                    # Interactive TUI dashboard
+
+# Features:
+# - CPU/Memory/GPU usage with progress bars
+# - Intelligent color coding:
+#   • Green (0-60%): Normal operation
+#   • Yellow (60-80%): Warning level
+#   • Red (80-100%): Critical level
+# - GPU core detection (Apple Silicon & NVIDIA)
+# - VRAM usage tracking with 4-tier color system
+# - Active Claude sessions tracking
+# - Cost metrics visualization
+```
+
+📊 **Resource Monitoring Details**: See [CLAUDE.md](./CLAUDE.md#資源監控顏色編碼系統) for complete color coding guide and system details.
+
 ### Claude Code Usage Analytics
 
 ```bash

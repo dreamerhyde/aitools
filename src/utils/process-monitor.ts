@@ -156,8 +156,8 @@ export class ProcessMonitor {
   async killProcess(pid: number): Promise<boolean> {
     try {
       await execAsync(`kill -TERM ${pid}`);
-      // Wait 5 seconds, force kill if still alive
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait 2 seconds, force kill if still alive
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       try {
         await execAsync(`kill -0 ${pid}`);
@@ -167,8 +167,22 @@ export class ProcessMonitor {
       }
       
       return true;
-    } catch (error) {
-      console.error(`Failed to terminate process ${pid}:`, error);
+    } catch (error: any) {
+      // Extract only the relevant error message
+      const errorMessage = error.stderr ? 
+        error.stderr.trim().replace(/\/bin\/sh: line \d+: /, '') : 
+        error.message || 'Unknown error';
+      
+      // Only log permission errors and other critical errors silently
+      if (errorMessage.includes('Operation not permitted')) {
+        // Silent fail for permission errors - handled by caller
+      } else if (errorMessage.includes('No such process')) {
+        // Process already terminated - silent
+      } else {
+        // For other errors, log a concise message
+        console.error(`Failed to terminate PID ${pid}: ${errorMessage}`);
+      }
+      
       return false;
     }
   }

@@ -1,4 +1,5 @@
 import { ProcessMonitor } from '../utils/process-monitor.js';
+import { GPUMonitor } from '../utils/gpu-monitor.js';
 import { JSONLParser } from '../utils/jsonl-parser.js';
 import { UsageAnalyzer } from '../utils/usage-analyzer.js';
 import { formatCost, formatNumber } from '../utils/formatters.js';
@@ -65,6 +66,7 @@ export class MonitorCommand {
   private activeSessionsBox: any = null;
   private sessionBoxes: Map<string, any> = new Map();
   private processMonitor: ProcessMonitor;
+  private gpuMonitor: GPUMonitor;
   private jsonParser: JSONLParser;
   private usageAnalyzer: UsageAnalyzer;
   private updateInterval: NodeJS.Timeout | null = null;
@@ -79,6 +81,7 @@ export class MonitorCommand {
 
   constructor() {
     this.processMonitor = new ProcessMonitor();
+    this.gpuMonitor = new GPUMonitor();
     this.jsonParser = new JSONLParser(undefined, true, true); // silent mode for TUI
     this.usageAnalyzer = new UsageAnalyzer();
     
@@ -1299,10 +1302,10 @@ export class MonitorCommand {
       this.metricsBox.setContent(chalk.gray('Loading...'));
     }
     
-    // Get system resource data (with timeout)
+    // Get system resource data (with longer timeout for GPU detection)
     Promise.race([
       this.getSystemResources(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000)) // Increased from 1000ms
     ]).then(resources => {
       // Cache the resources
       this.resourceCache = resources as any;
@@ -1332,10 +1335,11 @@ export class MonitorCommand {
       
       resourceDisplay.push(''); // spacing between MEM and GPU
       
-      // GPU section if available - dynamic width bar
-      if (resources.gpu !== undefined && resources.gpuInfo) {
-        const gpuBar = this.createMiniBar(resources.gpu, 100, barWidth);
-        resourceDisplay.push(`${chalk.bold('GPU')} ${gpuBar} ${chalk.magenta(resources.gpu.toFixed(1) + '%')}`);
+      // GPU section - always show if gpuInfo exists
+      if (resources.gpuInfo) {
+        const gpuUsage = resources.gpu || 0; // Default to 0 if undefined
+        const gpuBar = this.createMiniBar(gpuUsage, 100, barWidth);
+        resourceDisplay.push(`${chalk.bold('GPU')} ${gpuBar} ${chalk.magenta(gpuUsage.toFixed(1) + '%')}`);
         resourceDisplay.push(chalk.gray(`${resources.gpuInfo}`));
       }
       
@@ -1359,6 +1363,15 @@ export class MonitorCommand {
         resourceDisplay.push('');
         resourceDisplay.push(`${chalk.bold('MEM')} ${memBar} ${chalk.cyan(resources.memory.toFixed(1) + '%')}`);
         resourceDisplay.push(chalk.gray(`${resources.memUsed}/${resources.memTotal} GB`));
+        
+        // Include GPU if available in cache
+        if (resources.gpuInfo) {
+          resourceDisplay.push('');
+          const gpuUsage = resources.gpu || 0;
+          const gpuBar = this.createMiniBar(gpuUsage, 100, barWidth);
+          resourceDisplay.push(`${chalk.bold('GPU')} ${gpuBar} ${chalk.magenta(gpuUsage.toFixed(1) + '%')}`);
+          resourceDisplay.push(chalk.gray(`${resources.gpuInfo}`));
+        }
         
         this.metricsBox.setContent(resourceDisplay.join('\n'));
       } else {
@@ -1397,6 +1410,44 @@ export class MonitorCommand {
       let gpuInfo = undefined;
       let gpu = undefined;
       
+      // Get GPU info from GPUMonitor
+      try {
+        const gpuData = await this.gpuMonitor.getGPUInfo();
+        gpu = gpuData.usage;
+        
+        // For GPU, only show cores count (not chip name to avoid duplication)
+        if (gpuData.cores) {
+          gpuInfo = `${gpuData.cores} cores`;
+        } else {
+          gpuInfo = 'GPU';
+        }
+        
+        // Add memory info if available with color coding
+        if (gpuData.memory.total > 0) {
+          const memPercent = ((gpuData.memory.used / gpuData.memory.total) * 100);
+          const memPercentStr = memPercent.toFixed(0);
+          
+          // Color code VRAM usage
+          let vramColor = chalk.green;
+          if (memPercent > 80) {
+            vramColor = chalk.red;
+          } else if (memPercent > 60) {
+            vramColor = chalk.yellow;
+          } else if (memPercent > 40) {
+            vramColor = chalk.cyan;
+          }
+          
+          gpuInfo += ` • ${vramColor(memPercentStr + '% VRAM')}`;
+        }
+        
+        // Add temperature if available
+        if (gpuData.temperature !== null) {
+          gpuInfo += ` • ${gpuData.temperature}°C`;
+        }
+      } catch (gpuError) {
+        // Fallback to existing detection logic
+      }
+      
       try {
         // First check if it's Apple Silicon using a more reliable method
         const cpuArch = execSync('uname -m').toString().trim();
@@ -1410,21 +1461,54 @@ export class MonitorCommand {
             const chipName = chipMatch ? chipMatch[1] : 'Apple Silicon';
             cpuInfo = `${chipName} (${coreCount} cores)`;
             
-            // GPU info based on chip
-            if (chipName.includes('M1')) {
-              gpuInfo = `${chipName} GPU (7-8 cores)`;
-            } else if (chipName.includes('M2')) {
-              gpuInfo = `${chipName} GPU (10 cores)`;
-            } else if (chipName.includes('M3')) {
-              gpuInfo = `${chipName} GPU (10+ cores)`;
-            } else {
-              gpuInfo = `${chipName} GPU (Integrated)`;
+            // Set default GPU info if not already detected (only cores, no chip name)
+            if (!gpuInfo) {
+              // GPU core counts based on chip variant
+              if (chipName.includes('M1')) {
+                if (chipName.includes('Pro')) {
+                  gpuInfo = `14-16 cores`;
+                } else if (chipName.includes('Max')) {
+                  gpuInfo = `24-32 cores`;
+                } else if (chipName.includes('Ultra')) {
+                  gpuInfo = `48-64 cores`;
+                } else {
+                  gpuInfo = `7-8 cores`;
+                }
+              } else if (chipName.includes('M2')) {
+                if (chipName.includes('Pro')) {
+                  gpuInfo = `16-19 cores`;
+                } else if (chipName.includes('Max')) {
+                  gpuInfo = `30-38 cores`;
+                } else if (chipName.includes('Ultra')) {
+                  gpuInfo = `60-76 cores`;
+                } else {
+                  gpuInfo = `8-10 cores`;
+                }
+              } else if (chipName.includes('M3')) {
+                if (chipName.includes('Pro')) {
+                  gpuInfo = `14-18 cores`;
+                } else if (chipName.includes('Max')) {
+                  gpuInfo = `30-40 cores`;
+                } else {
+                  gpuInfo = `8-10 cores`;
+                }
+              } else if (chipName.includes('M4')) {
+                if (chipName.includes('Pro')) {
+                  gpuInfo = `16-20 cores`;
+                } else if (chipName.includes('Max')) {
+                  gpuInfo = `32-40 cores`;
+                } else {
+                  gpuInfo = `10 cores`;
+                }
+              } else {
+                gpuInfo = `GPU`;
+              }
             }
           } catch {
             cpuInfo = `Apple Silicon (${coreCount} cores)`;
-            gpuInfo = 'Apple GPU (Integrated)';
+            if (!gpuInfo) gpuInfo = 'Integrated GPU';
           }
-          gpu = 0; // Show as 0% rather than N/A
+          if (gpu === undefined) gpu = 0; // Show as 0% rather than N/A
         } else {
           // Intel Mac (x86_64)
           try {
@@ -1437,8 +1521,8 @@ export class MonitorCommand {
             cpuInfo = `Intel (${coreCount} cores)`;
           }
           // Skip GPU detection for Intel to avoid slowdown
-          gpuInfo = 'Discrete/Integrated';
-          gpu = 0;
+          if (!gpuInfo) gpuInfo = 'GPU';
+          if (gpu === undefined) gpu = 0;
         }
       } catch {
         const coreCount = execSync('sysctl -n hw.ncpu').toString().trim();
