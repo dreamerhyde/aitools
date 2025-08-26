@@ -89,7 +89,8 @@ export class SessionManager {
     topic?: string,
     model?: string,
     currentAction?: string,
-    recentMessages?: any[] // Can be either ConversationMessage[] or RecentMessage[]
+    recentMessages?: any[], // Can be either ConversationMessage[] or RecentMessage[]
+    status?: 'active' | 'completed' | 'idle'
   ): void {
     if (!this.activeSessions.has(sessionId)) {
       this.activeSessions.set(sessionId, {
@@ -106,7 +107,8 @@ export class SessionManager {
         })) : [],
         currentTopic: topic,
         currentModel: model,
-        currentAction: currentAction
+        currentAction: currentAction,
+        status: status || 'idle'
       });
     } else {
       // Update existing session info
@@ -117,6 +119,7 @@ export class SessionManager {
       session.currentTopic = topic;
       session.currentModel = model;
       session.currentAction = currentAction;
+      session.status = status || 'idle';
       
       // Update recent messages if provided
       if (recentMessages && recentMessages.length > 0) {

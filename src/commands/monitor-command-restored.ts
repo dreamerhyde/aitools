@@ -414,33 +414,33 @@ export class MonitorCommand {
                 if (item.type === 'tool_use' && item.name) {
                   // Map tool names to user-friendly actions
                   const toolActions: Record<string, string> = {
-                    'Read': '📖 Reading file...',
-                    'Write': '✏️ Writing file...',
-                    'Edit': '✏️ Editing file...',
-                    'MultiEdit': '✏️ Making multiple edits...',
-                    'Bash': '⚡ Running command...',
-                    'Grep': '🔍 Searching...',
-                    'Glob': '🔍 Finding files...',
-                    'LS': '📂 Listing directory...',
-                    'WebFetch': '🌐 Fetching web content...',
-                    'WebSearch': '🔍 Searching web...',
-                    'TodoWrite': '✓ Updating tasks...',
-                    'Task': '🤖 Running agent...',
-                    'NotebookEdit': '📓 Editing notebook...'
+                    'Read': 'Reading file...',
+                    'Write': 'Writing file...',
+                    'Edit': 'Editing file...',
+                    'MultiEdit': 'Making multiple edits...',
+                    'Bash': 'Running command...',
+                    'Grep': 'Searching...',
+                    'Glob': 'Finding files...',
+                    'LS': 'Listing directory...',
+                    'WebFetch': 'Fetching web content...',
+                    'WebSearch': 'Searching web...',
+                    'TodoWrite': 'Updating tasks...',
+                    'Task': 'Running agent...',
+                    'NotebookEdit': 'Editing notebook...'
                   };
                   
-                  currentAction = toolActions[item.name] || `🔧 Using ${item.name}...`;
+                  currentAction = toolActions[item.name] || `Using ${item.name}...`;
                   break;
                 }
                 // Check for thinking or other states
                 else if (item.type === 'text' && item.text) {
                   const text = item.text.toLowerCase();
                   if (text.includes('thinking') || text.includes('analyzing')) {
-                    currentAction = '💭 Thinking...';
+                    currentAction = 'Thinking...';
                   } else if (text.includes('reading') || text.includes('examining')) {
-                    currentAction = '📖 Reading...';
+                    currentAction = 'Reading...';
                   } else if (text.includes('searching')) {
-                    currentAction = '🔍 Searching...';
+                    currentAction = 'Searching...';
                   }
                 }
               }
@@ -695,18 +695,16 @@ export class MonitorCommand {
         const formattedResponse = [];
         
         // Check if response contains bullet points or structured content
-        const hasBullets = aiResponse.includes('•') || aiResponse.includes('- ') || 
-                          aiResponse.includes('✅') || aiResponse.includes('✓');
+        const hasBullets = aiResponse.includes('•') || aiResponse.includes('- ');
         
         if (hasBullets) {
           // Keep original formatting for structured content
           for (let i = 0; i < allLines.length; i++) {
             const line = allLines[i];
-            if (line.startsWith('- ') || line.startsWith('• ') || 
-                line.startsWith('✅') || line.startsWith('✓')) {
+            if (line.startsWith('- ') || line.startsWith('• ')) {
               // Bullet point line
               formattedResponse.push(chalk.green(line));
-            } else if (i > 0 && !line.match(/^[•\-✅✓]/)) {
+            } else if (i > 0 && !line.match(/^[•\-]/)) {
               // Continuation of previous bullet point
               formattedResponse.push(chalk.green('  ' + line));
             } else {

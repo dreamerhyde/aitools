@@ -6,6 +6,47 @@ import * as path from 'path';
 import * as os from 'os';
 import { execSync } from 'child_process';
 import { sanitizeText, sanitizeTopic, formatActionString } from './text-sanitizer.js';
+import { statusTracker } from './status-tracker.js';
+
+/**
+ * Extract tool name from action string for status tracking
+ */
+function extractToolNameFromAction(action: string): string | null {
+  // Map common action patterns back to tool names
+  const actionToToolMapping: Record<string, string> = {
+    'Reading file': 'Read',
+    'Writing file': 'Write',
+    'Editing file': 'Edit',
+    'Editing multiple files': 'MultiEdit',
+    'Running command': 'Bash',
+    'Searching': 'Grep',
+    'Finding files': 'Glob',
+    'Listing directory': 'LS',
+    'Fetching web content': 'WebFetch',
+    'Searching web': 'WebSearch',
+    'Running agent': 'Task',
+    'Updating todos': 'TodoWrite',
+    'Planning': 'ExitPlanMode',
+    'Editing notebook': 'NotebookEdit',
+    'Reading output': 'BashOutput',
+    'Terminating process': 'KillBash',
+    'Thinking': 'mcp__Sequential_Thinking__sequentialthinking',
+    'Planning task': 'mcp__Shrimp__plan_task',
+    'Analyzing task': 'mcp__Shrimp__analyze_task',
+    'Executing SQL': 'mcp__Supabase__execute_sql',
+    'Getting docs': 'mcp__Context_7__get-library-docs',
+    'Building component': 'mcp___21st-dev_magic__21st_magic_component_builder',
+    'Puttering': 'default'
+  };
+
+  for (const [actionPattern, toolName] of Object.entries(actionToToolMapping)) {
+    if (action.toLowerCase().includes(actionPattern.toLowerCase())) {
+      return toolName;
+    }
+  }
+
+  return 'default';
+}
 
 export interface RecentMessage {
   timestamp: Date;
@@ -20,6 +61,7 @@ export interface ConversationInfo {
   model?: string;
   currentAction?: string;
   recentMessages: RecentMessage[];
+  status?: 'active' | 'completed' | 'idle';
 }
 
 export interface SessionData {
@@ -153,7 +195,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     }
     
     // Process parsed entries to extract messages and metadata
-    for (let i = parsedEntries.length - 1; i >= 0 && recentMessages.length < 5; i--) {
+    for (let i = parsedEntries.length - 1; i >= 0; i--) {
       const entry = parsedEntries[i];
       
       if (process.env.DEBUG_SESSIONS) {
@@ -165,6 +207,21 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       // Extract model name from assistant messages
       if (entry.type === 'assistant' && entry.message && entry.message.model) {
         modelName = entry.message.model;
+      }
+      
+      // Check if this is a completed assistant response
+      let isCompletedResponse = false;
+      if (entry.type === 'assistant' && entry.message) {
+        // Check for completion indicators (not null means completed)
+        if (entry.message.stop_reason && entry.message.stop_reason !== null) {
+          isCompletedResponse = true;
+          lastTextResponseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Assistant Complete] stop_reason: ${entry.message.stop_reason}`);
+          }
+        } else if (process.env.DEBUG_SESSIONS && entry.message.stop_reason === null) {
+          console.log(`[Assistant Streaming] stop_reason is null - still active`);
+        }
       }
       
       // Check for tool use in assistant messages
@@ -268,10 +325,16 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           preserveWhitespace: false
         });
         
-        // Skip empty or pure meta messages (but keep interrupt messages)
-        if (!content || 
-            content.includes('DO NOT respond to these messages') ||
-            content.includes('Caveat:')) {
+        // Skip empty or pure meta messages (but keep interrupt messages and short user messages)
+        if (!content) {
+          continue; // Skip truly empty messages
+        }
+        
+        // Skip clearly meta messages but preserve user content
+        if (content.includes('DO NOT respond to these messages') ||
+            content.includes('Caveat:') ||
+            content.includes('The messages below were generated') ||
+            (content.length > 200 && content.includes('system-reminder'))) {
           continue;
         }
         
@@ -320,23 +383,104 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     
     // Debug logging
     if (process.env.DEBUG_SESSIONS) {
+      console.log(`[getLatestConversationInfo] Parsed ${parsedEntries.length} entries`);
       console.log(`[getLatestConversationInfo] Extracted ${recentMessages.length} messages`);
+      
+      // Debug system messages specifically
+      const systemMessages = parsedEntries.filter(e => e.type === 'system');
+      console.log(`[System messages found] ${systemMessages.length}`);
+      for (const sys of systemMessages) {
+        console.log(`  System: ${sys.content?.substring(0, 100)}...`);
+      }
+      
       for (const msg of recentMessages) {
         console.log(`  ${msg.role}: ${msg.content.substring(0, 60)}...`);
       }
     }
     
-    // Determine if action should be cleared
-    // Clear action if there's a text response after the tool use
-    if (lastTextResponseTime && lastToolUseTime && lastTextResponseTime > lastToolUseTime) {
-      if (process.env.DEBUG_SESSIONS) {
-        console.log(`[Clear Action] Text response at ${lastTextResponseTime.toISOString()} > Tool use at ${lastToolUseTime.toISOString()}`);
+    // Determine session status and if action should be cleared
+    let status: 'active' | 'completed' | 'idle' = 'idle';
+    
+    // First priority: Check for explicit completion via stop_reason
+    let hasCompletionMarker = false;
+    
+    // Look for completion markers: prioritize system Stop messages
+    let foundSystemStop = false;
+    let latestAssistantStopReason = null;
+    
+    for (let i = parsedEntries.length - 1; i >= 0; i--) {
+      const entry = parsedEntries[i];
+      
+      // Check for system Stop messages (highest priority)
+      if (entry.type === 'system' && entry.content) {
+        // Clean ANSI escape sequences for better detection
+        const cleanContent = entry.content.replace(/\u001b\[[0-9;]*m/g, '');
+        
+        if (cleanContent.includes('Stop') || cleanContent.includes('stop') || 
+            cleanContent.includes('completed') || cleanContent.includes('finished')) {
+          foundSystemStop = true;
+          hasCompletionMarker = true;
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Found completion marker] System stop message (cleaned): ${cleanContent}`);
+          }
+          break;
+        }
       }
+      
+      // Track latest assistant stop_reason (only if no system Stop found yet)
+      if (!foundSystemStop && entry.type === 'assistant' && entry.message && 'stop_reason' in entry.message) {
+        latestAssistantStopReason = entry.message.stop_reason;
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Latest assistant message] stop_reason: ${latestAssistantStopReason}`);
+        }
+        break; // Either way, this is the most recent assistant message
+      }
+    }
+    
+    // If no system Stop message found, check assistant stop_reason
+    if (!foundSystemStop && latestAssistantStopReason !== null) {
+      hasCompletionMarker = true;
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Found completion marker] Assistant stop_reason: ${latestAssistantStopReason}`);
+      }
+    }
+    
+    // Check if there's ongoing activity (currentAction indicates AI is working)
+    if (currentAction && currentAction.trim() !== '') {
+      status = 'active';
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Status: ACTIVE] Has currentAction: "${currentAction}"`);
+      }
+    } else if (!hasCompletionMarker) {
+      // No completion marker and no current action - assume still active if recent
+      const now = new Date();
+      const timeSinceLastMessage = recentMessages.length > 0 
+        ? now.getTime() - recentMessages[0].timestamp.getTime()
+        : Infinity;
+      
+      if (timeSinceLastMessage < 60 * 1000) { // Less than 1 minute - likely still active
+        status = 'active';
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Status: ACTIVE] Recent activity (${Math.floor(timeSinceLastMessage/1000)}s ago), no completion marker`);
+        }
+      } else {
+        status = 'idle';
+      }
+    } else {
+      // Has completion marker - truly completed
+      status = 'completed';
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Status: COMPLETED] Found completion marker and no current action`);
+      }
+    }
+    
+    // Clear currentAction only if status is completed
+    if (status === 'completed') {
       currentAction = '';
     }
     
-    if (process.env.DEBUG_SESSIONS && currentAction) {
-      console.log(`[Current Action] "${currentAction}"`);
+    if (process.env.DEBUG_SESSIONS) {
+      console.log(`[Session Status] ${status}, currentAction="${currentAction}"`);
     }
     
     // Build display topic from most recent Q/A
@@ -355,12 +499,20 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       console.log(`[Final] currentAction="${currentAction}", topic="${display}"`);
     }
     
+    // Update status tracker with current session info
+    const sessionId = `claude-${safePath}`;
+    if (currentAction) {
+      const toolName = extractToolNameFromAction(currentAction);
+      statusTracker.updateSessionStatus(sessionId, toolName, messageCount);
+    }
+    
     return { 
       topic: display,
       messageCount: messageCount,
       model: modelName || undefined,
       currentAction: currentAction,
-      recentMessages: recentMessages
+      recentMessages: recentMessages,
+      status: status
     };
   } catch (error) {
     return { topic: `Error: ${error}`, messageCount: 0, model: undefined, currentAction: '', recentMessages: [] };
@@ -380,7 +532,8 @@ export async function updateActiveSessionsFromConfig(
     topic?: string,
     model?: string,
     currentAction?: string,
-    recentMessages?: RecentMessage[]
+    recentMessages?: RecentMessage[],
+    status?: 'active' | 'completed' | 'idle'
   ) => void
 ): Promise<void> {
   const { activeProjects } = await getActiveProjects();
@@ -400,7 +553,8 @@ export async function updateActiveSessionsFromConfig(
       conversationInfo.topic,
       conversationInfo.model,
       conversationInfo.currentAction,
-      conversationInfo.recentMessages
+      conversationInfo.recentMessages,
+      conversationInfo.status
     );
   }
 }

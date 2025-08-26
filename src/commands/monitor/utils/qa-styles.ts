@@ -149,39 +149,117 @@ export function getQAStyle(
   return baseStyle;
 }
 
+// Message type detection for different Q styling
+export enum UserMessageType {
+  NORMAL = 'normal',        // Regular user question
+  INTERRUPTION = 'interruption', // Message sent during AI response
+  FOLLOWUP = 'followup',    // Quick follow-up or clarification
+  SYSTEM = 'system'         // System interrupt messages
+}
+
 /**
- * Format Q/A message with selected style
+ * Detect the type of user message based on context and content
+ */
+export function detectUserMessageType(
+  content: string,
+  sessionStatus?: 'active' | 'completed' | 'idle',
+  isRecent?: boolean
+): UserMessageType {
+  // System interrupt messages
+  if (content.includes('[Request interrupted') || 
+      content === '[Request interrupted by user]' ||
+      content === '[Request interrupted by user for tool use]') {
+    return UserMessageType.SYSTEM;
+  }
+  
+  // Short messages during CONFIRMED active sessions might be interruptions
+  // But be more conservative - only very short messages during active sessions
+  if (sessionStatus === 'active' && content.length < 30 && isRecent) {
+    return UserMessageType.INTERRUPTION;
+  }
+  
+  // Only extremely short messages are follow-ups (like single words or very brief questions)
+  if (content.length < 15 && content.includes('?')) {
+    return UserMessageType.FOLLOWUP;
+  }
+  
+  // Default to NORMAL for most user messages
+  return UserMessageType.NORMAL;
+}
+
+/**
+ * Get Q prefix style based on message type
+ */
+export function getQPrefixForType(type: UserMessageType, baseStyle: QAStyle): string {
+  switch (type) {
+    case UserMessageType.NORMAL:
+      return baseStyle.userPrefix; // Green Q badge
+      
+    case UserMessageType.INTERRUPTION:
+      // Orange Q badge for interruptions
+      return '{#d77757-bg}{black-fg} Q {/black-fg}{/#d77757-bg} {#d77757-fg}';
+      
+    case UserMessageType.FOLLOWUP:
+      // Yellow Q badge for follow-ups
+      return '{yellow-bg}{black-fg} Q {/black-fg}{/yellow-bg} {yellow-fg}';
+      
+    case UserMessageType.SYSTEM:
+      return ''; // No prefix for system messages
+  }
+}
+
+/**
+ * Format Q/A message with selected style and intelligent Q typing
  */
 export function formatQAMessage(
   role: 'user' | 'assistant',
   content: string[],
-  style: QAStyle
+  style: QAStyle,
+  sessionStatus?: 'active' | 'completed' | 'idle'
 ): string[] {
   const lines: string[] = [];
   const isUser = role === 'user';
   
   // First line with prefix
   if (content.length > 0) {
-    // Check if this is a system interrupt message
-    const isSystemMessage = content[0].includes('[Request interrupted') ||
-                           content[0] === '[Request interrupted by user]' ||
-                           content[0] === '[Request interrupted by user for tool use]';
-    
-    if (isSystemMessage) {
-      // System messages: no Q badge, just gray text (dim is not a valid blessed tag)
-      lines.push('{gray-fg}' + content[0] + '{/gray-fg}');
+    if (isUser) {
+      // Detect message type for intelligent Q styling
+      const messageType = detectUserMessageType(content[0], sessionStatus, true);
+      
+      if (messageType === UserMessageType.SYSTEM) {
+        // System messages: no Q badge, just gray text
+        lines.push('{gray-fg}' + content[0] + '{/gray-fg}');
+      } else {
+        // User messages with typed Q badges
+        const qPrefix = getQPrefixForType(messageType, style);
+        const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
+                      messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
+                      '{/yellow-fg}';
+        lines.push(qPrefix + content[0] + suffix);
+      }
+      
+      // Continuation lines for user messages
+      for (let i = 1; i < content.length; i++) {
+        const messageType = detectUserMessageType(content[0], sessionStatus, true);
+        if (messageType !== UserMessageType.SYSTEM) {
+          const continuation = style.userContinuation;
+          const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
+                        messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
+                        '{/yellow-fg}';
+          lines.push(continuation + content[i] + suffix);
+        }
+      }
     } else {
-      // Normal messages with Q/A badges
-      const prefix = isUser ? style.userPrefix : style.assistantPrefix;
-      const suffix = isUser ? '{/green-fg}' : '{/white-fg}';
+      // Assistant messages (unchanged)
+      const prefix = style.assistantPrefix;
+      const suffix = '{/white-fg}';
       lines.push(prefix + content[0] + suffix);
-    }
-    
-    // Continuation lines (shouldn't happen for system messages)
-    for (let i = 1; i < content.length; i++) {
-      const continuation = isUser ? style.userContinuation : style.assistantContinuation;
-      const suffix = isUser ? '{/green-fg}' : '{/white-fg}';
-      lines.push(continuation + content[i] + suffix);
+      
+      // Continuation lines
+      for (let i = 1; i < content.length; i++) {
+        const continuation = style.assistantContinuation;
+        lines.push(continuation + content[i] + suffix);
+      }
     }
   }
   

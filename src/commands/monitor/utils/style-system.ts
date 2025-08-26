@@ -181,11 +181,29 @@ export function createCustomStyle(
 }
 
 /**
- * Format action status with code block style
+ * Format action status with dynamic color and style
  */
 export function formatActionStatus(action: string, interrupt: boolean = true): string {
-  const actionText = interrupt ? `${action}... (esc to interrupt)` : `${action}...`;
-  return applyStyle(actionText, StyleType.ACTION_STATUS);
+  // Import color function
+  const { getActionColor } = require('../../../utils/text-sanitizer.js');
+  
+  const actionText = interrupt ? `${action} (esc to interrupt)` : action;
+  const colorType = getActionColor(action);
+  
+  // Apply dynamic coloring based on action type
+  switch (colorType) {
+    case 'green':
+      return `{green-fg}${actionText}{/green-fg}`;
+    case 'yellow':
+      return `{yellow-fg}${actionText}{/yellow-fg}`;
+    case 'blue':
+      return `{blue-fg}${actionText}{/blue-fg}`;
+    case 'magenta':
+      return `{magenta-fg}${actionText}{/magenta-fg}`;
+    case 'cyan':
+    default:
+      return `{cyan-fg}${actionText}{/cyan-fg}`;
+  }
 }
 
 /**

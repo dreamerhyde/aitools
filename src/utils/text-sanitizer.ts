@@ -166,17 +166,137 @@ export function sanitizeConversationMessages(messages: Array<{
 }
 
 /**
- * Formats action strings for display (e.g., "Puttering..." status)
+ * Enhanced action status mapping with progressive indicators
+ * Maps tool names to display status with progress indicators
+ */
+const ENHANCED_ACTION_MAPPING: Record<string, string> = {
+  // File operations
+  'Reading file': 'Reading file...',
+  'Writing file': 'Writing file...',
+  'Editing file': 'Editing file...',
+  'Editing multiple files': 'Editing multiple files...',
+  'Moving file': 'Moving file...',
+  'Creating directory': 'Creating directory...',
+  'Listing directory': 'Listing directory...',
+  'Searching files': 'Searching files...',
+  
+  // Command operations
+  'Running command': 'Running command...',
+  'Reading output': 'Reading output...',
+  'Terminating process': 'Terminating process...',
+  
+  // Analysis and thinking
+  'Thinking': 'Thinking...',
+  'Analyzing task': 'Analyzing task...',
+  'Planning task': 'Planning task...',
+  'Processing': 'Processing...',
+  
+  // Web operations  
+  'Fetching web content': 'Fetching web content...',
+  'Searching web': 'Searching web...',
+  'Taking screenshot': 'Taking screenshot...',
+  'Reading console': 'Reading console...',
+  'Checking errors': 'Checking errors...',
+  
+  // Database operations
+  'Executing SQL': 'Executing SQL...',
+  'Listing tables': 'Listing tables...',
+  
+  // Documentation
+  'Getting docs': 'Getting docs...',
+  'Resolving library': 'Resolving library...',
+  
+  // Development tools
+  'Building component': 'Building component...',
+  'Running agent': 'Running agent...',
+  'Auditing accessibility': 'Auditing accessibility...',
+  'Auditing performance': 'Auditing performance...',
+  'Auditing SEO': 'Auditing SEO...',
+  
+  // Task management
+  'Updating todos': 'Updating todos...',
+  'Planning': 'Planning...',
+  
+  // Generic states
+  'Puttering': 'Puttering...',
+  'Orchestrating': 'Orchestrating...',
+  'Working': 'Working...'
+};
+
+/**
+ * Formats action strings for display with enhanced status indicators
  * @param action The action string to format
- * @returns Formatted action string without emojis
+ * @returns Formatted action string with progress indicators
  */
 export function formatActionString(action: string): string {
-  // Just sanitize text here, styling will be applied at display layer
-  return sanitizeText(action, {
+  // First sanitize the text
+  let sanitized = sanitizeText(action, {
     removeEmojis: true,
     convertToAscii: true,
     preserveWhitespace: false
   });
+  
+  // Apply enhanced mapping if available
+  const enhanced = ENHANCED_ACTION_MAPPING[sanitized];
+  if (enhanced) {
+    sanitized = enhanced;
+  } else {
+    // If no direct mapping, add dots for progressive feel if not already present
+    if (!sanitized.endsWith('...') && !sanitized.endsWith('.')) {
+      sanitized += '...';
+    }
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Get action color based on action type
+ * @param action The action string
+ * @returns Color function for the action
+ */
+export function getActionColor(action: string): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' {
+  const lowercaseAction = action.toLowerCase();
+  
+  // Thinking and analysis - cyan
+  if (lowercaseAction.includes('thinking') || 
+      lowercaseAction.includes('analyzing') || 
+      lowercaseAction.includes('planning') ||
+      lowercaseAction.includes('orchestrating')) {
+    return 'cyan';
+  }
+  
+  // File operations - green  
+  if (lowercaseAction.includes('reading') ||
+      lowercaseAction.includes('writing') ||
+      lowercaseAction.includes('editing') ||
+      lowercaseAction.includes('file')) {
+    return 'green';
+  }
+  
+  // Commands and execution - yellow
+  if (lowercaseAction.includes('running') ||
+      lowercaseAction.includes('executing') ||
+      lowercaseAction.includes('command')) {
+    return 'yellow';
+  }
+  
+  // Web and network - blue
+  if (lowercaseAction.includes('fetching') ||
+      lowercaseAction.includes('searching') ||
+      lowercaseAction.includes('web')) {
+    return 'blue';
+  }
+  
+  // Development tools - magenta
+  if (lowercaseAction.includes('building') ||
+      lowercaseAction.includes('auditing') ||
+      lowercaseAction.includes('testing')) {
+    return 'magenta';
+  }
+  
+  // Default - cyan
+  return 'cyan';
 }
 
 /**

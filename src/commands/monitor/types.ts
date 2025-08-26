@@ -9,6 +9,7 @@ export interface SessionInfo {
   currentTopic?: string;
   currentModel?: string;
   currentAction?: string;
+  status?: 'active' | 'completed' | 'idle';
 }
 
 export interface ConversationMessage {

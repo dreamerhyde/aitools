@@ -273,7 +273,7 @@ export class MonitorCommand {
 
   private async updateActiveSessionsFromConfig(): Promise<void> {
     try {
-      await updateSessionsFromConfig((sessionId, displayName, currentTime, messageCount, topic, model, currentAction, recentMessages) => {
+      await updateSessionsFromConfig((sessionId, displayName, currentTime, messageCount, topic, model, currentAction, recentMessages, status) => {
         this.sessionManager.updateSessionFromConfig(
           sessionId,
           displayName,
@@ -282,7 +282,8 @@ export class MonitorCommand {
           topic,
           model,
           currentAction,
-          recentMessages
+          recentMessages,
+          status
         );
       });
     } catch (error) {

@@ -2,6 +2,8 @@ import chalk from 'chalk';
 import { SessionInfo, CostMetrics } from '../types.js';
 import { formatActiveSessionsList } from '../../../utils/formatters.js';
 import { SessionUsage } from '../../../types/claude-usage.js';
+import { statusTracker } from '../../../utils/status-tracker.js';
+import { getActionColor } from '../../../utils/text-sanitizer.js';
 
 export class SessionsView {
   private projectsBox: any;
@@ -143,7 +145,45 @@ export class SessionsView {
       
       // Update Sessions box (right)
       const sessionLines = [];
-      sessionLines.push(chalk.green.bold(`${activeCount} active`));
+      
+      // Get enhanced status from status tracker
+      const sessionCounts = statusTracker.getSessionCounts();
+      
+      // Update status tracker with current sessions
+      for (const [id, session] of activeSessions) {
+        statusTracker.updateSessionStatus(id, session.currentAction || null, session.messageCount);
+      }
+      
+      // Dynamic color based on activity and message count
+      let activeColor = chalk.green;
+      let statusText = `${activeCount} active`;
+      
+      // Debug: log message count for troubleshooting
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Sessions View] totalMessages: ${totalMessages}, thinking: ${sessionCounts.thinking}`);
+      }
+      
+      if (sessionCounts.thinking > 0) {
+        activeColor = chalk.cyan;
+        statusText = `${activeCount} active (${sessionCounts.thinking} thinking)`;
+      } else if (totalMessages > 100) {
+        activeColor = chalk.red;
+        statusText = `${activeCount} active (high activity)`;
+      } else if (totalMessages > 50) {
+        activeColor = chalk.yellow;
+        statusText = `${activeCount} active (moderate)`;
+      }
+      
+      // Lower thresholds for testing
+      if (totalMessages > 20 && totalMessages <= 50) {
+        activeColor = chalk.yellow;
+        statusText = `${activeCount} active (moderate)`;
+      } else if (totalMessages > 10 && totalMessages <= 20) {
+        activeColor = chalk.cyan;
+        statusText = `${activeCount} active (active)`;
+      }
+      
+      sessionLines.push(activeColor.bold(statusText));
       sessionLines.push(chalk.yellow(`${totalMessages} msgs`));
       
       this.sessionsBox.setContent(sessionLines.join('\n'));

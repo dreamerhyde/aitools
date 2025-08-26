@@ -119,6 +119,28 @@ export class SessionBoxesView {
         const modelBadge = session.currentModel ? ` [${session.currentModel}]` : '';
         box.setLabel(` ${session.user}${modelBadge} `);
         
+        // Set border color based on status
+        let borderColor = 'gray';
+        
+        // Debug logging for status
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Session Box] ${session.user}: status=${session.status}, currentAction=${session.currentAction}`);
+        }
+        
+        if (session.status === 'active') {
+          borderColor = '#d77757'; // Orange for active
+        } else if (session.status === 'completed') {
+          borderColor = 'green'; // Green for completed
+        } else {
+          // Fallback: if no current action, assume completed
+          if (!session.currentAction || session.currentAction.trim() === '') {
+            borderColor = 'green';
+          }
+        }
+        
+        // Update border style
+        box.style.border = { fg: borderColor };
+        
         // Calculate box width for proper text wrapping (accounting for padding)
         const boxWidth = Math.floor((box.width as number) - 4);
         
@@ -169,7 +191,7 @@ export class SessionBoxesView {
             const wrappedLines = wrapText(truncatedContent, boxWidth - 5); // Account for badge + space
             
             // Use the style system to format the message - allow up to 4 lines per message
-            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 4), this.qaStyle);
+            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 4), this.qaStyle, session.status);
             contentLines.push(...formattedLines);
             
             // Add separator between Q/A pairs (if style has one)
