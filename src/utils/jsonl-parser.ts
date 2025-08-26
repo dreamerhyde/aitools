@@ -254,7 +254,8 @@ export class JSONLParser {
         conversation_id: conversationId,
         project_id: requestId,
         title,
-        message_id: entry.message?.id // Store message ID for reference
+        message_id: entry.message?.id, // Store message ID for reference
+        cwd: entry.cwd // Extract current working directory for project identification
       };
     
     } catch {

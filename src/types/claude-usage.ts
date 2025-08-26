@@ -16,6 +16,7 @@ export interface ConversationMessage {
   project_id?: string;
   title?: string;
   message_id?: string;
+  cwd?: string; // Current working directory to identify project
 }
 
 export interface DailyUsage {

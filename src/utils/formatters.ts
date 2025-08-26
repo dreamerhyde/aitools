@@ -1,6 +1,20 @@
 /**
  * Utility functions for formatting numbers and costs
  */
+import chalk from 'chalk';
+
+// Session info interface - compatible with monitor implementations
+export interface SessionInfo {
+  sessionId: string;
+  user: string;
+  startTime: Date;
+  lastActivity: Date;
+  messageCount: number;
+  recentMessages: any[];
+  currentTopic?: string;
+  currentModel?: string;
+  currentAction?: string;
+}
 
 /**
  * Format a number with thousands separators
@@ -44,4 +58,47 @@ export function formatDuration(ms: number): string {
  */
 export function formatPercent(value: number, decimals: number = 1): string {
   return `${value.toFixed(decimals)}%`;
+}
+
+/**
+ * Formats the active sessions list for the Projects box display
+ * @param activeSessions - Map of active sessions
+ * @returns Array of formatted strings ready for display
+ */
+export function formatActiveSessionsList(activeSessions: Map<string, SessionInfo>): string[] {
+  const projectInfo = [];
+  const activeCount = activeSessions.size;
+  
+  if (activeCount > 0) {
+    // Get unique projects with session counts
+    const projectMap = new Map<string, number>();
+    let totalMessages = 0;
+    
+    for (const [id, session] of activeSessions) {
+      const project = session.user;
+      projectMap.set(project, (projectMap.get(project) || 0) + 1);
+      totalMessages += session.messageCount;
+    }
+    
+    // Show project list with session counts
+    projectInfo.push(chalk.green.bold(`${activeCount} active sessions`));
+    projectInfo.push(chalk.yellow(`${totalMessages} total messages`));
+    projectInfo.push(''); // Empty line
+    
+    // List projects (max 2 to fit in small box)
+    let i = 0;
+    for (const [project, count] of projectMap) {
+      if (i >= 2) {
+        projectInfo.push(chalk.gray(`+${projectMap.size - 2} more`));
+        break;
+      }
+      const shortName = project.split('/').pop() || project;
+      projectInfo.push(chalk.cyan(`• ${shortName} (${count})`));
+      i++;
+    }
+  } else {
+    projectInfo.push(chalk.gray('No active projects'));
+  }
+  
+  return projectInfo;
 }

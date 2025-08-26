@@ -8,7 +8,7 @@ const getMonitorCommand = async () => {
   
   if (isDev) {
     // In dev mode, use the full monitor with blessed
-    const { MonitorCommand } = await import('../commands/monitor-command.js');
+    const { MonitorCommand } = await import('../commands/monitor/index.js');
     return MonitorCommand;
   } else {
     // In production/bundled mode, use the stub

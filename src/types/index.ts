@@ -13,6 +13,8 @@ export interface SystemStats {
   totalMemory: string;
   freeMemory: string;
   activeMemory: string;
+  memoryUsed: number;  // in bytes
+  memoryTotal: number; // in bytes
   cpuUsage: number;
   loadAverage: number[];
 }

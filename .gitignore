@@ -15,3 +15,7 @@ coverage/
 .cursor/
 .cursorrules
 CLAUDE.md
+
+# backup files
+*.backup
+*.bak

@@ -29,6 +29,8 @@ export class ProcessMonitor {
         totalMemory: memoryInfo.total,
         freeMemory: memoryInfo.free,
         activeMemory: memoryInfo.active,
+        memoryUsed: memoryInfo.usedBytes,
+        memoryTotal: memoryInfo.totalBytes,
         cpuUsage: cpuInfo.cpu,
         loadAverage: cpuInfo.loadAverage
       };
@@ -153,6 +155,13 @@ export class ProcessMonitor {
     };
   }
 
+  async getHighCpuProcesses(threshold: number = 10): Promise<ProcessInfo[]> {
+    const processes = await this.getAllProcesses();
+    return processes
+      .filter(p => p.cpu > threshold)
+      .sort((a, b) => b.cpu - a.cpu);
+  }
+
   async killProcess(pid: number): Promise<boolean> {
     try {
       await execAsync(`kill -TERM ${pid}`);
@@ -243,13 +252,16 @@ export class ProcessMonitor {
     return totalSeconds;
   }
 
-  private parseMemoryInfo(vmStat: string): { total: string; free: string; active: string } {
+  private parseMemoryInfo(vmStat: string): { total: string; free: string; active: string; usedBytes: number; totalBytes: number } {
     const lines = vmStat.split('\n');
     const pageSize = 4096; // macOS page size
     
     let freePages = 0;
     let activePages = 0;
     let speculativePages = 0;
+    let inactivePages = 0;
+    let wiredPages = 0;
+    let compressedPages = 0;
     
     lines.forEach(line => {
       if (line.includes('Pages free:')) {
@@ -258,17 +270,28 @@ export class ProcessMonitor {
         activePages = parseInt(line.split(':')[1].trim().replace('.', ''));
       } else if (line.includes('Pages speculative:')) {
         speculativePages = parseInt(line.split(':')[1].trim().replace('.', ''));
+      } else if (line.includes('Pages inactive:')) {
+        inactivePages = parseInt(line.split(':')[1].trim().replace('.', ''));
+      } else if (line.includes('Pages wired down:')) {
+        wiredPages = parseInt(line.split(':')[1].trim().replace('.', ''));
+      } else if (line.includes('Pages occupied by compressor:')) {
+        compressedPages = parseInt(line.split(':')[1].trim().replace('.', ''));
       }
     });
     
+    const totalPages = freePages + activePages + speculativePages + inactivePages + wiredPages + compressedPages;
+    const usedPages = activePages + wiredPages + compressedPages;
+    
     const freeMemory = Math.round((freePages + speculativePages) * pageSize / 1024 / 1024);
     const activeMemory = Math.round(activePages * pageSize / 1024 / 1024);
-    const totalMemory = Math.round((freePages + activePages + speculativePages) * pageSize / 1024 / 1024);
+    const totalMemory = Math.round(totalPages * pageSize / 1024 / 1024);
     
     return {
       total: `${totalMemory}MB`,
       free: `${freeMemory}MB`,
-      active: `${activeMemory}MB`
+      active: `${activeMemory}MB`,
+      usedBytes: usedPages * pageSize,
+      totalBytes: totalPages * pageSize
     };
   }
 

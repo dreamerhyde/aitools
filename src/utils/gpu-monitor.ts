@@ -250,7 +250,7 @@ export class GPUMonitor {
     try {
       // Method 1: Try NVIDIA GPU first
       const nvidiaResult = await this.getWindowsNvidiaGPU();
-      if (nvidiaResult.usage > 0 || nvidiaResult.name !== 'Unknown GPU') {
+      if (nvidiaResult.usage && nvidiaResult.usage > 0 || nvidiaResult.name !== 'Unknown GPU') {
         return { ...gpuData, ...nvidiaResult };
       }
 
