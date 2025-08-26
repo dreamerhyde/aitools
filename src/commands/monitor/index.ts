@@ -56,11 +56,11 @@ export class MonitorCommand {
       // Initial updates
       await this.updateAllViews();
       
-      // Set up periodic updates
+      // Set up periodic updates - faster refresh rate (2 seconds)
       this.updateInterval = setInterval(async () => {
         await this.updateActiveSessionsFromConfig(); // Refresh sessions from config
         await this.updateAllViews();
-      }, 5000);
+      }, 2000);
 
       // Keep the screen alive
       this.screenManager.render();

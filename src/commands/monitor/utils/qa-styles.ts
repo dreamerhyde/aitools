@@ -74,7 +74,7 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
 
   // Style 6: Hybrid (Q with background badge, A with arrow) - RECOMMENDED
   [QAStyleType.HYBRID]: {
-    userPrefix: '{bold}{green-bg}{black-fg} Q {/black-fg}{/green-bg}{/bold} {green-fg}',
+    userPrefix: '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}',
     assistantPrefix: '{white-fg}→ ',
     userContinuation: '     {green-fg}',
     assistantContinuation: '  {white-fg}',
@@ -162,14 +162,25 @@ export function formatQAMessage(
   
   // First line with prefix
   if (content.length > 0) {
-    const prefix = isUser ? style.userPrefix : style.assistantPrefix;
-    // Updated suffix to match green for user questions
-    const suffix = isUser ? '{/green-fg}' : '{/white-fg}';
-    lines.push(prefix + content[0] + suffix);
+    // Check if this is a system interrupt message
+    const isSystemMessage = content[0].includes('[Request interrupted') ||
+                           content[0] === '[Request interrupted by user]' ||
+                           content[0] === '[Request interrupted by user for tool use]';
     
-    // Continuation lines
+    if (isSystemMessage) {
+      // System messages: no Q badge, just gray text (dim is not a valid blessed tag)
+      lines.push('{gray-fg}' + content[0] + '{/gray-fg}');
+    } else {
+      // Normal messages with Q/A badges
+      const prefix = isUser ? style.userPrefix : style.assistantPrefix;
+      const suffix = isUser ? '{/green-fg}' : '{/white-fg}';
+      lines.push(prefix + content[0] + suffix);
+    }
+    
+    // Continuation lines (shouldn't happen for system messages)
     for (let i = 1; i < content.length; i++) {
       const continuation = isUser ? style.userContinuation : style.assistantContinuation;
+      const suffix = isUser ? '{/green-fg}' : '{/white-fg}';
       lines.push(continuation + content[i] + suffix);
     }
   }

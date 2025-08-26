@@ -128,6 +128,8 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     const recentMessages: RecentMessage[] = [];
     let modelName = '';
     let currentAction = '';
+    let lastToolUseTime: Date | null = null;
+    let lastTextResponseTime: Date | null = null;
     const parsedEntries: { type: string; message?: any; timestamp?: string }[] = [];
     
     // Parse all entries first
@@ -183,11 +185,47 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
               'Task': 'Running agent',
               'TodoWrite': 'Updating todos',
               'ExitPlanMode': 'Planning',
+              'NotebookEdit': 'Editing notebook',
+              'BashOutput': 'Reading output',
+              'KillBash': 'Terminating process',
+              // MCP tools
+              'mcp__Browser_Tools__takeScreenshot': 'Taking screenshot',
+              'mcp__Browser_Tools__getConsoleLogs': 'Reading console',
+              'mcp__Browser_Tools__getConsoleErrors': 'Checking errors',
+              'mcp__Browser_Tools__getNetworkErrors': 'Checking network',
+              'mcp__Browser_Tools__getNetworkLogs': 'Reading network logs',
+              'mcp__Browser_Tools__runAccessibilityAudit': 'Auditing accessibility',
+              'mcp__Browser_Tools__runPerformanceAudit': 'Auditing performance',
+              'mcp__Browser_Tools__runSEOAudit': 'Auditing SEO',
+              'mcp__File_System__write_file': 'Writing file',
+              'mcp__File_System__read_file': 'Reading file',
+              'mcp__File_System__read_text_file': 'Reading text',
+              'mcp__File_System__edit_file': 'Editing file',
+              'mcp__File_System__create_directory': 'Creating directory',
+              'mcp__File_System__list_directory': 'Listing directory',
+              'mcp__File_System__move_file': 'Moving file',
+              'mcp__File_System__search_files': 'Searching files',
+              'mcp__Sequential_Thinking__sequentialthinking': 'Thinking',
+              'mcp__Shrimp__plan_task': 'Planning task',
+              'mcp__Shrimp__analyze_task': 'Analyzing task',
+              'mcp__Supabase__execute_sql': 'Executing SQL',
+              'mcp__Supabase__list_tables': 'Listing tables',
+              'mcp__Context_7__resolve-library-id': 'Resolving library',
+              'mcp__Context_7__get-library-docs': 'Getting docs',
+              'mcp___21st-dev_magic__21st_magic_component_builder': 'Building component',
               // Generic puttering for other tools
               'default': 'Puttering'
             };
+            // Update current action to the latest tool being used
             currentAction = formatActionString(toolActions[item.name] || toolActions['default']);
-            break;
+            lastToolUseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+            
+            if (process.env.DEBUG_SESSIONS) {
+              console.log(`[Tool Use] ${item.name} -> ${currentAction} at ${lastToolUseTime.toISOString()}`);
+            }
+          } else if (item.type === 'text' && item.text) {
+            // Text response found - may indicate tool completed
+            lastTextResponseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
           }
         }
       }
@@ -225,13 +263,23 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           preserveWhitespace: false
         });
         
-        // Skip empty, meta, or command messages
+        // Skip empty or pure meta messages (but keep interrupt messages)
         if (!content || 
             content.includes('DO NOT respond to these messages') ||
-            content.includes('Caveat:') ||
-            content.includes('<command-name>') ||
-            content.includes('<local-command-stdout>')) {
+            content.includes('Caveat:')) {
           continue;
+        }
+        
+        // Extract actual user message from command output if present
+        if (content.includes('<command-name>') || content.includes('<local-command-stdout>')) {
+          // Try to extract the actual message between tags or after them
+          const messageMatch = content.match(/(?:local-command-stdout>|command-message>)([^<]+)/);
+          if (messageMatch && messageMatch[1]) {
+            content = messageMatch[1].trim();
+          } else {
+            // If we can't extract meaningful content, skip
+            continue;
+          }
         }
           
         recentMessages.unshift({
@@ -271,6 +319,19 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       for (const msg of recentMessages) {
         console.log(`  ${msg.role}: ${msg.content.substring(0, 60)}...`);
       }
+    }
+    
+    // Determine if action should be cleared
+    // Clear action if there's a text response after the tool use
+    if (lastTextResponseTime && lastToolUseTime && lastTextResponseTime > lastToolUseTime) {
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Clear Action] Text response at ${lastTextResponseTime.toISOString()} > Tool use at ${lastToolUseTime.toISOString()}`);
+      }
+      currentAction = '';
+    }
+    
+    if (process.env.DEBUG_SESSIONS && currentAction) {
+      console.log(`[Current Action] "${currentAction}"`);
     }
     
     // Build display topic from most recent Q/A

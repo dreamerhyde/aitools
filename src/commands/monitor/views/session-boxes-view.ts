@@ -131,11 +131,11 @@ export class SessionBoxesView {
         contentLines.push('');
         
         // Show current action if present (like "Puttering..." when AI is working)
-        if (session.currentAction) {
+        if (session.currentAction && session.currentAction.trim() !== '') {
           // Add a pulsing indicator for active work
-          const actionIndicator = '* ';
+          const actionIndicator = '✽ ';
           const sanitizedAction = formatActionString(session.currentAction);
-          contentLines.push(`{yellow-fg}${actionIndicator}${sanitizedAction}... (esc to interrupt){/yellow-fg}`);
+          contentLines.push(`{#d77757-fg}${actionIndicator}${sanitizedAction}... (esc to interrupt){/#d77757-fg}`);
           contentLines.push('');
         }
         
@@ -162,11 +162,11 @@ export class SessionBoxesView {
               preserveWhitespace: false
             });
             
-            const truncatedContent = truncateText(cleanContent, boxWidth * 2); // Allow 2 lines worth
+            const truncatedContent = truncateText(cleanContent, boxWidth * 4); // Allow more content
             const wrappedLines = wrapText(truncatedContent, boxWidth - 5); // Account for badge + space
             
-            // Use the style system to format the message
-            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 2), this.qaStyle);
+            // Use the style system to format the message - allow up to 4 lines per message
+            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 4), this.qaStyle);
             contentLines.push(...formattedLines);
             
             // Add separator between Q/A pairs (if style has one)
