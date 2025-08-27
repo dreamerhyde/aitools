@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+// import chalk from 'chalk';
 
 export interface ChartData {
   date: string;
@@ -72,7 +72,7 @@ export class ChartGenerator {
       const barStartX = Math.floor(centerX - barWidth / 2);
       
       // Choose color based on value relative to max
-      let barChar = '█';
+      const barChar = '█';
       let coloredBar = '';
       if (item.value > maxValue * 0.8) {
         coloredBar = '{red-fg}█{/red-fg}';

@@ -405,6 +405,7 @@ export class GPUMonitor {
     // Try to detect Apple Silicon even when detailed monitoring fails
     if (this.platform === 'darwin') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { execSync } = require('child_process');
         const arch = execSync('uname -m').toString().trim();
         if (arch === 'arm64') {

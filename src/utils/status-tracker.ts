@@ -157,7 +157,7 @@ export class StatusTracker {
     if (status.currentAction) {
       return {
         text: status.currentAction,
-        color: getActionColor(status.currentAction),
+        color: getActionColor(),
         isActive: status.isActive
       };
     }

@@ -8,7 +8,7 @@ import { SessionBoxesView } from './views/session-boxes-view.js';
 import { DataFetcher } from './services/data-fetcher.js';
 import { SessionManager } from './services/session-manager.js';
 import { LogWatcher } from './services/log-watcher.js';
-import { updateActiveSessionsFromConfig as updateSessionsFromConfig } from '../../utils/session-utils.js';
+import { updateActiveSessionsFromConfig as updateSessionsFromConfig } from '../../utils/session/index.js';
 import { CostMetrics } from './types.js';
 
 export class MonitorCommand {
@@ -58,7 +58,7 @@ export class MonitorCommand {
       // Initial updates
       await this.updateAllViews();
       
-      // Set up periodic updates - faster refresh rate (2 seconds)
+      // Set up periodic updates - real-time refresh (2 seconds)
       this.updateInterval = setInterval(async () => {
         await this.updateActiveSessionsFromConfig(); // Refresh sessions from config
         await this.updateAllViews();
@@ -102,7 +102,7 @@ export class MonitorCommand {
     // Add status bar at bottom
     const screen = this.screenManager.getScreen();
     
-    const statusBar = blessed.box({
+    blessed.box({
       parent: screen,
       bottom: 0,
       left: 0,
@@ -141,6 +141,7 @@ export class MonitorCommand {
   }
 
   private async getSystemResources(): Promise<any> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { execSync } = require('child_process');
     
     try {
@@ -272,7 +273,7 @@ export class MonitorCommand {
 
   private async updateActiveSessionsFromConfig(): Promise<void> {
     try {
-      await updateSessionsFromConfig((sessionId, displayName, currentTime, messageCount, topic, model, currentAction, recentMessages, status) => {
+      await updateSessionsFromConfig((sessionId, displayName, currentTime, messageCount, topic, model, currentAction, recentMessages) => {
         this.sessionManager.updateSessionFromConfig(
           sessionId,
           displayName,
@@ -281,8 +282,7 @@ export class MonitorCommand {
           topic,
           model,
           currentAction,
-          recentMessages,
-          status
+          recentMessages
         );
       });
     } catch (error) {
@@ -325,6 +325,15 @@ export class MonitorCommand {
       this.screenManager.render();
     } catch (error) {
       this.log(`Update error: ${error}`);
+      // Display error on screen for debugging
+      if (this.costView) {
+        this.costView.updateCostDisplay(
+          { today: 0, todayTokens: 0, todaySessions: 0, week: 0, weekSessions: 0, weekCosts: [] },
+          new Map()
+        );
+        // Log to console for immediate visibility
+        console.error('Monitor update error:', error);
+      }
     }
   }
 

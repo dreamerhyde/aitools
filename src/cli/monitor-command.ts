@@ -24,13 +24,13 @@ export function setupMonitorCommand(program: Command): void {
     .description('Real-time Claude Code session monitor (TUI dashboard)')
     .option('-r, --refresh <seconds>', 'Refresh interval in seconds', '2')
     .option('--no-color', 'Disable colored output')
-    .action(async (options) => {
+    .action(async () => {
       try {
         const MonitorCommand = await getMonitorCommand();
         const command = new MonitorCommand();
         await command.execute();
-      } catch (error: any) {
-        UIHelper.showError(`Monitor failed: ${error.message}`);
+      } catch (error) {
+        UIHelper.showError(`Monitor failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });

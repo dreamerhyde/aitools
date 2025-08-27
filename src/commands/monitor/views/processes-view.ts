@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { ProcessInfo } from '../types.js';
 import { extractSmartProcessName } from '../utils/sanitizers.js';
-import { createMiniBar } from '../utils/formatters.js';
+// import { createMiniBar } from '../utils/formatters.js';
 
 export class ProcessesView {
   private highCpuProcessesBox: any;

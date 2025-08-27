@@ -1,9 +1,6 @@
 import chalk from 'chalk';
 import { SessionInfo, CostMetrics } from '../types.js';
-import { formatActiveSessionsList } from '../../../utils/formatters.js';
-import { SessionUsage } from '../../../types/claude-usage.js';
 import { statusTracker } from '../../../utils/status-tracker.js';
-import { getActionColor } from '../../../utils/text-sanitizer.js';
 
 export class SessionsView {
   private projectsBox: any;
@@ -72,9 +69,9 @@ export class SessionsView {
       // Get unique projects with session counts, message counts, and token counts
       const projectMap = new Map<string, { sessionCount: number, messageCount: number, tokenCount: number }>();
       let totalMessages = 0;
-      let totalTokens = 0;
+      // const totalTokens = 0;
       
-      for (const [id, session] of activeSessions) {
+      for (const [, session] of activeSessions) {
         const project = session.user;
         const existing = projectMap.get(project) || { sessionCount: 0, messageCount: 0, tokenCount: 0 };
         
@@ -92,7 +89,7 @@ export class SessionsView {
           tokenCount: existing.tokenCount + sessionTokens
         });
         totalMessages += session.messageCount;
-        totalTokens += sessionTokens;
+        // totalTokens += sessionTokens;
       }
       
       // Update Projects box (left) - show cost per project

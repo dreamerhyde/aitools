@@ -289,8 +289,7 @@ const ENHANCED_ACTION_MAPPING: Record<string, string> = {
   // Generic states
   'Puttering': 'Puttering...',
   'Orchestrating': 'Orchestrating...',
-  'Working': 'Working...',
-  'Processing': 'Processing...'
+  'Working': 'Working...'
 };
 
 /**
@@ -337,9 +336,9 @@ export function formatActionString(action: string): string {
  * @param action The action string
  * @returns Color function for the action
  */
-export function getActionColor(action: string): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' | 'orange' {
-  // Always return orange for all actions
-  return 'orange';
+export function getActionColor(): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' {
+  // Always return cyan for all actions
+  return 'cyan';
 }
 
 /**

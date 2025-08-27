@@ -74,7 +74,7 @@ export function formatActiveSessionsList(activeSessions: Map<string, SessionInfo
     const projectMap = new Map<string, number>();
     let totalMessages = 0;
     
-    for (const [id, session] of activeSessions) {
+    for (const [, session] of activeSessions) {
       const project = session.user;
       projectMap.set(project, (projectMap.get(project) || 0) + 1);
       totalMessages += session.messageCount;

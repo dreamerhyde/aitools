@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 /**
  * Unified style system for terminal text display
  * Provides consistent styling for different types of content
@@ -185,7 +186,7 @@ export function createCustomStyle(
  */
 export function formatActionStatus(action: string, interrupt: boolean = true): string {
   // Import color function
-  const { getActionColor } = require('../../../utils/text-sanitizer.js');
+  // const { getActionColor } = require('../../../utils/text-sanitizer.js');
   
   // Format with orange action and gray interrupt text
   if (interrupt) {
@@ -252,7 +253,7 @@ export function parseMarkdown(text: string): string {
   result = result.replace(/```[\w]*\n?([\s\S]*?)\n?```/g, (match, code) => {
     // Style the entire code block with a subtle background
     const lines = code.split('\n');
-    return lines.map(line => `{gray-fg}${line}{/gray-fg}`).join('\n');
+    return lines.map((line: string) => `{gray-fg}${line}{/gray-fg}`).join('\n');
   });
   
   // Convert headers to bold (# ## ### at start of line)

@@ -3,7 +3,6 @@ import { SessionInfo } from '../types.js';
 import { 
   truncateText, 
   wrapText, 
-  formatElapsedTime, 
   formatMessageCount,
   createSeparator,
   formatStatusIndicator

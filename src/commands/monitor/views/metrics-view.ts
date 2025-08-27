@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { SystemMetrics } from '../types.js';
 import { createMiniBar } from '../utils/formatters.js';
 
 export class MetricsView {

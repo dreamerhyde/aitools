@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as figlet from 'figlet';
 import { CostMetrics, DailyUsage, SessionInfo } from '../types.js';
-import { formatCost, formatNumber } from '../../../utils/formatters.js';
+import { formatNumber } from '../../../utils/formatters.js';
 import { ChartGenerator } from '../../../utils/chart-generator.js';
 import { sanitizeText } from '../../../utils/text-sanitizer.js';
 

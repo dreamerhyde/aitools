@@ -331,6 +331,14 @@ export class JSONLParser {
     return inputCost + outputCost + cacheCreationCost + cacheReadCost;
   }
 
+  async parseLogs(daysBack: number = 1): Promise<ConversationMessage[]> {
+    // Parse only the last N days of logs
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+    return this.parseAllLogs(startDate, endDate);
+  }
+
   async parseAllLogs(startDate?: Date, endDate?: Date): Promise<ConversationMessage[]> {
     const files = await this.findLogFiles();
     const allMessages: ConversationMessage[] = [];

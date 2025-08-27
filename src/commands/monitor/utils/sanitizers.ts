@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // Utility function to sanitize text for safe terminal display
 export function sanitizeForTerminal(str: string): string {
   return str
@@ -5,6 +6,7 @@ export function sanitizeForTerminal(str: string): string {
     // Keep only: Basic Latin, Latin-1 Supplement, and CJK
     .replace(/[^\u0020-\u007E\u00A0-\u00FF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFF9F\u4E00-\u9FAF\u3400-\u4DBF]/g, '')
     // Remove control characters except newlines and tabs
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, (match) => {
       if (match === '\n' || match === '\t') return match;
       return '';
