@@ -112,23 +112,26 @@ export class GPUMonitor {
         gpuData.usage = activityResult.usage;
       }
 
-      // Method 3: Get GPU usage from top command (process-based) as fallback
-      if (gpuData.usage === 0) {
-        const topResult = await this.getMacOSGPUFromTop();
-        if (topResult.usage > 0) {
-          gpuData.usage = topResult.usage;
-        }
-      }
+      // Removed top command usage - relying on ioreg and activity monitor only
       
-      // Get memory usage from ioreg if available
+      // For Apple Silicon, don't report memory info since it uses unified memory
+      // Memory usage is better shown in the system MEM section
+      // Only report memory for discrete GPUs
       try {
-        const { stdout } = await execAsync('ioreg -r -d 1 -w 0 -c "IOAccelerator" | grep -E "In use system memory"');
-        const memMatch = stdout.match(/"In use system memory"=(\d+)/);
-        const allocMatch = stdout.match(/"Alloc system memory"=(\d+)/);
+        // Check if this is Apple Silicon
+        const { stdout: cpuBrand } = await execAsync('sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Unknown"');
+        const isAppleSilicon = cpuBrand.includes('Apple') || cpuBrand.includes('M1') || cpuBrand.includes('M2') || cpuBrand.includes('M3') || cpuBrand.includes('M4');
         
-        if (memMatch && allocMatch) {
-          gpuData.memory.used = Math.round(parseInt(memMatch[1]) / (1024 * 1024)); // Convert to MB
-          gpuData.memory.total = Math.round(parseInt(allocMatch[1]) / (1024 * 1024)); // Convert to MB
+        if (!isAppleSilicon) {
+          // Only get memory info for discrete GPUs
+          const { stdout } = await execAsync('ioreg -r -d 1 -w 0 -c "IOAccelerator" | grep -E "In use system memory"');
+          const memMatch = stdout.match(/"In use system memory"=(\d+)/);
+          const allocMatch = stdout.match(/"Alloc system memory"=(\d+)/);
+          
+          if (memMatch && allocMatch) {
+            gpuData.memory.used = Math.round(parseInt(memMatch[1]) / (1024 * 1024)); // Convert to MB
+            gpuData.memory.total = Math.round(parseInt(allocMatch[1]) / (1024 * 1024)); // Convert to MB
+          }
         }
       } catch {
         // Memory info not available
@@ -141,35 +144,7 @@ export class GPUMonitor {
     return gpuData;
   }
 
-  /**
-   * Get GPU usage from top command (macOS)
-   */
-  private async getMacOSGPUFromTop(): Promise<{ usage: number }> {
-    try {
-      const { stdout } = await execAsync('top -l 1 -s 0 -stats pid,command,cpu,gpu | grep -v "0.0" | grep -v "GPU"');
-      
-      let totalGPU = 0;
-      let processCount = 0;
-      
-      const lines = stdout.split('\n').filter(line => line.trim());
-      for (const line of lines) {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 4) {
-          const gpuUsage = parseFloat(parts[3]);
-          if (!isNaN(gpuUsage) && gpuUsage > 0) {
-            totalGPU += gpuUsage;
-            processCount++;
-          }
-        }
-      }
-      
-      return {
-        usage: Math.min(totalGPU, 100) // Cap at 100%
-      };
-    } catch (error) {
-      return { usage: 0 };
-    }
-  }
+  // Removed getMacOSGPUFromTop method - no longer using top command
 
   /**
    * Get GPU info from ioreg (macOS)

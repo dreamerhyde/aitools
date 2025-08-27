@@ -19,13 +19,31 @@ export class ProcessMonitor {
 
   async getSystemStats(): Promise<SystemStats> {
     try {
+      // Get memory stats
       const { stdout: vmStat } = await execAsync('vm_stat');
-      const { stdout: topOutput } = await execAsync('top -l 1 -n 0 | head -10');
-      // Get actual physical memory from sysctl
       const { stdout: physicalMemory } = await execAsync('sysctl -n hw.memsize');
       
+      // Get load average using sysctl (much faster than top)
+      const { stdout: loadAvgOutput } = await execAsync('sysctl -n vm.loadavg');
+      
+      // Get CPU core count for proper percentage calculation
+      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.logicalcpu');
+      const cpuCount = parseInt(cpuCountOutput.trim()) || 1;
+      
+      // Get CPU usage from ps (already being called anyway)
+      const { stdout: cpuOutput } = await execAsync("ps aux | awk 'NR>1{sum+=$3} END {print sum}'");
+      
       const memoryInfo = this.parseMemoryInfo(vmStat, parseInt(physicalMemory.trim()));
-      const cpuInfo = this.parseCpuInfo(topOutput);
+      
+      // Parse load average from sysctl output: "{ 5.96 6.75 6.95 }"
+      const loadMatch = loadAvgOutput.match(/\{\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+      const loadAverage = loadMatch ? 
+        [parseFloat(loadMatch[1]), parseFloat(loadMatch[2]), parseFloat(loadMatch[3])] :
+        [0, 0, 0];
+      
+      // Parse CPU usage and normalize to 0-100% by dividing by core count
+      const rawCpuUsage = parseFloat(cpuOutput.trim()) || 0;
+      const cpuUsage = rawCpuUsage / cpuCount;
       
       return {
         totalMemory: memoryInfo.total,
@@ -33,8 +51,8 @@ export class ProcessMonitor {
         activeMemory: memoryInfo.active,
         memoryUsed: memoryInfo.usedBytes,
         memoryTotal: memoryInfo.totalBytes,
-        cpuUsage: cpuInfo.cpu,
-        loadAverage: cpuInfo.loadAverage
+        cpuUsage: cpuUsage,
+        loadAverage: loadAverage
       };
     } catch (error) {
       throw new Error(`Failed to get system status: ${error}`);
@@ -307,25 +325,5 @@ export class ProcessMonitor {
     };
   }
 
-  private parseCpuInfo(topOutput: string): { cpu: number; loadAverage: number[] } {
-    const lines = topOutput.split('\n');
-    let cpuUsage = 0;
-    let loadAverage: number[] = [0, 0, 0];
-    
-    lines.forEach(line => {
-      if (line.includes('CPU usage:')) {
-        const match = line.match(/(\d+\.\d+)% user/);
-        if (match) {
-          cpuUsage = parseFloat(match[1]);
-        }
-      } else if (line.includes('Load Avg:')) {
-        const match = line.match(/Load Avg: ([\d.]+), ([\d.]+), ([\d.]+)/);
-        if (match) {
-          loadAverage = [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])];
-        }
-      }
-    });
-    
-    return { cpu: cpuUsage, loadAverage };
-  }
+  // Removed parseCpuInfo method - no longer needed since we don't use top command
 }

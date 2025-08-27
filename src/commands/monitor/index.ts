@@ -160,8 +160,12 @@ export class MonitorCommand {
           gpuInfo = 'GPU';
         }
         
-        // Add VRAM info if available
-        if (gpuData.memory.total > 0) {
+        // Don't show memory info for Apple Silicon with unified memory
+        // It's confusing since it's already shown in the MEM section
+        // Only show memory for discrete GPUs with dedicated VRAM
+        const isAppleSilicon = cpuInfo.includes('Apple') || cpuInfo.includes('M1') || cpuInfo.includes('M2') || cpuInfo.includes('M3') || cpuInfo.includes('M4');
+        
+        if (gpuData.memory.total > 0 && !isAppleSilicon) {
           const memUsedGB = (gpuData.memory.used / 1024).toFixed(1);
           const memTotalGB = (gpuData.memory.total / 1024).toFixed(1);
           const memPercent = ((gpuData.memory.used / gpuData.memory.total) * 100);
