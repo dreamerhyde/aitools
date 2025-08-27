@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../utils/process-monitor.js';
 import { UIHelper } from '../utils/ui.js';
-import { extractSmartProcessName } from '../commands/monitor/utils/sanitizers.js';
+import { extractSmartProcessName, getCacheStats } from '../commands/monitor/utils/sanitizers.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import inquirer from 'inquirer';
@@ -21,6 +21,7 @@ export function setupProcessCommand(program: Command): void {
     .option('-a, --all', 'Show all processes')
     .option('--cpu <threshold>', 'Filter by CPU usage threshold', '0.1')
     .option('--sort <field>', 'Sort by field (cpu|mem|pid)', 'cpu')
+    .option('--show-cache-stats', 'Show process name cache statistics')
     .action(async (options) => {
       try {
         const processMonitor = new ProcessMonitor();
@@ -110,6 +111,25 @@ export function setupProcessCommand(program: Command): void {
         
         console.log(table.toString());
         console.log(chalk.gray(`\nShowing ${Math.min(30, filtered.length)} of ${filtered.length} processes`));
+        
+        // Show cache stats if requested
+        if (options.showCacheStats) {
+          const stats = getCacheStats();
+          console.log(chalk.cyan('\nCache Statistics:'));
+          console.log(chalk.gray('Process Cache:'));
+          console.log(chalk.gray(`  Size: ${stats.size}/${1000} entries`));
+          console.log(chalk.gray(`  Hits: ${stats.hits}`));
+          console.log(chalk.gray(`  Misses: ${stats.misses}`));
+          console.log(chalk.gray(`  Hit Rate: ${stats.hitRate}`));
+          
+          if (stats.appCache) {
+            console.log(chalk.gray('\nApplication Cache:'));
+            console.log(chalk.gray(`  Cached Apps: ${stats.appCache.entries}`));
+            console.log(chalk.gray(`  Cache Age: ${stats.appCache.age}`));
+            console.log(chalk.gray(`  TTL: ${stats.appCache.ttl}`));
+            console.log(chalk.gray(`  Remaining: ${stats.appCache.remaining}`));
+          }
+        }
         
         // Status legend
         console.log(chalk.gray('\nStatus: ') + 

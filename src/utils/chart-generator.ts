@@ -99,7 +99,8 @@ export class ChartGenerator {
     
     // Add Y-axis labels and chart
     for (let i = 0; i < height; i++) {
-      const value = Math.round(((height - i) / height * maxValue));
+      // Fixed: Use same scaling as bar height calculation (height - 1)
+      const value = Math.round(((height - 1 - i) / (height - 1) * maxValue));
       const label = `$${value}`;
       const paddedLabel = label.padStart(4);
       

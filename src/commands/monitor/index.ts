@@ -381,5 +381,8 @@ export class MonitorCommand {
     }
     
     this.screenManager.destroy();
+    
+    // IMPORTANT: Actually exit the process after cleanup!
+    process.exit(0);
   }
 }

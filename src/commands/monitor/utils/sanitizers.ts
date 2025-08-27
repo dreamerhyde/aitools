@@ -1,4 +1,39 @@
 /* eslint-disable no-useless-escape */
+import { ApplicationCache } from '../../../utils/app-cache.js';
+
+// Cache for process name extraction
+const processNameCache = new Map<string, string>();
+const CACHE_MAX_SIZE = 1000;
+let cacheHits = 0;
+let cacheMisses = 0;
+
+// Application cache instance (singleton)
+const appCache = ApplicationCache.getInstance();
+
+// Export cache stats for debugging
+export function getCacheStats() {
+  const appStats = appCache.getStats();
+  return {
+    size: processNameCache.size,
+    hits: cacheHits,
+    misses: cacheMisses,
+    hitRate: cacheHits > 0 ? (cacheHits / (cacheHits + cacheMisses) * 100).toFixed(2) + '%' : '0%',
+    appCache: {
+      entries: appStats.size,
+      age: `${appStats.age}s`,
+      ttl: `${appStats.ttl}s`,
+      remaining: `${appStats.remainingTime}s`
+    }
+  };
+}
+
+// Clear cache if needed
+export function clearProcessNameCache() {
+  processNameCache.clear();
+  cacheHits = 0;
+  cacheMisses = 0;
+}
+
 // Utility function to sanitize text for safe terminal display
 export function sanitizeForTerminal(str: string): string {
   return str
@@ -20,6 +55,22 @@ export function sanitizeForTerminal(str: string): string {
 
 // Extract smart process name from command
 export function extractSmartProcessName(command: string): string {
+  // Check cache first
+  const cached = processNameCache.get(command);
+  if (cached !== undefined) {
+    cacheHits++;
+    return cached;
+  }
+  cacheMisses++;
+  
+  // Check application cache for known apps
+  const appName = appCache.get(command);
+  if (appName) {
+    // Found in app cache, store in process cache and return
+    processNameCache.set(command, appName);
+    return appName;
+  }
+  
   // Define the pattern type
   interface Pattern {
     regex: RegExp;
@@ -36,6 +87,57 @@ export function extractSmartProcessName(command: string): string {
   
   // Common patterns for different types of processes
   const patterns: Pattern[] = [
+    // Special handling for aitools itself
+    {
+      regex: /(?:bun|node|npm|yarn|pnpm|npx)\s+(?:run\s+)?([^\/]*\/)?(?:dist\/)?cli\.js\s+(\w+)/,
+      group: 0,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const subcommand = fullMatch[2];
+        const commandMap: { [key: string]: string } = {
+          'm': 'monitor',
+          'ps': 'process list',
+          'k': 'kill',
+          'c': 'cost',
+          'h': 'hooks',
+          't': 'tree'
+        };
+        return `aitools ${commandMap[subcommand] || subcommand}`;
+      }
+    },
+    
+    // Apple System Drivers (DriverKit)
+    {
+      regex: /\/System\/Library\/DriverExtensions\/([^\/]+)\.dext\/([^\s]+)/,
+      group: 0,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const driverName = fullMatch[1];
+        const execName = fullMatch[2];
+        
+        // Map known Apple drivers to friendly names
+        const driverMap: { [key: string]: string } = {
+          'com.apple.DriverKit-AppleBCMWLAN': 'Apple WiFi/Bluetooth Driver',
+          'com.apple.DriverKit-IOUserDockChannelSerial': 'Apple Dock Serial Driver',
+          'com.apple.AppleUserHIDDrivers': 'Apple HID Drivers',
+          'IOUserBluetoothSerialDriver': 'Bluetooth Serial Driver',
+          'com.apple.DriverKit-AppleUSBDeviceNCM': 'Apple USB Network Driver',
+          'com.apple.DriverKit-AppleConvergedIPCOLYBTControl': 'Apple Bluetooth Controller'
+        };
+        
+        return driverMap[driverName] || `Driver: ${driverName.replace('com.apple.DriverKit-', '')}`;
+      }
+    },
+    
+    // Apple Virtualization Framework
+    {
+      regex: /Virtualization\.framework.*com\.apple\.Virtualization\.VirtualMachine/,
+      group: 0,
+      transform: () => {
+        // Simple static name - we know Docker is the most common user
+        // If needed, we can enhance this later with a smarter detection
+        return 'Virtual Machine (Docker/UTM)';
+      }
+    },
+    
     // macOS Application Bundle - Main app from /Applications
     // e.g., /Applications/Warp.app/Contents/MacOS/stable -> Warp
     { 
@@ -237,22 +339,42 @@ export function extractSmartProcessName(command: string): string {
     { regex: /^([^\s\/]+)/i, group: 1 }
   ];
 
+  let result: string | undefined;
+  
   for (const pattern of patterns) {
     const match = command.match(pattern.regex);
     if (match) {
       // Handle transform function if present
       if ('transform' in pattern && pattern.transform) {
         const transformed = pattern.transform(match[pattern.group], match);
-        if (transformed !== null) return transformed;
+        if (transformed !== null) {
+          result = transformed;
+          break;
+        }
       }
       // Standard extraction
       if (match[pattern.group]) {
         const name = match[pattern.group];
-        return pattern.prefix ? `${pattern.prefix}${name}` : name;
+        result = pattern.prefix ? `${pattern.prefix}${name}` : name;
+        break;
       }
     }
   }
 
   // Ultimate fallback: truncate command
-  return command.split(' ')[0].substring(0, 30);
+  if (!result) {
+    result = command.split(' ')[0].substring(0, 30);
+  }
+  
+  // Store in cache with LRU eviction
+  if (processNameCache.size >= CACHE_MAX_SIZE) {
+    // Remove oldest entry (first in map)
+    const firstKey = processNameCache.keys().next().value;
+    if (firstKey !== undefined) {
+      processNameCache.delete(firstKey);
+    }
+  }
+  processNameCache.set(command, result);
+  
+  return result;
 }

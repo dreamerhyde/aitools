@@ -61,6 +61,7 @@ export class ProcessMonitor {
 
   async getAllProcesses(): Promise<ProcessInfo[]> {
     try {
+      // Use more efficient ps command - avoid 'aux' which includes unnecessary info
       const { stdout } = await execAsync(
         'ps -Ao pid,ppid,pcpu,pmem,etime,stat,command | tail -n +2'
       );
