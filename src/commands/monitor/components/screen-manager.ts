@@ -6,8 +6,6 @@ export class ScreenManager {
   private contrib: any;
   private currentFontIndex: number = 0;
   private allFonts: figlet.Fonts[] = ['ANSI Shadow', 'Big', 'Standard', 'Small', 'Slant'];
-  private escPressCount: number = 0;
-  private lastEscPress: number = 0;
 
   async initialize(): Promise<void> {
     // Dynamically import blessed modules
@@ -42,25 +40,9 @@ export class ScreenManager {
       process.exit(0);
     });
     
-    // Smart ESC detection - exit if pressed 3 times within 2 seconds
+    // ESC key handler - immediate exit
     const handleEscPress = () => {
-      const now = Date.now();
-      
-      // Reset count if more than 2 seconds since last press
-      if (now - this.lastEscPress > 2000) {
-        this.escPressCount = 0;
-      }
-      
-      this.escPressCount++;
-      this.lastEscPress = now;
-      
-      // Force exit after 3 rapid presses
-      if (this.escPressCount >= 3) {
-        // Force immediate exit
-        process.exit(0);
-      }
-      
-      // Try normal exit first
+      // Clean exit immediately
       try {
         process.exit(0);
       } catch (e) {
