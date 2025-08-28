@@ -224,6 +224,8 @@ export class SessionBoxesView {
         }
         
         box.setContent(contentLines.join('\n'));
+        // Auto-scroll to bottom to show latest messages
+        box.setScrollPerc(100);
       } else {
         // Empty box
         box.setLabel(` Session ${i + 1} `);
