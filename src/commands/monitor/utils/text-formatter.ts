@@ -49,42 +49,54 @@ export function wrapText(text: string, maxWidth: number): string[] {
     return [];
   }
   
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let currentLine = '';
+  // First split by newlines to preserve line breaks
+  const inputLines = text.split('\n');
+  const resultLines: string[] = [];
   
-  for (const word of words) {
-    const wordDisplayLength = getDisplayLength(word);
-    
-    // If single word is longer than max width, truncate it
-    if (wordDisplayLength > maxWidth) {
-      if (currentLine) {
-        lines.push(currentLine.trim());
-        currentLine = '';
-      }
-      // For words with tags, we need smarter truncation
-      lines.push(word); // Keep the word as-is if it has tags
+  for (const line of inputLines) {
+    // Skip empty lines but preserve them
+    if (!line.trim()) {
+      resultLines.push('');
       continue;
     }
     
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const testLineLength = getDisplayLength(testLine);
+    // Now split each line by spaces for word wrapping
+    const words = line.split(/\s+/);
+    let currentLine = '';
     
-    if (testLineLength <= maxWidth) {
-      currentLine = testLine;
-    } else {
-      if (currentLine) {
-        lines.push(currentLine.trim());
+    for (const word of words) {
+      const wordDisplayLength = getDisplayLength(word);
+      
+      // If single word is longer than max width, keep it as-is
+      if (wordDisplayLength > maxWidth) {
+        if (currentLine) {
+          resultLines.push(currentLine.trim());
+          currentLine = '';
+        }
+        // For words with tags, we need smarter truncation
+        resultLines.push(word); // Keep the word as-is if it has tags
+        continue;
       }
-      currentLine = word;
+      
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testLineLength = getDisplayLength(testLine);
+      
+      if (testLineLength <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          resultLines.push(currentLine.trim());
+        }
+        currentLine = word;
+      }
+    }
+    
+    if (currentLine) {
+      resultLines.push(currentLine.trim());
     }
   }
   
-  if (currentLine) {
-    lines.push(currentLine.trim());
-  }
-  
-  return lines;
+  return resultLines;
 }
 
 /**

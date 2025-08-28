@@ -166,6 +166,17 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
   } = options;
 
   let result = text;
+  
+  // IMPORTANT: Protect blessed terminal tags from being modified
+  // Store blessed tags temporarily and restore them after sanitization
+  const blessedTags: string[] = [];
+  const placeholder = '___BLESSED_TAG___';
+  
+  // Extract and replace blessed tags with placeholders
+  result = result.replace(/\{[^}]+\}/g, (match) => {
+    blessedTags.push(match);
+    return `${placeholder}${blessedTags.length - 1}${placeholder}`;
+  });
 
   // Convert known emojis to ASCII symbols first
   if (convertToAscii) {
@@ -202,6 +213,11 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
   // Apply length limit if specified
   if (maxLength && result.length > maxLength) {
     result = result.substring(0, maxLength - 3) + '...';
+  }
+  
+  // Restore blessed tags
+  for (let i = 0; i < blessedTags.length; i++) {
+    result = result.replace(`${placeholder}${i}${placeholder}`, blessedTags[i]);
   }
 
   return result;

@@ -178,21 +178,23 @@ export class SessionBoxesView {
               contentLines.push(''); // Empty line for visual separation
             }
             
-            // Clean, sanitize and truncate the message content
-            const cleanContent = sanitizeText(msg.content, {
+            // Apply Markdown parsing FIRST (before sanitization changes the structure)
+            const markdownParsed = parseMarkdown(msg.content);
+            
+            // Then clean and sanitize the already-parsed content
+            const cleanContent = sanitizeText(markdownParsed, {
               removeEmojis: true,
               convertToAscii: true,
-              preserveWhitespace: false
+              preserveWhitespace: true  // Keep line breaks
             });
             
-            // Apply Markdown parsing for rich formatting
-            const richContent = parseMarkdown(cleanContent);
+            // No truncation for AI responses, keep full content
+            const contentToWrap = msg.role === 'assistant' ? cleanContent : truncateText(cleanContent, boxWidth * 4);
+            const wrappedLines = wrapText(contentToWrap, boxWidth - 5); // Account for badge + space
             
-            const truncatedContent = truncateText(richContent, boxWidth * 4); // Allow more content
-            const wrappedLines = wrapText(truncatedContent, boxWidth - 5); // Account for badge + space
-            
-            // Use the style system to format the message - allow up to 4 lines per message
-            const formattedLines = formatQAMessage(msg.role, wrappedLines.slice(0, 4), this.qaStyle, session.status);
+            // No line limit for AI responses, limit user messages to 4 lines
+            const linesToShow = msg.role === 'assistant' ? wrappedLines : wrappedLines.slice(0, 4);
+            const formattedLines = formatQAMessage(msg.role, linesToShow, this.qaStyle, session.status);
             contentLines.push(...formattedLines);
             
             // Add empty line after each question for better spacing

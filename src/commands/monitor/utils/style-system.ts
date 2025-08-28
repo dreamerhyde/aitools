@@ -235,10 +235,8 @@ export function combineStyles(text: string, ...styles: StyleType[]): string {
 /**
  * Parse and apply basic markdown formatting
  * Supports:
- * - Headers (# ## ###) converted to bold
- * - Bold text (**text**)
- * - Code blocks (`code`)
- * - Italic (*text* or _text_) converted to cyan
+ * - Headers (# ## ###) converted to bold (only if followed by line break)
+ * - Code blocks (`code`) with dim background
  */
 export function parseMarkdown(text: string): string {
   // Skip if text already contains blessed color tags (check for specific pattern)
@@ -248,39 +246,32 @@ export function parseMarkdown(text: string): string {
   
   let result = text;
   
-  // First handle triple backtick code blocks (``` ... ```)
-  // This must be done BEFORE other processing to avoid conflicts
-  result = result.replace(/```[\w]*\n?([\s\S]*?)\n?```/g, (match, code) => {
-    // Style the entire code block with a subtle background
-    const lines = code.split('\n');
-    return lines.map((line: string) => `{gray-fg}${line}{/gray-fg}`).join('\n');
+  // Convert **text** to bold white FIRST (before processing headers)
+  result = result.replace(/\*\*([^*]+)\*\*/g, '{bold}{white-fg}$1{/white-fg}{/bold}');
+  
+  // Convert headers to bold (# ## ### ONLY at start of line)
+  // Headers must be at the beginning of a line to be considered headers
+  result = result.replace(/^(#{1,3})\s+(.+)$/gm, (match, hashes, text) => {
+    // Remove any existing bold tags to avoid nesting
+    const cleanText = text.replace(/\{bold\}|\{\/bold\}/g, '');
+    return `{bold}{white-fg}${cleanText}{/white-fg}{/bold}`;  // Bold + white for better visibility
   });
   
-  // Convert headers to bold (# ## ### at start of line)
-  // Only if not inside code blocks
-  result = result.replace(/^#{1,3}\s+(.+)$/gm, '{bold}$1{/bold}');
+  // Handle markdown inline code with proper rules
+  // Double backticks can contain single backticks: `` ` ``
+  // Triple backticks on same line are just inline code too: ``` code ```
   
-  // Convert **bold** to bold (but not inside code blocks)
-  result = result.replace(/\*\*([^*]+)\*\*/g, '{bold}$1{/bold}');
+  // First handle double-backtick delimited code (can contain single backticks)
+  result = result.replace(/``(.+?)``/g, (match, content) => {
+    // Include the backticks in the cyan styling
+    return '{cyan-fg}``' + content + '``{/cyan-fg}';
+  });
   
-  // Convert __bold__ to bold
-  result = result.replace(/__([^_]+)__/g, '{bold}$1{/bold}');
-  
-  // Convert single backtick `code` to monospace style
-  // Only if not part of triple backticks
-  result = result.replace(/(?<!`)`([^`\n]+)`(?!`)/g, '{white-fg}$1{/white-fg}');
-  
-  // Convert *italic* to cyan (avoid conflicting with bold)
-  result = result.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '{cyan-fg}$1{/cyan-fg}');
-  
-  // Convert _italic_ to cyan
-  result = result.replace(/(?<!_)_(?!_)([^_]+)_(?!_)/g, '{cyan-fg}$1{/cyan-fg}');
-  
-  // Convert lists (- or * at start of line) to have a bullet point
-  result = result.replace(/^[\*\-]\s+/gm, '• ');
-  
-  // Convert numbered lists to have consistent formatting
-  result = result.replace(/^\d+\.\s+/gm, '  ◦ ');
+  // Then handle single-backtick delimited code (cannot contain backticks)
+  result = result.replace(/`([^`]+)`/g, (match, content) => {
+    // Include the backticks in the cyan styling
+    return '{cyan-fg}`' + content + '`{/cyan-fg}';
+  });
   
   return result;
 }

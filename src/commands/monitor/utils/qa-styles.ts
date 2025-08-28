@@ -22,22 +22,22 @@ export interface QAStyle {
 }
 
 export const QA_STYLES: Record<QAStyleType, QAStyle> = {
-  // Style 1: Colored Background Badges (Most distinctive)
+  // Style 1: Colored text labels (no background)
   [QAStyleType.BADGE]: {
-    userPrefix: '{bold}{cyan-bg}{black-fg} Q {/black-fg}{/cyan-bg}{/bold} {cyan-fg}',
-    assistantPrefix: '{bold}{green-bg}{black-fg} A {/black-fg}{/green-bg}{/bold} {white-fg}',
+    userPrefix: '{bold}{cyan-fg}[Q]{/cyan-fg}{/bold} {cyan-fg}',
+    assistantPrefix: '{bold}{green-fg}[A]{/green-fg}{/bold} {#DDDDDD-fg}',  // Light gray for AI
     userContinuation: '     {cyan-fg}',
-    assistantContinuation: '     {white-fg}',
+    assistantContinuation: '     {#DDDDDD-fg}',  // Light gray
     separator: '{gray-fg}' + '─'.repeat(20) + '{/gray-fg}',
-    description: 'Colored badges with high contrast'
+    description: 'Colored brackets without background'
   },
 
   // Style 2: Unicode Icons (Clean and modern)
   [QAStyleType.ICON]: {
     userPrefix: '{cyan-fg}{bold}▶ Q:{/bold} ',
-    assistantPrefix: '{green-fg}{bold}▷ A:{/bold} {white-fg}',
+    assistantPrefix: '{green-fg}{bold}▷ A:{/bold} {#DDDDDD-fg}',  // Light gray for AI
     userContinuation: '      {cyan-fg}',
-    assistantContinuation: '      {white-fg}',
+    assistantContinuation: '      {#DDDDDD-fg}',  // Light gray
     separator: '{gray-fg}  · · ·{/gray-fg}',
     description: 'Arrow icons with colors'
   },
@@ -45,9 +45,9 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
   // Style 3: Bracketed Labels (Traditional)
   [QAStyleType.BRACKET]: {
     userPrefix: '{cyan-fg}{bold}[Q]{/bold} ',
-    assistantPrefix: '{green-fg}{bold}[A]{/bold} {white-fg}',
+    assistantPrefix: '{green-fg}{bold}[A]{/bold} {#DDDDDD-fg}',  // Light gray for AI
     userContinuation: '    {cyan-fg}',
-    assistantContinuation: '    {white-fg}',
+    assistantContinuation: '    {#DDDDDD-fg}',  // Light gray
     separator: '',
     description: 'Square brackets with colors'
   },
@@ -55,9 +55,9 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
   // Style 4: Arrow Indicators (Directional)
   [QAStyleType.ARROW]: {
     userPrefix: '{cyan-fg}{bold}→{/bold} ',
-    assistantPrefix: '{green-fg}{bold}←{/bold} {white-fg}',
+    assistantPrefix: '{green-fg}{bold}←{/bold} {#DDDDDD-fg}',  // Light gray for AI
     userContinuation: '  {cyan-fg}',
-    assistantContinuation: '  {white-fg}',
+    assistantContinuation: '  {#DDDDDD-fg}',  // Light gray
     separator: '',
     description: 'Directional arrows'
   },
@@ -65,19 +65,19 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
   // Style 5: Minimal (Subtle)
   [QAStyleType.MINIMAL]: {
     userPrefix: '{cyan-fg}• ',
-    assistantPrefix: '{white-fg}  ',
+    assistantPrefix: '{#DDDDDD-fg}  ',  // Light gray for AI
     userContinuation: '  {cyan-fg}',
-    assistantContinuation: '    {white-fg}',
+    assistantContinuation: '    {#DDDDDD-fg}',  // Light gray
     separator: '',
     description: 'Minimal with indentation'
   },
 
-  // Style 6: Hybrid (Q with background badge, A with arrow) - RECOMMENDED
+  // Style 6: Hybrid (Q with badge, A with arrow) - RECOMMENDED
   [QAStyleType.HYBRID]: {
-    userPrefix: '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}',
-    assistantPrefix: '{white-fg}→ ',
-    userContinuation: '     {green-fg}',
-    assistantContinuation: '  {white-fg}',
+    userPrefix: '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}',  // Q with green background badge
+    assistantPrefix: '{#DDDDDD-fg}→ ',  // Light gray for AI
+    userContinuation: '     {green-fg}',  // Align with Q badge width
+    assistantContinuation: '  {#DDDDDD-fg}',  // Light gray
     separator: '',
     description: 'Hybrid style with Q badge and A arrow'
   }
@@ -249,15 +249,14 @@ export function formatQAMessage(
         }
       }
     } else {
-      // Assistant messages (unchanged)
+      // Assistant messages - no suffix to allow internal colors (cyan, bold, etc)
       const prefix = style.assistantPrefix;
-      const suffix = '{/white-fg}';
-      lines.push(prefix + content[0] + suffix);
+      lines.push(prefix + content[0]);
       
       // Continuation lines
       for (let i = 1; i < content.length; i++) {
         const continuation = style.assistantContinuation;
-        lines.push(continuation + content[i] + suffix);
+        lines.push(continuation + content[i]);
       }
     }
   }
