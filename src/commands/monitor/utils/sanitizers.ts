@@ -250,9 +250,9 @@ export function extractSmartProcessName(command: string): string {
         // Skip if it's a helper app (already handled above)
         if (appName.includes('Helper')) return null;
         
-        // For generic executables, use app name
+        // For generic executables, show both app and exec name for clarity
         if (genericExecutables.includes(execName.toLowerCase())) {
-          return appName;
+          return `${appName}: ${execName}`;
         }
         
         // If names match, just use app name
@@ -272,9 +272,42 @@ export function extractSmartProcessName(command: string): string {
       prefix: 'Claude Hook: '
     },
     
-    // Node.js scripts
-    { regex: /node\s+([^\/\s]+\.js)/i, group: 1 },
-    { regex: /node\s+.*\/([^\/]+\.js)/i, group: 1 },
+    // Node.js with Vercel/vc CLI
+    {
+      regex: /node\s+.*\/(vc|vercel)\s+(\w+)/i,
+      group: 1,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const tool = fullMatch[1]; // vc or vercel
+        const command = fullMatch[2]; // dev, build, etc.
+        // Try to get the current working directory from the process
+        // For now, just show the command clearly
+        return `vercel:${command}`;
+      }
+    },
+    
+    // Node.js with npm/yarn/pnpm/bun scripts
+    {
+      regex: /node\s+.*\/(npm|yarn|pnpm|bun)\s+(run\s+)?(\w+)/i,
+      group: 1,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const tool = fullMatch[1];
+        const script = fullMatch[3];
+        return `${tool}:${script}`;
+      }
+    },
+    
+    // Node.js scripts with project detection
+    {
+      regex: /node\s+(.*\/([^\/]+)\/[^\/]+\.js)/i,
+      group: 1,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const projectName = fullMatch[2]; // The directory name
+        const scriptName = match.split('/').pop(); // The script file
+        return `node:${projectName}/${scriptName}`;
+      }
+    },
+    { regex: /node\s+([^\/\s]+\.js)/i, group: 1, prefix: 'node:' },
+    { regex: /node\s+.*\/([^\/]+\.js)/i, group: 1, prefix: 'node:' },
     
     // Python scripts
     { regex: /python[0-9]?\s+([^\/\s]+\.py)/i, group: 1 },
@@ -297,6 +330,17 @@ export function extractSmartProcessName(command: string): string {
     
     // Common development tools
     { regex: /(webpack|vite|rollup|parcel|esbuild|turbo|nx)/i, group: 1 },
+    
+    // Generic runtime with working directory detection
+    {
+      regex: /^(node|bun|deno|python[0-9]?|ruby|java|go)\s+(?!.*\.(?:js|ts|py|rb|java|go)).*?\/([^\/]+)(?:\/|$)/i,
+      group: 1,
+      transform: (match: string, fullMatch: RegExpMatchArray) => {
+        const runtime = fullMatch[1];
+        const projectDir = fullMatch[2];
+        return `${runtime}:${projectDir}`;
+      }
+    },
     { regex: /(jest|mocha|vitest|cypress|playwright)/i, group: 1 },
     { regex: /(eslint|prettier|tsc|tsx|swc|babel)/i, group: 1 },
     { regex: /(cargo|rustc|go|gcc|g\+\+|clang|make|cmake)/i, group: 1 },
@@ -365,6 +409,14 @@ export function extractSmartProcessName(command: string): string {
   if (!result) {
     result = command.split(' ')[0].substring(0, 30);
   }
+  
+  // Clean up escaped characters (like \x20 for space)
+  result = result.replace(/\\x([0-9a-fA-F]{2})/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // Also clean up any trailing spaces
+  result = result.trim();
   
   // Store in cache with LRU eviction
   if (processNameCache.size >= CACHE_MAX_SIZE) {
