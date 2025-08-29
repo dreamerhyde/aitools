@@ -49,6 +49,14 @@ export class TranscriptParser {
           if (typeof entry.message.content === 'string') {
             questionCandidate = entry.message.content;
           } else if (Array.isArray(entry.message.content)) {
+            // Skip messages that contain tool_result blocks
+            const hasToolResult = entry.message.content.some((block: any) => 
+              block.type === 'tool_result'
+            );
+            if (hasToolResult) {
+              continue; // Skip this entire message
+            }
+            
             const textBlocks = entry.message.content
               .filter((block: any) => block.type === 'text')
               .map((block: any) => block.text || '')
@@ -104,23 +112,39 @@ export class TranscriptParser {
           console.error(`[DEBUG TranscriptParser] Last user question at index ${lastUserEntry.index}: ${finalUserQuestion.substring(0, 100)}`);
         }
         
-        // Find the first assistant response AFTER this user question
+        // Find ALL assistant responses AFTER this user question until next user question or end
+        const assistantResponses: { text: string; timestamp: string; index: number }[] = [];
+        
         for (let i = lastUserEntry.index + 1; i < entries.length; i++) {
           const entry = entries[i];
+          
+          // Stop if we hit another user question (not including tool results)
+          if (entry.type === 'user' && !entry.isMeta && !entry.isVisibleInTranscriptOnly) {
+            // Check if it's a real user question or just a tool result
+            if (entry.message?.content) {
+              let isToolResult = false;
+              if (Array.isArray(entry.message.content)) {
+                isToolResult = entry.message.content.some((block: any) => block.type === 'tool_result');
+              }
+              // If it's a real user question, stop collecting assistant responses
+              if (!isToolResult) {
+                break;
+              }
+            }
+          }
           
           // Look for assistant message entries
           if (entry.type === 'assistant' && entry.message) {
             const message = entry.message;
             if (message.role === 'assistant' && message.content) {
               messageCount++;
-              lastAssistantTimestamp = entry.timestamp;
               
               // Extract text content from the message
               let assistantText = '';
               if (typeof message.content === 'string') {
                 assistantText = message.content;
               } else if (Array.isArray(message.content)) {
-                // Content is an array of content blocks
+                // Content is an array of content blocks - get only text blocks
                 const textBlocks = message.content
                   .filter((block: any) => block.type === 'text')
                   .map((block: any) => block.text || '')
@@ -134,15 +158,30 @@ export class TranscriptParser {
                 }
               }
               
-              // Use the first assistant response after the last user question
-              if (assistantText && !finalAssistantResponse) {
-                finalAssistantResponse = assistantText;
+              // Store all assistant text responses
+              if (assistantText && assistantText.trim().length > 10) {
+                assistantResponses.push({
+                  text: assistantText,
+                  timestamp: entry.timestamp,
+                  index: i
+                });
+                lastAssistantTimestamp = entry.timestamp;
+                
                 if (process.env.DEBUG) {
-                  console.error(`[DEBUG TranscriptParser] Found assistant response at index ${i}: ${assistantText.substring(0, 100)}`);
+                  console.error(`[DEBUG TranscriptParser] Found assistant response at index ${i}: ${assistantText.substring(0, 60)}...`);
                 }
-                break; // Stop after finding the first response
               }
             }
+          }
+        }
+        
+        // Use the LAST substantial assistant response (the final conclusion)
+        if (assistantResponses.length > 0) {
+          const lastResponse = assistantResponses[assistantResponses.length - 1];
+          finalAssistantResponse = lastResponse.text;
+          
+          if (process.env.DEBUG) {
+            console.error(`[DEBUG TranscriptParser] Using last of ${assistantResponses.length} responses from index ${lastResponse.index}`);
           }
         }
       }
