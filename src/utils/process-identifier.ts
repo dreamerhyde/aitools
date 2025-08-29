@@ -8,18 +8,20 @@ import path from 'path';
 
 const execAsync = promisify(exec);
 
-interface ProcessInfo {
+export interface ProcessInfo {
   pid: number;
   command: string;
   cwd?: string;
   name?: string;
+  port?: number;  // Add port for Docker container matching
 }
 
-interface IdentifiedProcess {
+export interface IdentifiedProcess {
   displayName: string;
-  category: 'web' | 'database' | 'tool' | 'service' | 'app' | 'script' | 'system';
+  category: 'web' | 'database' | 'tool' | 'service' | 'app' | 'script' | 'system' | 'container';
   project?: string;
   port?: number;
+  containerInfo?: { name: string; image: string };
 }
 
 // Cache for process working directories
@@ -64,19 +66,178 @@ async function getProcessCwd(pid: number): Promise<string | null> {
 }
 
 /**
+ * Get Docker container by port mapping
+ */
+async function getDockerContainerByPort(port: number): Promise<{ name: string; image: string } | null> {
+  try {
+    // First get all containers, then filter in JavaScript to avoid grep exit code issues
+    const { stdout } = await execAsync(`docker ps --format "{{.Names}}|{{.Ports}}"`, { 
+      maxBuffer: 1024 * 1024,
+      encoding: 'utf8'
+    }).catch(() => ({ stdout: '' }));
+    
+    if (!stdout || stdout.trim() === '') {
+      return null;
+    }
+    
+    // Find the container with this port
+    const lines = stdout.trim().split('\n');
+    let matchingLine: string | null = null;
+    
+    for (const line of lines) {
+      if (line.includes(`:${port}->`)) {
+        matchingLine = line;
+        break;
+      }
+    }
+    
+    if (!matchingLine) {
+      return null;
+    }
+    
+    const [name, ports] = matchingLine.split('|');
+    if (!name) return null;
+    
+    // Keep the full container name
+    let displayName = name;
+    
+    // Get the image name for additional context
+    const { stdout: imageInfo } = await execAsync(`docker ps --format "{{.Names}}|{{.Image}}" 2>/dev/null | grep "^${name}|"`, { maxBuffer: 1024 * 1024 }).catch(() => ({ stdout: '' }));
+    const image = imageInfo ? imageInfo.split('|')[1]?.trim() : 'unknown';
+    
+    return { name: displayName, image };
+  } catch {
+    // Docker not installed or not accessible
+  }
+  return null;
+}
+
+/**
+ * Get Docker container info for a process
+ */
+async function getDockerContainerInfo(pid: number, port?: number): Promise<{ name: string; id: string } | null> {
+  try {
+    // If we have a port, try to match via Docker port mapping first
+    if (port) {
+      const containerByPort = await getDockerContainerByPort(port);
+      if (containerByPort) {
+        return { 
+          name: containerByPort.name, 
+          id: containerByPort.image 
+        };
+      }
+    }
+    
+    // Method 1: Check if process is in a container via cgroup (Linux)
+    const { stdout: cgroupOutput } = await execAsync(`cat /proc/${pid}/cgroup 2>/dev/null | grep -i docker`);
+    if (cgroupOutput) {
+      // Extract container ID from cgroup
+      const containerIdMatch = cgroupOutput.match(/docker[/-]([a-f0-9]{12,64})/);
+      if (containerIdMatch) {
+        const containerId = containerIdMatch[1].substring(0, 12); // Use short ID
+        
+        // Get container name from docker
+        try {
+          const { stdout: containerInfo } = await execAsync(`docker ps --format "{{.ID}}:{{.Names}}:{{.Image}}" | grep "^${containerId}"`);
+          if (containerInfo) {
+            const [id, name, image] = containerInfo.trim().split(':');
+            return { name: name || image, id };
+          }
+        } catch {
+          // Docker might not be accessible
+          return { name: `container:${containerId}`, id: containerId };
+        }
+      }
+    }
+    
+    // Method 2: Check Docker Desktop processes (macOS specific)
+    // On macOS, Docker Desktop runs in a VM, so we check for docker-proxy processes
+    const { stdout: processInfo } = await execAsync(`ps -p ${pid} -o command= 2>/dev/null`);
+    if (processInfo && (processInfo.includes('docker-proxy') || processInfo.includes('com.docker'))) {
+      // This is likely a Docker proxy process
+      // Try to match by checking all containers
+      try {
+        const { stdout: containers } = await execAsync(`docker ps --format "{{.Names}}:{{.Image}}"`);
+        const lines = containers.split('\n').filter(l => l);
+        if (lines.length === 1) {
+          // If only one container is running, it's likely this one
+          const [name, image] = lines[0].split(':');
+          return { name, id: image };
+        }
+        // For multiple containers, we'd need port info to match
+        return { name: 'docker-container', id: 'docker' };
+      } catch {
+        // Docker not accessible
+      }
+    }
+  } catch {
+    // Not a container process or can't determine
+  }
+  
+  return null;
+}
+
+/**
  * Smart process identification using context
  */
 export async function identifyProcess(info: ProcessInfo): Promise<IdentifiedProcess> {
-  const { pid, command } = info;
+  const { pid, command, port } = info;
   
-  // 1. First, try to get the working directory for context
+  // 1. ALWAYS check Docker by port first if port is provided
+  if (port) {
+    const dockerByPort = await getDockerContainerByPort(port);
+    if (dockerByPort) {
+      return {
+        displayName: `docker:${dockerByPort.name}`,
+        category: 'container',
+        project: dockerByPort.name,
+        port,
+        containerInfo: { name: dockerByPort.name, image: dockerByPort.image }
+      };
+    }
+  }
+  
+  // 2. Check if it's a Docker container process by PID
+  const dockerInfo = await getDockerContainerInfo(pid, port);
+  if (dockerInfo) {
+    return {
+      displayName: `docker:${dockerInfo.name}`,
+      category: 'container',
+      project: dockerInfo.name,
+      port,
+      containerInfo: { name: dockerInfo.name, image: dockerInfo.id }
+    };
+  }
+  
+  // 2. Get the working directory for context
   const cwd = info.cwd || await getProcessCwd(pid);
   const projectName = cwd ? path.basename(cwd) : null;
   
-  // 2. Identify by command patterns with priority
+  // 2. Special case: Docker Desktop process listening on ports
+  // com.docker.backend or com.docke on macOS
+  if (command.match(/com\.docker/i) && port) {
+    const dockerByPort = await getDockerContainerByPort(port);
+    if (dockerByPort) {
+      return {
+        displayName: `docker:${dockerByPort.name}`,
+        category: 'container',
+        project: dockerByPort.name,
+        port,
+        containerInfo: { name: dockerByPort.name, image: dockerByPort.image }
+      };
+    }
+    // If no container found but it's Docker Desktop, still indicate it
+    return {
+      displayName: `docker:${port}`,
+      category: 'container',
+      port
+    };
+  }
+  
+  // 3. Identify by command patterns with priority
   const identifiers: Array<{
     pattern: RegExp;
-    handler: (match: RegExpMatchArray, ctx: { cwd?: string, projectName?: string }) => IdentifiedProcess;
+    handler: (match: RegExpMatchArray, ctx: { cwd?: string, projectName?: string, port?: number }) => IdentifiedProcess;
   }> = [
     // Web development servers
     {
@@ -166,14 +327,27 @@ export async function identifyProcess(info: ProcessInfo): Promise<IdentifiedProc
         displayName: `docker:${match[1]}`,
         category: 'service'
       })
+    },
+    
+    // Docker Desktop process (com.docker.backend or com.docke)
+    {
+      pattern: /^com\.dock/i,
+      handler: (match, ctx) => ({
+        displayName: 'Docker Desktop',
+        category: 'service'
+      })
     }
   ];
   
-  // 3. Try each identifier
+  // 4. Try each identifier
   for (const { pattern, handler } of identifiers) {
     const match = command.match(pattern);
     if (match) {
-      return handler(match, { cwd: cwd || undefined, projectName: projectName || undefined });
+      return handler(match, { 
+        cwd: cwd || undefined, 
+        projectName: projectName || undefined,
+        port: port || undefined
+      });
     }
   }
   

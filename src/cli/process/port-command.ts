@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { ProcessMonitor } from '../../utils/process-monitor.js';
 import { UIHelper } from '../../utils/ui.js';
 import { extractSmartProcessName } from '../../commands/monitor/utils/sanitizers.js';
-import { identifyProcessBatch } from '../../utils/process-identifier.js';
+import { identifyProcess, type IdentifiedProcess } from '../../utils/process-identifier.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { exec } from 'child_process';
@@ -80,21 +80,50 @@ export function setupPortCommand(processCommand: Command): void {
         const processMap = new Map(allProcesses.map(p => [p.pid, p]));
         
         // Prepare processes for identification
-        const processesToIdentify = Array.from(pidsToIdentify).map(pid => {
-          const fullProcess = processMap.get(pid);
-          return {
-            pid,
-            command: fullProcess ? fullProcess.command : rawProcesses.find(p => p.pid === pid)?.command || ''
-          };
+        // For Docker Desktop, we need to identify each port separately even if same PID
+        const processesToIdentify: Array<{ pid: number; command: string; port?: number; key: string }> = [];
+        
+        rawProcesses.forEach(proc => {
+          const fullProcess = processMap.get(proc.pid);
+          const port = parseInt(proc.port);
+          const key = `${proc.pid}:${port}`;
+          
+          processesToIdentify.push({
+            pid: proc.pid,
+            command: fullProcess ? fullProcess.command : proc.command,
+            port,
+            key
+          });
         });
         
-        // Batch identify all processes (with CWD detection)
-        const identified = await identifyProcessBatch(processesToIdentify);
+        // Identify processes individually (cannot batch due to port-specific identification)
+        // Docker Desktop uses same PID for multiple ports, so we need per-port identification
+        const identifiedMap = new Map<string, IdentifiedProcess>();
+        
+        for (const processInfo of processesToIdentify) {
+          if (!identifiedMap.has(processInfo.key)) {
+            const identified = await identifyProcess({
+              pid: processInfo.pid,
+              command: processInfo.command,
+              port: processInfo.port
+            });
+            identifiedMap.set(processInfo.key, identified);
+          }
+        }
         
         // Build final port map with identified names
         rawProcesses.forEach(proc => {
-          const identifiedInfo = identified.get(proc.pid);
-          const displayName = identifiedInfo ? identifiedInfo.displayName : extractSmartProcessName(proc.command);
+          // Use same key format as when storing
+          const portNum = parseInt(proc.port);
+          const key = `${proc.pid}:${portNum}`;
+          const identifiedInfo = identifiedMap.get(key);
+          
+          // For fallback, try to use full command from processMap
+          let displayName = identifiedInfo ? identifiedInfo.displayName : null;
+          if (!displayName) {
+            const fullProcess = processMap.get(proc.pid);
+            displayName = fullProcess ? extractSmartProcessName(fullProcess.command) : extractSmartProcessName(proc.command);
+          }
           
           if (!ports.has(proc.port)) {
             ports.set(proc.port, []);
