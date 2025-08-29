@@ -15,80 +15,110 @@ export class TranscriptParser {
       const transcriptContent = await fs.readFile(transcriptPath, 'utf-8');
       const lines = transcriptContent.trim().split('\n');
       
-      // Parse each line as JSON and look for assistant messages and timestamps
-      let lastAssistantMessage = '';
-      let messageCount = 0;
-      let hasCodeBlocks = false;
-      let lastUserTimestamp: string | null = null;
-      let lastAssistantTimestamp: string | null = null;
-      let firstUserQuestion: string | null = null;
-      let userQuestions: string[] = [];
-      
+      // Parse all entries first to build complete message sequence
+      const entries: any[] = [];
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
+          entries.push(entry);
+        } catch {
+          // Skip invalid JSON lines
+          continue;
+        }
+      }
+      
+      // Find all valid user questions with their indices
+      const userQuestionIndices: { index: number; question: string; timestamp: string }[] = [];
+      
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        
+        // Debug: log entry type and meta status
+        if (process.env.DEBUG && entry.type === 'user') {
+          console.error(`[DEBUG TranscriptParser] User entry ${i}: isMeta=${entry.isMeta}, content=${typeof entry.message?.content === 'string' ? entry.message.content.substring(0, 50) : 'array/null'}`);
+        }
+        
+        // Capture user message timestamp and question (skip meta and internal messages)
+        if (entry.type === 'user' && entry.timestamp && 
+            !entry.isMeta && 
+            !entry.isVisibleInTranscriptOnly && 
+            !entry.isCompactSummary &&
+            entry.message && entry.message.content) {
           
-          // Debug: log entry type and meta status
-          if (process.env.DEBUG && entry.type === 'user') {
-            console.error(`[DEBUG TranscriptParser] User entry: isMeta=${entry.isMeta}, content=${typeof entry.message?.content === 'string' ? entry.message.content.substring(0, 50) : 'array/null'}`);
-          }
-          
-          // Capture user message timestamp and first question (skip meta and internal messages)
-          if (entry.type === 'user' && entry.timestamp && 
-              !entry.isMeta && 
-              !entry.isVisibleInTranscriptOnly && 
-              !entry.isCompactSummary) {
-            lastUserTimestamp = entry.timestamp;
-            
-            // Capture the first meaningful user question (skip system messages)
-            if (!firstUserQuestion && entry.message && entry.message.content) {
-              let questionCandidate = '';
-              if (typeof entry.message.content === 'string') {
-                questionCandidate = entry.message.content;
-              } else if (Array.isArray(entry.message.content)) {
-                const textBlocks = entry.message.content
-                  .filter((block: any) => block.type === 'text')
-                  .map((block: any) => block.text || '')
-                  .join(' ');
-                if (textBlocks) {
-                  questionCandidate = textBlocks;
-                }
-              }
-              
-              // Skip system-generated messages, meta messages, and session continuations
-              if (questionCandidate && 
-                  !questionCandidate.startsWith('Caveat:') && 
-                  !questionCandidate.startsWith('<system-reminder>') &&
-                  !questionCandidate.startsWith('<command-name>') &&
-                  !questionCandidate.startsWith('<local-command-stdout>') &&
-                  !questionCandidate.startsWith('This session is being continued') &&
-                  !questionCandidate.includes('The messages below were generated') &&
-                  !questionCandidate.includes('The conversation is summarized below') &&
-                  !questionCandidate.includes('Please continue the conversation') &&
-                  !questionCandidate.includes('DO NOT respond to these messages') &&
-                  !questionCandidate.includes('ran out of context') &&
-                  !questionCandidate.includes('[Request interrupted') &&
-                  questionCandidate.trim().length > 5) {
-                // Store all valid user questions
-                userQuestions.push(questionCandidate);
-                // Keep the first one for backwards compatibility
-                if (!firstUserQuestion) {
-                  firstUserQuestion = questionCandidate;
-                }
-              }
+          let questionCandidate = '';
+          if (typeof entry.message.content === 'string') {
+            questionCandidate = entry.message.content;
+          } else if (Array.isArray(entry.message.content)) {
+            const textBlocks = entry.message.content
+              .filter((block: any) => block.type === 'text')
+              .map((block: any) => block.text || '')
+              .join(' ');
+            if (textBlocks) {
+              questionCandidate = textBlocks;
             }
           }
           
-          // Look for assistant message entries (check both entry.type and entry.message structure)
+          // Skip system-generated messages, meta messages, and session continuations
+          if (questionCandidate && 
+              !questionCandidate.startsWith('Caveat:') && 
+              !questionCandidate.startsWith('<system-reminder>') &&
+              !questionCandidate.startsWith('<command-name>') &&
+              !questionCandidate.startsWith('<local-command-stdout>') &&
+              !questionCandidate.startsWith('This session is being continued') &&
+              !questionCandidate.includes('The messages below were generated') &&
+              !questionCandidate.includes('The conversation is summarized below') &&
+              !questionCandidate.includes('Please continue the conversation') &&
+              !questionCandidate.includes('DO NOT respond to these messages') &&
+              !questionCandidate.includes('ran out of context') &&
+              !questionCandidate.includes('[Request interrupted') &&
+              questionCandidate.trim().length > 5) {
+            // Store valid user question with its index
+            userQuestionIndices.push({
+              index: i,
+              question: questionCandidate,
+              timestamp: entry.timestamp
+            });
+          }
+        }
+      }
+      
+      if (process.env.DEBUG) {
+        console.error(`[DEBUG TranscriptParser] Found ${userQuestionIndices.length} valid user questions`);
+      }
+      
+      // Now find the LAST user question and its corresponding AI response
+      let finalUserQuestion: string | undefined;
+      let finalAssistantResponse: string | undefined;
+      let lastUserTimestamp: string | null = null;
+      let lastAssistantTimestamp: string | null = null;
+      let messageCount = 0;
+      let hasCodeBlocks = false;
+      
+      if (userQuestionIndices.length > 0) {
+        // Get the last user question
+        const lastUserEntry = userQuestionIndices[userQuestionIndices.length - 1];
+        finalUserQuestion = lastUserEntry.question;
+        lastUserTimestamp = lastUserEntry.timestamp;
+        
+        if (process.env.DEBUG) {
+          console.error(`[DEBUG TranscriptParser] Last user question at index ${lastUserEntry.index}: ${finalUserQuestion.substring(0, 100)}`);
+        }
+        
+        // Find the first assistant response AFTER this user question
+        for (let i = lastUserEntry.index + 1; i < entries.length; i++) {
+          const entry = entries[i];
+          
+          // Look for assistant message entries
           if (entry.type === 'assistant' && entry.message) {
-            // Handle nested message structure from Claude Code transcripts
             const message = entry.message;
             if (message.role === 'assistant' && message.content) {
               messageCount++;
-              lastAssistantTimestamp = entry.timestamp; // Capture assistant timestamp
+              lastAssistantTimestamp = entry.timestamp;
+              
               // Extract text content from the message
+              let assistantText = '';
               if (typeof message.content === 'string') {
-                lastAssistantMessage = message.content;
+                assistantText = message.content;
               } else if (Array.isArray(message.content)) {
                 // Content is an array of content blocks
                 const textBlocks = message.content
@@ -96,41 +126,31 @@ export class TranscriptParser {
                   .map((block: any) => block.text || '')
                   .join(' ');
                 if (textBlocks) {
-                  lastAssistantMessage = textBlocks;
+                  assistantText = textBlocks;
                   // Check if message contains code blocks
                   if (textBlocks.includes('```')) {
                     hasCodeBlocks = true;
                   }
                 }
               }
-            }
-          } else if (entry.type === 'message' && entry.role === 'assistant' && entry.content) {
-            // Alternative format (simpler structure)
-            messageCount++;
-            if (typeof entry.content === 'string') {
-              lastAssistantMessage = entry.content;
-            } else if (Array.isArray(entry.content)) {
-              const textBlocks = entry.content
-                .filter((block: any) => block.type === 'text')
-                .map((block: any) => block.text || '')
-                .join(' ');
-              if (textBlocks) {
-                lastAssistantMessage = textBlocks;
-                if (textBlocks.includes('```')) {
-                  hasCodeBlocks = true;
+              
+              // Use the first assistant response after the last user question
+              if (assistantText && !finalAssistantResponse) {
+                finalAssistantResponse = assistantText;
+                if (process.env.DEBUG) {
+                  console.error(`[DEBUG TranscriptParser] Found assistant response at index ${i}: ${assistantText.substring(0, 100)}`);
                 }
+                break; // Stop after finding the first response
               }
             }
           }
-        } catch (parseError) {
-          // Skip invalid JSON lines
-          continue;
         }
       }
       
-      if (lastAssistantMessage) {
+      // Process the final Q/A pair if we found both
+      if (finalAssistantResponse) {
         // Preserve markdown formatting but clean up for Slack
-        let summary = lastAssistantMessage;
+        let summary = finalAssistantResponse;
         
         // Convert markdown code blocks to Slack format
         summary = summary.replace(/```(\w+)?\n/g, '```');
@@ -171,36 +191,23 @@ export class TranscriptParser {
           duration = assistantTime - userTime;
         }
         
-        // Use the last user question instead of first (more likely to be the actual query)
-        const userQuestion = userQuestions.length > 0 ? userQuestions[userQuestions.length - 1] : firstUserQuestion;
-        
         if (process.env.DEBUG) {
-          console.error(`[DEBUG TranscriptParser] Found ${userQuestions.length} valid questions`);
-          if (userQuestion) {
-            console.error(`[DEBUG TranscriptParser] Using question: ${userQuestion.substring(0, 100)}`);
-          } else {
-            console.error(`[DEBUG TranscriptParser] No valid user question found`);
+          console.error(`[DEBUG TranscriptParser] Final Q/A pair:`);
+          if (finalUserQuestion) {
+            console.error(`[DEBUG TranscriptParser] Question: ${finalUserQuestion.substring(0, 100)}`);
           }
+          console.error(`[DEBUG TranscriptParser] Response: ${summary.substring(0, 100)}`);
         }
         
-        return { summary, duration, userQuestion: userQuestion || undefined };
+        return { summary, duration, userQuestion: finalUserQuestion };
       }
       
       if (process.env.DEBUG) {
-        console.error('[DEBUG] No assistant messages found in transcript');
+        console.error('[DEBUG TranscriptParser] No assistant response found for last user question');
       }
       
-      // Calculate duration even if no assistant messages
-      let duration: number | undefined;
-      if (lastUserTimestamp && lastAssistantTimestamp) {
-        const userTime = new Date(lastUserTimestamp).getTime();
-        const assistantTime = new Date(lastAssistantTimestamp).getTime();
-        duration = assistantTime - userTime;
-      }
-      
-      // Use the last user question instead of first
-      const userQuestion = userQuestions.length > 0 ? userQuestions[userQuestions.length - 1] : firstUserQuestion;
-      return { duration, userQuestion: userQuestion || undefined };
+      // Return just the user question if no assistant response found
+      return { userQuestion: finalUserQuestion };
     } catch (error) {
       if (process.env.DEBUG) {
         console.error('[DEBUG] Failed to read transcript:', error);
