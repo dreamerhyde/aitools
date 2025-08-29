@@ -95,11 +95,11 @@ async function getDockerContainerByPort(port: number): Promise<{ name: string; i
       return null;
     }
     
-    const [name, ports] = matchingLine.split('|');
+    const [name] = matchingLine.split('|');
     if (!name) return null;
     
     // Keep the full container name
-    let displayName = name;
+    const displayName = name;
     
     // Get the image name for additional context
     const { stdout: imageInfo } = await execAsync(`docker ps --format "{{.Names}}|{{.Image}}" 2>/dev/null | grep "^${name}|"`, { maxBuffer: 1024 * 1024 }).catch(() => ({ stdout: '' }));
@@ -308,7 +308,7 @@ export async function identifyProcess(info: ProcessInfo): Promise<IdentifiedProc
     
     // macOS Applications
     {
-      pattern: /\/Applications\/([^\/]+)\.app\/.*\/([^\/\s]+)$/i,
+      pattern: /\/Applications\/([^/]+)\.app\/.*\/([^/\s]+)$/i,
       handler: (match) => {
         const appName = match[1];
         const binary = match[2];
@@ -322,7 +322,7 @@ export async function identifyProcess(info: ProcessInfo): Promise<IdentifiedProc
     
     // Docker containers
     {
-      pattern: /docker\s+run.*\s+([^\/\s:]+)(?::|$)/i,
+      pattern: /docker\s+run.*\s+([^/\s:]+)(?::|$)/i,
       handler: (match) => ({
         displayName: `docker:${match[1]}`,
         category: 'service'
@@ -332,7 +332,7 @@ export async function identifyProcess(info: ProcessInfo): Promise<IdentifiedProc
     // Docker Desktop process (com.docker.backend or com.docke)
     {
       pattern: /^com\.dock/i,
-      handler: (match, ctx) => ({
+      handler: () => ({
         displayName: 'Docker Desktop',
         category: 'service'
       })

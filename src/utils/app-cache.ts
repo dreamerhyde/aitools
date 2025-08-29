@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-interface CacheEntry {
-  appPath: string;
-  appName: string;
-  executable?: string;
-}
+// interface CacheEntry {
+//   appPath: string;
+//   appName: string;
+//   executable?: string;
+// }
 
 interface CacheData {
   entries: Map<string, string>;  // executable path -> app name
@@ -174,7 +174,7 @@ export class ApplicationCache {
    */
   private scanApplications(): void {
     // Removed console.log - it interferes with monitor TUI
-    const startTime = Date.now();
+    // const startTime = Date.now(); // Currently unused
     
     try {
       const applicationsDir = '/Applications';
@@ -225,7 +225,7 @@ export class ApplicationCache {
       this.lastUpdate = Date.now();
       this.saveCache();
       
-      const scanTime = Date.now() - startTime;
+      // const scanTime = Date.now() - startTime; // Currently unused
       // Removed console.log - it interferes with monitor TUI
       
     } catch (error) {

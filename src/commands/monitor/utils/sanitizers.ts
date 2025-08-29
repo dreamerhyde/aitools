@@ -111,7 +111,7 @@ export function extractSmartProcessName(command: string): string {
       group: 0,
       transform: (match: string, fullMatch: RegExpMatchArray) => {
         const driverName = fullMatch[1];
-        const execName = fullMatch[2];
+        // const execName = fullMatch[2]; // Currently unused
         
         // Map known Apple drivers to friendly names
         const driverMap: { [key: string]: string } = {
@@ -183,7 +183,7 @@ export function extractSmartProcessName(command: string): string {
       group: 0,
       transform: (match: string, fullMatch: RegExpMatchArray) => {
         const appName = fullMatch[1];
-        const helperName = fullMatch[2];
+        // const helperName = fullMatch[2]; // Currently unused - just using app name
         // Simplify to just app name + Helper
         return `${appName} Helper`;
       }
@@ -277,7 +277,7 @@ export function extractSmartProcessName(command: string): string {
       regex: /node\s+.*\/(vc|vercel)\s+(\w+)/i,
       group: 1,
       transform: (match: string, fullMatch: RegExpMatchArray) => {
-        const tool = fullMatch[1]; // vc or vercel
+        // const tool = fullMatch[1]; // vc or vercel - currently not used
         const command = fullMatch[2]; // dev, build, etc.
         // Try to get the current working directory from the process
         // For now, just show the command clearly

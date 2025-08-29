@@ -144,7 +144,7 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
       const parts = line.split(/\s+/);
       if (parts.length < 9) return;
       
-      const [command, pid, user, fd, type, device, size, node, name] = parts;
+      const [, pid, , , , , , , name] = parts;
       const portMatch = name?.match(/:(\d+)/);
       if (!portMatch) return;
       

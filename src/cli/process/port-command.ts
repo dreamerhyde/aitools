@@ -52,7 +52,7 @@ export function setupPortCommand(processCommand: Command): void {
           const parts = line.split(/\s+/);
           if (parts.length < 9) return;
           
-          const [command, pid, user, fd, type, device, size, node, name] = parts;
+          const [command, pid, user, , type, , , , name] = parts;
           
           // Extract port from name (e.g., *:8080, 127.0.0.1:3000)
           const portMatch = name?.match(/:(\d+)(\s+\((.+)\))?$/);
@@ -267,7 +267,7 @@ function displayPortsTable(sortedPorts: [string, any[]][], options: any, showAll
     });
     
     console.log(table.toString());
-    const totalConns = sortedPorts.reduce((sum, [_, procs]) => sum + procs.length, 0);
+    const totalConns = sortedPorts.reduce((sum, [, procs]) => sum + procs.length, 0);
     console.log(chalk.gray(`\nShowing ${sortedPorts.length} port(s) with ${totalConns} connection(s)`));
   }
 }
