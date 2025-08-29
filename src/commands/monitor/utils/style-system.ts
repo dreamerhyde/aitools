@@ -263,14 +263,14 @@ export function parseMarkdown(text: string): string {
   
   // First handle double-backtick delimited code (can contain single backticks)
   result = result.replace(/``(.+?)``/g, (match, content) => {
-    // Include the backticks in the cyan styling
-    return '{cyan-fg}``' + content + '``{/cyan-fg}';
+    // Remove the backticks but keep cyan styling
+    return '{cyan-fg}' + content + '{/cyan-fg}';
   });
   
   // Then handle single-backtick delimited code (cannot contain backticks)
   result = result.replace(/`([^`]+)`/g, (match, content) => {
-    // Include the backticks in the cyan styling
-    return '{cyan-fg}`' + content + '`{/cyan-fg}';
+    // Remove the backticks but keep cyan styling
+    return '{cyan-fg}' + content + '{/cyan-fg}';
   });
   
   return result;
