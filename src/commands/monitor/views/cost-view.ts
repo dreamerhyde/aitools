@@ -143,7 +143,7 @@ export class CostView {
             const bigCost = figlet.textSync(costStr, figletOptions);
 
             // Apply green color to the big cost display
-            const coloredCost = chalk.green.bold(bigCost);
+            // const coloredCost = chalk.green.bold(bigCost); // Not used - applied inline instead
 
             // Add powered by text at the bottom left corner (very dim)
             const poweredBy = chalk.gray.dim.italic(
@@ -169,6 +169,7 @@ export class CostView {
             const centerText = (text: string): string => {
                 // Remove ANSI codes and blessed tags for accurate length calculation
                 const cleanText = text
+                    // eslint-disable-next-line no-control-regex
                     .replace(/\x1b\[[0-9;]*m/g, '')
                     .replace(/\{[^}]+\}/g, '');
                 const textLength = cleanText.length;
@@ -241,6 +242,7 @@ export class CostView {
             // Helper function to center text
             const centerText = (text: string): string => {
                 const cleanText = text
+                    // eslint-disable-next-line no-control-regex
                     .replace(/\x1b\[[0-9;]*m/g, '')
                     .replace(/\{[^}]+\}/g, '');
                 const textLength = cleanText.length;
