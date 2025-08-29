@@ -17,12 +17,35 @@ export class SlackMessenger {
    * Build Slack message blocks with enhanced formatting
    */
   buildSlackMessage(notification: TaskNotification): SlackMessage {
+    // Get first 50 characters of the user question for header, with better fallbacks
+    let questionToShow = notification.userQuestion;
+    
+    // If no valid user question, extract from AI summary or use project info
+    if (!questionToShow || questionToShow.startsWith('Caveat:') || questionToShow.includes('The messages below were generated')) {
+      // Try to extract first sentence from AI summary as fallback
+      if (notification.message) {
+        const firstSentence = notification.message.split(/[.!?]\s+/)[0];
+        if (firstSentence && firstSentence.length > 10 && firstSentence.length < 100) {
+          questionToShow = firstSentence;
+        }
+      }
+      
+      // Final fallback: use project-based description
+      if (!questionToShow) {
+        questionToShow = `Task completed in ${notification.project}`;
+      }
+    }
+    
+    const truncatedQuestion = questionToShow.length > 50 
+      ? questionToShow.substring(0, 50) + '...' 
+      : questionToShow;
+    
     const blocks: any[] = [
       {
         type: 'header',
         text: {
           type: 'plain_text',
-          text: '✅ AI Tools Task Completed',
+          text: `✅ ${truncatedQuestion}`,
           emoji: true
         }
       }

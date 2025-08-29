@@ -185,6 +185,7 @@ export function setupHooksCommand(program: Command): void {
         // Try to read stdin JSON from Claude Code hook
         let aiSummary: string | undefined;
         let taskDuration: number | undefined;
+        let userQuestion: string | undefined;
         
         // Check if stdin is available (not TTY)
         if (!process.stdin.isTTY) {
@@ -226,9 +227,18 @@ export function setupHooksCommand(program: Command): void {
               
               // Extract AI summary and timing from transcript if available
               if (hookData.transcript_path) {
+                if (process.env.DEBUG) {
+                  // Get file stats to see how recent it is
+                  const fs = await import('fs/promises');
+                  const stats = await fs.stat(hookData.transcript_path);
+                  const ageInSeconds = (Date.now() - stats.mtime.getTime()) / 1000;
+                  console.error(chalk.gray(`[DEBUG] Transcript file age: ${ageInSeconds.toFixed(1)}s`));
+                  console.error(chalk.gray(`[DEBUG] Transcript file: ${hookData.transcript_path.split('/').pop()}`));
+                }
                 const result = await notificationManager.extractAISummaryAndTiming(hookData.transcript_path);
                 aiSummary = result.summary;
                 taskDuration = result.duration;
+                userQuestion = result.userQuestion;
                 
                 if (process.env.DEBUG) {
                   if (aiSummary) {
@@ -258,7 +268,7 @@ export function setupHooksCommand(program: Command): void {
         } else {
           // Use AI summary if available, otherwise use provided message or default
           const message = aiSummary || options.message || 'Task completed successfully';
-          await notificationManager.sendTaskComplete(message, taskDuration);
+          await notificationManager.sendTaskComplete(message, taskDuration, userQuestion);
         }
         // Silent by default for hooks - no output
       } catch (error) {

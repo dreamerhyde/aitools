@@ -9,7 +9,7 @@ export class TranscriptParser {
   /**
    * Extract AI summary and timing from Claude Code transcript file
    */
-  async extractAISummaryAndTiming(transcriptPath: string): Promise<{ summary?: string; duration?: number }> {
+  async extractAISummaryAndTiming(transcriptPath: string): Promise<{ summary?: string; duration?: number; userQuestion?: string }> {
     try {
       // Read the JSONL transcript file
       const transcriptContent = await fs.readFile(transcriptPath, 'utf-8');
@@ -21,14 +21,62 @@ export class TranscriptParser {
       let hasCodeBlocks = false;
       let lastUserTimestamp: string | null = null;
       let lastAssistantTimestamp: string | null = null;
+      let firstUserQuestion: string | null = null;
+      let userQuestions: string[] = [];
       
       for (const line of lines) {
         try {
           const entry = JSON.parse(line);
           
-          // Capture user message timestamp
-          if (entry.type === 'user' && entry.timestamp) {
+          // Debug: log entry type and meta status
+          if (process.env.DEBUG && entry.type === 'user') {
+            console.error(`[DEBUG TranscriptParser] User entry: isMeta=${entry.isMeta}, content=${typeof entry.message?.content === 'string' ? entry.message.content.substring(0, 50) : 'array/null'}`);
+          }
+          
+          // Capture user message timestamp and first question (skip meta and internal messages)
+          if (entry.type === 'user' && entry.timestamp && 
+              !entry.isMeta && 
+              !entry.isVisibleInTranscriptOnly && 
+              !entry.isCompactSummary) {
             lastUserTimestamp = entry.timestamp;
+            
+            // Capture the first meaningful user question (skip system messages)
+            if (!firstUserQuestion && entry.message && entry.message.content) {
+              let questionCandidate = '';
+              if (typeof entry.message.content === 'string') {
+                questionCandidate = entry.message.content;
+              } else if (Array.isArray(entry.message.content)) {
+                const textBlocks = entry.message.content
+                  .filter((block: any) => block.type === 'text')
+                  .map((block: any) => block.text || '')
+                  .join(' ');
+                if (textBlocks) {
+                  questionCandidate = textBlocks;
+                }
+              }
+              
+              // Skip system-generated messages, meta messages, and session continuations
+              if (questionCandidate && 
+                  !questionCandidate.startsWith('Caveat:') && 
+                  !questionCandidate.startsWith('<system-reminder>') &&
+                  !questionCandidate.startsWith('<command-name>') &&
+                  !questionCandidate.startsWith('<local-command-stdout>') &&
+                  !questionCandidate.startsWith('This session is being continued') &&
+                  !questionCandidate.includes('The messages below were generated') &&
+                  !questionCandidate.includes('The conversation is summarized below') &&
+                  !questionCandidate.includes('Please continue the conversation') &&
+                  !questionCandidate.includes('DO NOT respond to these messages') &&
+                  !questionCandidate.includes('ran out of context') &&
+                  !questionCandidate.includes('[Request interrupted') &&
+                  questionCandidate.trim().length > 5) {
+                // Store all valid user questions
+                userQuestions.push(questionCandidate);
+                // Keep the first one for backwards compatibility
+                if (!firstUserQuestion) {
+                  firstUserQuestion = questionCandidate;
+                }
+              }
+            }
           }
           
           // Look for assistant message entries (check both entry.type and entry.message structure)
@@ -123,7 +171,19 @@ export class TranscriptParser {
           duration = assistantTime - userTime;
         }
         
-        return { summary, duration };
+        // Use the last user question instead of first (more likely to be the actual query)
+        const userQuestion = userQuestions.length > 0 ? userQuestions[userQuestions.length - 1] : firstUserQuestion;
+        
+        if (process.env.DEBUG) {
+          console.error(`[DEBUG TranscriptParser] Found ${userQuestions.length} valid questions`);
+          if (userQuestion) {
+            console.error(`[DEBUG TranscriptParser] Using question: ${userQuestion.substring(0, 100)}`);
+          } else {
+            console.error(`[DEBUG TranscriptParser] No valid user question found`);
+          }
+        }
+        
+        return { summary, duration, userQuestion: userQuestion || undefined };
       }
       
       if (process.env.DEBUG) {
@@ -138,7 +198,9 @@ export class TranscriptParser {
         duration = assistantTime - userTime;
       }
       
-      return { duration };
+      // Use the last user question instead of first
+      const userQuestion = userQuestions.length > 0 ? userQuestions[userQuestions.length - 1] : firstUserQuestion;
+      return { duration, userQuestion: userQuestion || undefined };
     } catch (error) {
       if (process.env.DEBUG) {
         console.error('[DEBUG] Failed to read transcript:', error);

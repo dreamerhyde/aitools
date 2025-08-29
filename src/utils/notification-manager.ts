@@ -129,7 +129,7 @@ export class NotificationManager {
   /**
    * Send task completion notification
    */
-  async sendTaskComplete(message: string = '', overrideDuration?: number): Promise<void> {
+  async sendTaskComplete(message: string = '', overrideDuration?: number, userQuestion?: string): Promise<void> {
     try {
       // Ensure package info is loaded
       await this.loadPackageInfo();
@@ -160,7 +160,8 @@ export class NotificationManager {
         spent: this.timeTracker.formatSmartTime(timeSpent),
         changes: await this.gitAnalyzer.getGitChanges(),
         finished: this.timeTracker.formatFinishedTime(),
-        message: finalMessage
+        message: finalMessage,
+        userQuestion: userQuestion
       };
 
       // Clean up time tracking file after successful notification

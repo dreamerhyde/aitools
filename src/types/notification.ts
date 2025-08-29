@@ -12,6 +12,7 @@ export interface TaskNotification {
   changes: GitChanges;
   finished: string;
   message: string;
+  userQuestion?: string; // User's original question/request
 }
 
 export interface SlackMessage {

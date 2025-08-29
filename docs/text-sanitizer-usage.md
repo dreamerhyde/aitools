@@ -31,7 +31,7 @@ import { sanitizeConversationMessages } from '../utils/text-sanitizer.js';
 
 const messages = [
   { role: 'user', content: 'Fix bug 🐛', timestamp: new Date() },
-  { role: 'assistant', content: 'Done! ✅', timestamp: new Date() }
+  { role: 'assistant', content: 'Done! ✓', timestamp: new Date() }
 ];
 
 const clean = sanitizeConversationMessages(messages);
@@ -109,7 +109,7 @@ Common emoji conversions follow project standards:
 | 😀 😁 | `:)` `:D` | Emotions |
 | ❤️ 💔 | `<3` `</3` | Hearts |
 | 👍 👎 | `+1` `-1` | Feedback |
-| ✅ ❌ | `[OK]` `[X]` | Status |
+| ✓ ✗ | `[OK]` `[X]` | Status |
 | 🐛 🔨 | `[bug]` `[build]` | Development |
 | 📈 📉 | `↗` `↘` | Trends |
 | 🚀 ⚡ | `^` `!` | Speed/Action |
