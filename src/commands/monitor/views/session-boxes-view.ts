@@ -65,7 +65,7 @@ export class SessionBoxesView {
         label: ` Session ${i + 1} `,
         border: { type: 'line', fg: 'gray' },
         style: {
-          fg: 'white',
+          // Don't set fg here - it overrides color tags!
           border: { fg: 'gray' }
         },
         tags: true,
@@ -179,12 +179,25 @@ export class SessionBoxesView {
             // Apply Markdown parsing FIRST (before sanitization changes the structure)
             const markdownParsed = parseMarkdown(msg.content);
             
+            // Debug logging
+            if (process.env.DEBUG_EMOJI) {
+              console.log(`[EMOJI DEBUG] Original: "${msg.content}"`);
+              console.log(`[EMOJI DEBUG] After markdown: "${markdownParsed}"`);
+            }
+            
             // Then clean and sanitize the already-parsed content
             const cleanContent = sanitizeText(markdownParsed, {
               removeEmojis: true,
               convertToAscii: true,
-              preserveWhitespace: true  // Keep line breaks
+              preserveWhitespace: true,  // Keep line breaks
+              useColors: true  // Enable colored emoji conversion (using ANSI codes)
             });
+            
+            // Debug logging
+            if (process.env.DEBUG_EMOJI) {
+              console.log(`[EMOJI DEBUG] After sanitize: "${cleanContent}"`);
+              console.log(`[EMOJI DEBUG] Has ANSI codes: ${cleanContent.includes('\x1b[')}`);
+            }
             
             // No truncation for both user and AI messages - let wrapping handle length
             const contentToWrap = cleanContent;
@@ -232,6 +245,7 @@ export class SessionBoxesView {
           const sanitizedTopic = sanitizeText(session.currentTopic, {
             removeEmojis: true,
             convertToAscii: true,
+            useColors: true,  // Enable colored emoji conversion
             preserveWhitespace: false
           });
           const wrappedTopic = wrapText(sanitizedTopic, boxWidth);

@@ -22,6 +22,10 @@ export class ScreenManager {
       warnings: false,
       // Enhance rendering
       forceUnicode: true,
+      // Enable colors
+      colors: true,
+      fullcolor: true,
+      terminal: process.env.TERM || 'xterm-256color',
       cursor: {
         artificial: false,
         shape: 'line',

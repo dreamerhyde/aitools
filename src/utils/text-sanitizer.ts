@@ -8,21 +8,21 @@ export interface SanitizeOptions {
   convertToAscii?: boolean;
   maxLength?: number;
   preserveWhitespace?: boolean;
+  useColors?: boolean;  // Enable colored output for blessed terminals
 }
 
 /**
- * Emoji to ASCII symbol mapping following project's visual design principles
- * Uses flat symbols instead of emojis (✓、✗、●、○、▪、→ etc.)
+ * Plain ASCII mapping without colors
  */
-const EMOJI_TO_ASCII: Record<string, string> = {
-  // Success and failure indicators - using project standard symbols
+const EMOJI_TO_PLAIN_ASCII: Record<string, string> = {
+  // Success and failure indicators
   '✅': '✓',
   '❌': '✗',
   '✔️': '✓',
   '❎': '✗',
   '☑️': '✓',
   
-  // Status indicators - using project standard symbols  
+  // Status indicators
   '⭐': '●',
   '🔴': '●',
   '🟢': '●',
@@ -33,7 +33,7 @@ const EMOJI_TO_ASCII: Record<string, string> = {
   '🟠': '●',
   '🟣': '●',
   
-  // Arrows and directions - keeping Unicode arrows
+  // Arrows and directions
   '📈': '↗',
   '📉': '↘',
   '🚀': '↑',
@@ -42,12 +42,12 @@ const EMOJI_TO_ASCII: Record<string, string> = {
   '➡️': '→',
   '⬅️': '←',
   
-  // Warning and attention - using project symbols
-  '⚠️': '▪',
-  '❗': '▪',
-  '‼️': '▪',
-  '❓': '▪',
-  '❔': '▪',
+  // Warning and attention
+  '⚠️': '!',
+  '❗': '!',
+  '‼️': '!!',
+  '❓': '?',
+  '❔': '?',
   
   // Progress and activity
   '🔧': '→',
@@ -59,11 +59,99 @@ const EMOJI_TO_ASCII: Record<string, string> = {
   '📄': '→',
   '💻': '→',
   
-  // Development related - simplified
+  // Development related
   '🐛': '[bug]',
   '🔨': '[build]',
   '📦': '[pkg]',
   '🧪': '[test]',
+  
+  // Numbers and lists - remove completely
+  '1️⃣': '', '2️⃣': '', '3️⃣': '', '4️⃣': '', '5️⃣': '',
+  '6️⃣': '', '7️⃣': '', '8️⃣': '', '9️⃣': '', '🔟': '', '0️⃣': '',
+  
+  // Emotions - remove
+  '😀': '', '😁': '', '😂': '', '🤣': '', '😊': '',
+  '😢': '', '😭': '', '😡': '', '😠': '', '🤔': '',
+  '😎': '', '🙄': '',
+  
+  // Gestures - remove
+  '👍': '', '👎': '', '👌': '', '✌️': '',
+  '🤝': '', '👏': '', '🙏': '',
+  
+  // Hearts and celebrations - remove
+  '❤️': '', '💔': '', '🔥': '', '✨': '',
+  '🎉': '', '🎯': '', '💯': '',
+  
+  // Additional common emojis
+  '📋': '', '📊': '', '📌': '▪', '💰': '$',
+  '🔗': '', '📮': '', '📬': '', '📭': '', '📯': '',
+  
+  // Media and objects - remove
+  '🖥️': '', '⌨️': '', '🖱️': '', '🖨️': '',
+  '📱': '', '💿': '', '💾': '', '💽': '',
+  
+  // Time and calendar - remove
+  '⏰': '', '⏲️': '', '⏱️': '',
+  '📅': '', '📆': '', '🗓️': '',
+  
+  // Common activity emojis
+  '🏃': '→', '🚶': '→', '💨': '→'
+};
+
+/**
+ * Emoji to ASCII symbol mapping with color support for blessed terminal rendering
+ */
+const EMOJI_TO_COLORED_ASCII: Record<string, string> = {
+  // Success and failure indicators - with colors
+  // Try using ANSI escape codes directly instead of blessed tags
+  '✅': '\x1b[32m✓\x1b[0m',  // Direct ANSI green
+  '❌': '\x1b[31m✗\x1b[0m',  // Direct ANSI red
+  '✔️': '\x1b[32m✓\x1b[0m',  // Direct ANSI green
+  '❎': '\x1b[31m✗\x1b[0m',  // Direct ANSI red
+  '☑️': '\x1b[32m✓\x1b[0m',  // Direct ANSI green
+  
+  // Status indicators - with appropriate colors (using ANSI)
+  '⭐': '\x1b[33m●\x1b[0m',  // Yellow
+  '🔴': '\x1b[31m●\x1b[0m',  // Red
+  '🟢': '\x1b[32m●\x1b[0m',  // Green
+  '🟡': '\x1b[33m●\x1b[0m',  // Yellow
+  '🔵': '\x1b[34m●\x1b[0m',  // Blue
+  '⚪': '\x1b[90m○\x1b[0m',  // Gray
+  '⚫': '\x1b[90m●\x1b[0m',  // Gray
+  '🟠': '\x1b[38;5;208m●\x1b[0m',  // Orange (256 color)
+  '🟣': '\x1b[35m●\x1b[0m',  // Magenta
+  
+  // Arrows and directions - with subtle colors
+  '📈': '{green-fg}↗{/green-fg}',
+  '📉': '{red-fg}↘{/red-fg}',
+  '🚀': '{cyan-fg}↑{/cyan-fg}',
+  '⬆️': '{green-fg}↑{/green-fg}',
+  '⬇️': '{red-fg}↓{/red-fg}',
+  '➡️': '{blue-fg}→{/blue-fg}',
+  '⬅️': '{blue-fg}←{/blue-fg}',
+  
+  // Warning and attention - with appropriate colors (using ANSI)
+  '⚠️': '\x1b[33m!\x1b[0m',  // Yellow
+  '❗': '\x1b[31m!\x1b[0m',  // Red
+  '‼️': '\x1b[31m!!\x1b[0m',  // Red
+  '❓': '\x1b[36m?\x1b[0m',  // Cyan
+  '❔': '\x1b[90m?\x1b[0m',  // Gray
+  
+  // Progress and activity - with contextual colors
+  '🔧': '{cyan-fg}→{/cyan-fg}',
+  '⚡': '{yellow-fg}→{/yellow-fg}',
+  '💡': '{yellow-fg}→{/yellow-fg}',
+  '🔍': '{blue-fg}→{/blue-fg}',
+  '📝': '{gray-fg}→{/gray-fg}',
+  '📁': '{blue-fg}→{/blue-fg}',
+  '📄': '{gray-fg}→{/gray-fg}',
+  '💻': '{cyan-fg}→{/cyan-fg}',
+  
+  // Development related - with semantic colors
+  '🐛': '{red-fg}[bug]{/red-fg}',
+  '🔨': '{cyan-fg}[build]{/cyan-fg}',
+  '📦': '{blue-fg}[pkg]{/blue-fg}',
+  '🧪': '{green-fg}[test]{/green-fg}',
   
   // Numbers and lists - remove completely to match UI principles
   '1️⃣': '',
@@ -163,7 +251,8 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
     removeEmojis = true,
     convertToAscii = true,
     maxLength,
-    preserveWhitespace = false
+    preserveWhitespace = false,
+    useColors = false  // Default to false for backward compatibility
   } = options;
 
   let result = text;
@@ -181,7 +270,10 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
 
   // Convert known emojis to ASCII symbols first
   if (convertToAscii) {
-    for (const [emoji, ascii] of Object.entries(EMOJI_TO_ASCII)) {
+    // Choose the appropriate mapping based on useColors option
+    const mappingTable = useColors ? EMOJI_TO_COLORED_ASCII : EMOJI_TO_PLAIN_ASCII;
+    
+    for (const [emoji, ascii] of Object.entries(mappingTable)) {
       const regex = new RegExp(emoji.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       result = result.replace(regex, ascii);
     }
@@ -324,7 +416,8 @@ export function formatActionString(action: string): string {
   let sanitized = sanitizeText(action, {
     removeEmojis: true,
     convertToAscii: true,
-    preserveWhitespace: false
+    preserveWhitespace: false,
+    useColors: true  // Enable colored emoji conversion
   });
   
   // Check if it's already a formatted status (like from activeForm)

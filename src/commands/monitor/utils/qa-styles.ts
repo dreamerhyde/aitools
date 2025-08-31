@@ -264,9 +264,41 @@ export function formatQAMessage(
         // System messages with gray Q badge and gray text
         lines.push(qPrefix + content[0] + '{/gray-fg}');
       } else {
-        // Normal user messages with appropriate colors
-        const suffix = '{/green-fg}';
-        lines.push(qPrefix + content[0] + suffix);
+        // Check if content already has blessed tags or ANSI escape codes
+        const hasBlessed = (content[0].includes('{') && content[0].includes('}'));
+        const hasAnsi = content[0].includes('\x1b[');
+        
+        if (hasBlessed || hasAnsi) {
+          // Content already has color formatting (blessed tags or ANSI codes)
+          if (hasBlessed) {
+            // For blessed tags, handle prefix color
+            // For HYBRID style, prefix is '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}'
+            // We want to keep everything except the final {green-fg}
+            if (qPrefix.endsWith(' {green-fg}')) {
+              // Remove ' {green-fg}' and add back just the space
+              lines.push(qPrefix.slice(0, -11) + ' ' + content[0]);
+            } else if (qPrefix.endsWith('{green-fg}')) {
+              // Safety fallback: remove just '{green-fg}'
+              lines.push(qPrefix.slice(0, -10) + content[0]);
+            } else {
+              lines.push(qPrefix + content[0]);
+            }
+          } else {
+            // For ANSI codes, just use the Q badge without the green-fg suffix
+            // Remove the trailing {green-fg} from qPrefix if present
+            if (qPrefix.endsWith(' {green-fg}')) {
+              lines.push(qPrefix.slice(0, -11) + ' ' + content[0]);
+            } else if (qPrefix.endsWith('{green-fg}')) {
+              lines.push(qPrefix.slice(0, -10) + ' ' + content[0]);
+            } else {
+              lines.push(qPrefix + content[0]);
+            }
+          }
+        } else {
+          // No color formatting, add the green suffix
+          const suffix = '{/green-fg}';
+          lines.push(qPrefix + content[0] + suffix);
+        }
       }
       
       // Continuation lines for user messages
@@ -277,10 +309,29 @@ export function formatQAMessage(
           // Gray continuation for system commands
           lines.push('     {gray-fg}' + content[i] + '{/gray-fg}');
         } else {
-          const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
-                        messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
-                        '{/yellow-fg}';
-          lines.push(continuation + content[i] + suffix);
+          // Check if content already has blessed tags or ANSI codes
+          const hasBlessed = content[i].includes('{') && content[i].includes('}');
+          const hasAnsi = content[i].includes('\x1b[');
+          
+          if (hasBlessed || hasAnsi) {
+            // Content has blessed tags, handle continuation color
+            // For HYBRID style, continuation is '     {green-fg}'
+            if (continuation.endsWith(' {green-fg}')) {
+              // Remove ' {green-fg}' and add back just the spaces
+              lines.push(continuation.slice(0, -11) + ' ' + content[i]);
+            } else if (continuation.endsWith('{green-fg}')) {
+              // Safety fallback
+              lines.push(continuation.slice(0, -10) + content[i]);
+            } else {
+              lines.push(continuation + content[i]);
+            }
+          } else {
+            // No blessed tags, add appropriate suffix based on message type
+            const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
+                          messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
+                          '{/yellow-fg}';
+            lines.push(continuation + content[i] + suffix);
+          }
         }
       }
     } else {
