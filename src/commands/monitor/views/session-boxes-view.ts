@@ -1,6 +1,5 @@
 import { SessionInfo } from '../types.js';
 import { 
-  truncateText, 
   wrapText, 
   formatMessageCount,
   createSeparator,
@@ -187,14 +186,14 @@ export class SessionBoxesView {
               preserveWhitespace: true  // Keep line breaks
             });
             
-            // No truncation for AI responses, keep full content
-            const contentToWrap = msg.role === 'assistant' ? cleanContent : truncateText(cleanContent, boxWidth * 4);
+            // No truncation for both user and AI messages - let wrapping handle length
+            const contentToWrap = cleanContent;
             // Different wrap width for user (Q badge = 5 chars) vs assistant (> = 2 chars)
             const wrapWidth = msg.role === 'user' ? boxWidth - 5 : boxWidth - 2;
             const wrappedLines = wrapText(contentToWrap, wrapWidth);
             
-            // No line limit for AI responses, limit user messages to 4 lines
-            const linesToShow = msg.role === 'assistant' ? wrappedLines : wrappedLines.slice(0, 4);
+            // No line limit for both user and AI messages
+            const linesToShow = wrappedLines;
             const formattedLines = formatQAMessage(msg.role, linesToShow, this.qaStyle, session.status);
             contentLines.push(...formattedLines);
             
@@ -219,7 +218,8 @@ export class SessionBoxesView {
             preserveWhitespace: false
           });
           const wrappedTopic = wrapText(sanitizedTopic, boxWidth);
-          for (const line of wrappedTopic.slice(0, 3)) {
+          // Show all lines of the topic, no limit
+          for (const line of wrappedTopic) {
             contentLines.push(line);
           }
         } else {

@@ -289,15 +289,49 @@ export function parseMarkdown(text: string): string {
             // Add text before the code block
             parts.push(result.substring(lastIndex, startPos));
             // Add the code block content with blue color (more visible than cyan)
-            const codeContent = result.substring(i, closeStart);
+            let codeContent = result.substring(i, closeStart);
+            
+            // For triple backticks, check if first line is a language identifier
+            let isCodeBlock = false;
+            if (openCount === 3) {
+              isCodeBlock = true;
+              const lines = codeContent.split('\n');
+              if (lines.length > 0 && lines[0].match(/^[a-zA-Z]+$/)) {
+                // First line is just a language name (like "python", "javascript")
+                // Store it for future use but don't display it
+                const language = lines[0]; // Can use this later for syntax highlighting
+                // Remove the language line from the content
+                codeContent = lines.slice(1).join('\n');
+              }
+              // Also trim any leading/trailing empty lines from the code content
+              codeContent = codeContent.replace(/^\n+/, '').replace(/\n+$/, '');
+            }
+            
             // Don't add color if the content looks like a blessed tag itself
             // This prevents double-tagging like {blue-fg}{blue-fg}{/blue-fg}
             if (codeContent.match(/^\{[#a-z\-]+fg\}.*\{\/[#a-z\-]+fg\}$/)) {
               // Content is already a blessed tag, keep as-is for display
               parts.push(codeContent);
             } else {
-              // Normal code content, add blue color
-              parts.push('{blue-fg}' + codeContent + '{/blue-fg}');
+              // For code blocks (triple backticks), add empty lines before and after for visual separation
+              if (isCodeBlock) {
+                // Add empty line before code block
+                parts.push('\n');
+              }
+              
+              // For multiline code blocks, wrap each line separately to avoid blessed tag issues
+              const codeLines = codeContent.split('\n');
+              const wrappedLines = codeLines.map(line => {
+                // Don't wrap empty lines
+                if (line.trim() === '') return line;
+                return '{blue-fg}' + line + '{/blue-fg}';
+              });
+              parts.push(wrappedLines.join('\n'));
+              
+              // For code blocks (triple backticks), add empty line after
+              if (isCodeBlock) {
+                parts.push('\n');
+              }
             }
             lastIndex = j;
             i = j;

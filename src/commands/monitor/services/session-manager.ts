@@ -51,8 +51,8 @@ export class SessionManager {
         if (entry.role === 'user' && entry.content) {
           const sanitizedTopic = sanitizeText(entry.content, {
             removeEmojis: true,
-            convertToAscii: true,
-            maxLength: 50
+            convertToAscii: true
+            // Removed maxLength - let view layer handle display limits
           });
           session.currentTopic = sanitizeForTerminal(sanitizedTopic);
         }
