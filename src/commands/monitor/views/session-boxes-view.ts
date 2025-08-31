@@ -192,9 +192,26 @@ export class SessionBoxesView {
             const wrapWidth = msg.role === 'user' ? boxWidth - 5 : boxWidth - 2;
             const wrappedLines = wrapText(contentToWrap, wrapWidth);
             
+            // Check if this is a continuation of previous assistant messages
+            // Only show > for the first assistant message after a user message
+            const isPreviousAssistant = j > 0 && messagesToShow[j - 1].role === 'assistant';
+            const isAssistantContinuation = msg.role === 'assistant' && isPreviousAssistant;
+            
             // No line limit for both user and AI messages
             const linesToShow = wrappedLines;
-            const formattedLines = formatQAMessage(msg.role, linesToShow, this.qaStyle, session.status);
+            
+            // For assistant continuations, format without the > prefix
+            let formattedLines: string[];
+            if (isAssistantContinuation) {
+              // Format as continuation lines (no > prefix)
+              formattedLines = linesToShow.map(line => 
+                this.qaStyle.assistantContinuation + line
+              );
+            } else {
+              // Normal formatting with prefix
+              formattedLines = formatQAMessage(msg.role, linesToShow, this.qaStyle, session.status);
+            }
+            
             contentLines.push(...formattedLines);
             
             // Add empty line after each question for better spacing
