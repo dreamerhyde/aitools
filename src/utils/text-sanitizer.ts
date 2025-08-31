@@ -148,8 +148,9 @@ const EMOJI_TO_ASCII: Record<string, string> = {
 /**
  * Comprehensive emoji regex pattern that catches most emoji characters
  * Including number emojis, skin tones, and modifier sequences
+ * IMPORTANT: Excludes checkmarks (✓ U+2713, ✗ U+2717) and other ASCII symbols we want to keep
  */
-const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F0FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{FE00}-\u{FE0F}]|[\u{1F1E6}-\u{1F1FF}]|[\u{1F191}-\u{1F251}]|[\u{1F004}]|[\u{1F0CF}]|[\u{1F170}-\u{1F171}]|[\u{1F17E}-\u{1F17F}]|[\u{1F18E}]|[\u{3030}]|[\u{2B50}]|[\u{2B55}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{3297}]|[\u{3299}]|[\u{303D}]|[\u{00A9}]|[\u{00AE}]|[\u{2122}]|[\u{23F3}]|[\u{24C2}]|[\u{23E9}-\u{23EF}]|[\u{25B6}]|[\u{23F8}-\u{23FA}]|[\u{200D}]|[\u{20E3}]/gu;
+const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{2712}]|[\u{2714}-\u{2716}]|[\u{2718}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F018}-\u{1F0FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{FE00}-\u{FE0F}]|[\u{1F1E6}-\u{1F1FF}]|[\u{1F191}-\u{1F251}]|[\u{1F004}]|[\u{1F0CF}]|[\u{1F170}-\u{1F171}]|[\u{1F17E}-\u{1F17F}]|[\u{1F18E}]|[\u{3030}]|[\u{2B50}]|[\u{2B55}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{3297}]|[\u{3299}]|[\u{303D}]|[\u{00A9}]|[\u{00AE}]|[\u{2122}]|[\u{23F3}]|[\u{24C2}]|[\u{23E9}-\u{23EF}]|[\u{25B6}]|[\u{23F8}-\u{23FA}]|[\u{200D}]|[\u{20E3}]/gu;
 
 /**
  * Sanitizes text by removing or converting emojis
@@ -209,15 +210,20 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
       .replace(/\n\s*\n/g, '\n')  // Remove empty lines
       .trim();
   }
-
-  // Apply length limit if specified
-  if (maxLength && result.length > maxLength) {
-    result = result.substring(0, maxLength - 3) + '...';
-  }
   
-  // Restore blessed tags
+  // Restore blessed tags BEFORE applying length limit
+  // This prevents breaking blessed tags or showing placeholders
   for (let i = 0; i < blessedTags.length; i++) {
     result = result.replace(`${placeholder}${i}${placeholder}`, blessedTags[i]);
+  }
+
+  // Apply length limit if specified (AFTER restoring blessed tags)
+  // Note: For monitor view, we should avoid using maxLength to prevent truncation
+  if (maxLength && result.length > maxLength) {
+    // Try to find a good break point (space or newline) near the limit
+    const cutPoint = result.lastIndexOf(' ', maxLength);
+    const breakPoint = cutPoint > maxLength - 20 ? cutPoint : maxLength - 3;
+    result = result.substring(0, breakPoint) + '...';
   }
 
   return result;
@@ -244,7 +250,7 @@ export function sanitizeConversationMessages(messages: Array<{
     content: sanitizeText(msg.content, {
       removeEmojis: true,
       convertToAscii: true,
-      maxLength: 500,
+      // Removed maxLength - show full content in session boxes
       preserveWhitespace: false
     })
   }));

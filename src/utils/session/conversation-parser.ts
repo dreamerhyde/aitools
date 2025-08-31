@@ -263,7 +263,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
             timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
             role: 'user',
             content: sanitizeText(content, { 
-              maxLength: 500,
+              // Removed maxLength - show full content
               preserveWhitespace: true  // Keep line breaks for better formatting
             }),
             tokens: entry.message.tokens
@@ -291,7 +291,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
             timestamp: entry.timestamp ? new Date(entry.timestamp) : new Date(),
             role: 'assistant',
             content: sanitizeText(textContent, { 
-              maxLength: 500,
+              // Removed maxLength - show full content
               preserveWhitespace: true  // IMPORTANT: Keep line breaks for markdown headers
             }),
             tokens: entry.message.tokens
