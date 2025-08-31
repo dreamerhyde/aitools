@@ -298,8 +298,8 @@ export function parseMarkdown(text: string): string {
               const lines = codeContent.split('\n');
               if (lines.length > 0 && lines[0].match(/^[a-zA-Z]+$/)) {
                 // First line is just a language name (like "python", "javascript")
-                // Store it for future use but don't display it
-                const language = lines[0]; // Can use this later for syntax highlighting
+                // TODO: Store language for future syntax highlighting
+                // const language = lines[0];
                 // Remove the language line from the content
                 codeContent = lines.slice(1).join('\n');
               }

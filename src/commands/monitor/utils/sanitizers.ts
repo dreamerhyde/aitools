@@ -40,6 +40,7 @@ export function sanitizeForTerminal(str: string): string {
     // Remove ALL potentially problematic Unicode characters
     // Keep only: Basic Latin (including newline/tab), Latin-1 Supplement, and CJK
     // Added \u0009 (tab) and \u000A (newline) to the allowed characters
+    // eslint-disable-next-line no-control-regex
     .replace(/[^\u0009\u000A\u0020-\u007E\u00A0-\u00FF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFF9F\u4E00-\u9FAF\u3400-\u4DBF]/g, '')
     // Remove other control characters (but newlines and tabs are already preserved above)
     // eslint-disable-next-line no-control-regex
