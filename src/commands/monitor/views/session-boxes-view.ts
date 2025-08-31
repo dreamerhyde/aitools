@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { SessionInfo } from '../types.js';
 import { 
   truncateText, 
@@ -84,7 +83,7 @@ export class SessionBoxesView {
       });
       
       // Initially show empty state
-      box.setContent(chalk.gray('No active conversation'));
+      box.setContent('{gray-fg}No active conversation{/gray-fg}');
       this.sessionBoxes.push(box);
     }
   }
@@ -190,7 +189,9 @@ export class SessionBoxesView {
             
             // No truncation for AI responses, keep full content
             const contentToWrap = msg.role === 'assistant' ? cleanContent : truncateText(cleanContent, boxWidth * 4);
-            const wrappedLines = wrapText(contentToWrap, boxWidth - 5); // Account for badge + space
+            // Different wrap width for user (Q badge = 5 chars) vs assistant (> = 2 chars)
+            const wrapWidth = msg.role === 'user' ? boxWidth - 5 : boxWidth - 2;
+            const wrappedLines = wrapText(contentToWrap, wrapWidth);
             
             // No line limit for AI responses, limit user messages to 4 lines
             const linesToShow = msg.role === 'assistant' ? wrappedLines : wrappedLines.slice(0, 4);
@@ -227,7 +228,10 @@ export class SessionBoxesView {
         
         box.setContent(contentLines.join('\n'));
         // Auto-scroll to bottom to show latest messages
-        box.setScrollPerc(100);
+        // Use nextTick to ensure content is rendered before scrolling
+        process.nextTick(() => {
+          box.setScrollPerc(100);
+        });
       } else {
         // Empty box
         box.setLabel(` Session ${i + 1} `);

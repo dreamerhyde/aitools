@@ -239,15 +239,12 @@ export function combineStyles(text: string, ...styles: StyleType[]): string {
  * - Code blocks (`code`) with dim background
  */
 export function parseMarkdown(text: string): string {
-  // Skip if text already contains blessed color tags (check for specific pattern)
-  if (text.match(/\{[#a-z\-]+fg\}|\{\/[#a-z\-]+fg\}/)) {
-    return text;
-  }
-  
   let result = text;
   
-  // Convert **text** to bold white FIRST (before processing headers)
-  result = result.replace(/\*\*([^*]+)\*\*/g, '{bold}{white-fg}$1{/white-fg}{/bold}');
+  // Debug logging
+  if (process.env.DEBUG_MARKDOWN && (text.includes('`'))) {
+    console.log('[parseMarkdown] Input:', text);
+  }
   
   // Convert headers to bold (# ## ### ONLY at start of line)
   // Headers must be at the beginning of a line to be considered headers
@@ -257,21 +254,82 @@ export function parseMarkdown(text: string): string {
     return `{bold}{white-fg}${cleanText}{/white-fg}{/bold}`;  // Bold + white for better visibility
   });
   
-  // Handle markdown inline code with proper rules
-  // Double backticks can contain single backticks: `` ` ``
-  // Triple backticks on same line are just inline code too: ``` code ```
+  // Handle markdown inline code with proper pairing
+  // Process backticks from left to right, matching pairs correctly
   
-  // First handle double-backtick delimited code (can contain single backticks)
-  result = result.replace(/``(.+?)``/g, (match, content) => {
-    // Remove the backticks but keep cyan styling
-    return '{cyan-fg}' + content + '{/cyan-fg}';
-  });
+  const parts: string[] = [];
+  let lastIndex = 0;
+  let i = 0;
   
-  // Then handle single-backtick delimited code (cannot contain backticks)
-  result = result.replace(/`([^`]+)`/g, (match, content) => {
-    // Remove the backticks but keep cyan styling
-    return '{cyan-fg}' + content + '{/cyan-fg}';
-  });
+  while (i < result.length) {
+    if (result[i] === '`') {
+      // Found backtick, count how many
+      let openCount = 0;
+      const startPos = i;
+      while (i < result.length && result[i] === '`') {
+        openCount++;
+        i++;
+      }
+      
+      // Look for matching closing backticks of same count
+      let j = i;
+      let found = false;
+      
+      while (j < result.length) {
+        if (result[j] === '`') {
+          let closeCount = 0;
+          const closeStart = j;
+          while (j < result.length && result[j] === '`') {
+            closeCount++;
+            j++;
+          }
+          
+          if (closeCount === openCount) {
+            // Found matching pair!
+            // Add text before the code block
+            parts.push(result.substring(lastIndex, startPos));
+            // Add the code block content with blue color (more visible than cyan)
+            const codeContent = result.substring(i, closeStart);
+            // Don't add color if the content looks like a blessed tag itself
+            // This prevents double-tagging like {blue-fg}{blue-fg}{/blue-fg}
+            if (codeContent.match(/^\{[#a-z\-]+fg\}.*\{\/[#a-z\-]+fg\}$/)) {
+              // Content is already a blessed tag, keep as-is for display
+              parts.push(codeContent);
+            } else {
+              // Normal code content, add blue color
+              parts.push('{blue-fg}' + codeContent + '{/blue-fg}');
+            }
+            lastIndex = j;
+            i = j;
+            found = true;
+            break;
+          }
+        } else {
+          j++;
+        }
+      }
+      
+      if (!found) {
+        // No matching backticks, skip these
+        i = startPos + openCount;
+      }
+    } else {
+      i++;
+    }
+  }
+  
+  // Add any remaining text
+  parts.push(result.substring(lastIndex));
+  result = parts.join('');
+  
+  // NOW process bold markers AFTER backticks are handled
+  // This prevents ** from being processed inside code blocks
+  result = result.replace(/\*\*([^*]+)\*\*/g, '{bold}{white-fg}$1{/white-fg}{/bold}');
+  
+  // Debug logging
+  if (process.env.DEBUG_MARKDOWN && text.includes('`')) {
+    console.log('[parseMarkdown] Output:', result);
+  }
   
   return result;
 }

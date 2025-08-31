@@ -38,14 +38,12 @@ export function clearProcessNameCache() {
 export function sanitizeForTerminal(str: string): string {
   return str
     // Remove ALL potentially problematic Unicode characters
-    // Keep only: Basic Latin, Latin-1 Supplement, and CJK
-    .replace(/[^\u0020-\u007E\u00A0-\u00FF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFF9F\u4E00-\u9FAF\u3400-\u4DBF]/g, '')
-    // Remove control characters except newlines and tabs
+    // Keep only: Basic Latin (including newline/tab), Latin-1 Supplement, and CJK
+    // Added \u0009 (tab) and \u000A (newline) to the allowed characters
+    .replace(/[^\u0009\u000A\u0020-\u007E\u00A0-\u00FF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFF9F\u4E00-\u9FAF\u3400-\u4DBF]/g, '')
+    // Remove other control characters (but newlines and tabs are already preserved above)
     // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001F\u007F-\u009F]/g, (match) => {
-      if (match === '\n' || match === '\t') return match;
-      return '';
-    })
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g, '')
     // Remove variation selectors and joiners
     .replace(/[\uFE00-\uFE0F]/g, '')
     .replace(/[\u200C-\u200D]/g, '')

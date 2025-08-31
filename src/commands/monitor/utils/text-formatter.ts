@@ -10,10 +10,37 @@ function stripBlessedTags(text: string): string {
 }
 
 /**
+ * Calculate actual display width for terminal (considering double-width characters)
+ * Chinese, Japanese, Korean characters are double-width
+ */
+function getCharWidth(char: string): number {
+  const code = char.charCodeAt(0);
+  // Check for East Asian Wide characters
+  // This is a simplified check - ideally use a library like 'string-width'
+  if (
+    (code >= 0x1100 && code <= 0x115F) || // Hangul Jamo
+    (code >= 0x2E80 && code <= 0x9FFF) || // CJK
+    (code >= 0xAC00 && code <= 0xD7AF) || // Hangul Syllables
+    (code >= 0xF900 && code <= 0xFAFF) || // CJK Compatibility
+    (code >= 0xFE30 && code <= 0xFE4F) || // CJK Compatibility Forms
+    (code >= 0xFF00 && code <= 0xFF60) || // Fullwidth Forms
+    (code >= 0xFFE0 && code <= 0xFFE6)    // Fullwidth Forms
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+/**
  * Calculate actual display length (excluding blessed tags)
  */
 function getDisplayLength(text: string): number {
-  return stripBlessedTags(text).length;
+  const stripped = stripBlessedTags(text);
+  let width = 0;
+  for (const char of stripped) {
+    width += getCharWidth(char);
+  }
+  return width;
 }
 
 /**
@@ -60,43 +87,120 @@ export function wrapText(text: string, maxWidth: number): string[] {
       continue;
     }
     
-    // Now split each line by spaces for word wrapping
-    const words = line.split(/\s+/);
-    let currentLine = '';
+    // For lines that might contain CJK characters without spaces,
+    // we need character-by-character wrapping instead of word-based
+    const lineLength = getDisplayLength(line);
     
-    for (const word of words) {
-      const wordDisplayLength = getDisplayLength(word);
-      
-      // If single word is longer than max width, keep it as-is
-      if (wordDisplayLength > maxWidth) {
-        if (currentLine) {
-          resultLines.push(currentLine.trim());
-          currentLine = '';
-        }
-        // For words with tags, we need smarter truncation
-        resultLines.push(word); // Keep the word as-is if it has tags
-        continue;
-      }
-      
-      const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const testLineLength = getDisplayLength(testLine);
-      
-      if (testLineLength <= maxWidth) {
-        currentLine = testLine;
-      } else {
-        if (currentLine) {
-          resultLines.push(currentLine.trim());
-        }
-        currentLine = word;
-      }
+    if (lineLength <= maxWidth) {
+      // Line fits entirely
+      resultLines.push(line);
+      continue;
     }
     
-    if (currentLine) {
-      resultLines.push(currentLine.trim());
+    // Check if line has spaces for word-based wrapping
+    if (line.includes(' ')) {
+      // Has spaces, use word-based wrapping
+      const words = line.split(/\s+/);
+      let currentLine = '';
+      
+      for (const word of words) {
+        const wordDisplayLength = getDisplayLength(word);
+        
+        // If single word is longer than max width, break it character by character
+        if (wordDisplayLength > maxWidth) {
+          if (currentLine) {
+            resultLines.push(currentLine.trim());
+            currentLine = '';
+          }
+          // Break the long word character by character
+          const brokenLines = breakLongText(word, maxWidth);
+          resultLines.push(...brokenLines);
+          continue;
+        }
+        
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testLineLength = getDisplayLength(testLine);
+        
+        if (testLineLength <= maxWidth) {
+          currentLine = testLine;
+        } else {
+          if (currentLine) {
+            resultLines.push(currentLine.trim());
+          }
+          currentLine = word;
+        }
+      }
+      
+      if (currentLine) {
+        resultLines.push(currentLine.trim());
+      }
+    } else {
+      // No spaces (likely CJK text), break character by character
+      const brokenLines = breakLongText(line, maxWidth);
+      resultLines.push(...brokenLines);
     }
   }
   
   return resultLines;
+}
+
+/**
+ * Break long text character by character, respecting blessed tags and character widths
+ */
+function breakLongText(text: string, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let currentLine = '';
+  let currentWidth = 0;
+  let inTag = false;
+  let tagBuffer = '';
+  
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    
+    // Handle blessed tags
+    if (char === '{' && !inTag) {
+      inTag = true;
+      tagBuffer = char;
+      continue;
+    }
+    
+    if (inTag) {
+      tagBuffer += char;
+      if (char === '}') {
+        inTag = false;
+        currentLine += tagBuffer;
+        tagBuffer = '';
+      }
+      continue;
+    }
+    
+    // Calculate width of this character
+    const charWidth = getCharWidth(char);
+    
+    if (currentWidth + charWidth > maxWidth) {
+      // Would exceed max width, start new line
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = char;
+      currentWidth = charWidth;
+    } else {
+      currentLine += char;
+      currentWidth += charWidth;
+    }
+  }
+  
+  // Add any remaining tag buffer
+  if (tagBuffer) {
+    currentLine += tagBuffer;
+  }
+  
+  // Add final line
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 }
 
 /**

@@ -54,8 +54,8 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
 
   // Style 4: Arrow Indicators (Directional)
   [QAStyleType.ARROW]: {
-    userPrefix: '{cyan-fg}{bold}→{/bold} ',
-    assistantPrefix: '{green-fg}{bold}←{/bold} {#DDDDDD-fg}',  // Light gray for AI
+    userPrefix: '{cyan-fg}{bold}>{/bold} ',
+    assistantPrefix: '{green-fg}{bold}<{/bold} {#DDDDDD-fg}',  // Light gray for AI
     userContinuation: '  {cyan-fg}',
     assistantContinuation: '  {#DDDDDD-fg}',  // Light gray
     separator: '',
@@ -72,14 +72,14 @@ export const QA_STYLES: Record<QAStyleType, QAStyle> = {
     description: 'Minimal with indentation'
   },
 
-  // Style 6: Hybrid (Q with badge, A with arrow) - RECOMMENDED
+  // Style 6: Hybrid (Q with badge, A with >) - RECOMMENDED
   [QAStyleType.HYBRID]: {
     userPrefix: '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}',  // Q with green background badge
-    assistantPrefix: '{#DDDDDD-fg}→ ',  // Light gray for AI
-    userContinuation: '     {green-fg}',  // Align with Q badge width
-    assistantContinuation: '  {#DDDDDD-fg}',  // Light gray
+    assistantPrefix: '{#DDDDDD-fg}> ',  // Light gray for AI with > symbol (guaranteed 1 char width)
+    userContinuation: '     {green-fg}',  // Align with Q badge width (5 spaces)  
+    assistantContinuation: '  {#DDDDDD-fg}',  // 2 spaces - matches > + space width exactly
     separator: '',
-    description: 'Hybrid style with Q badge and A arrow'
+    description: 'Hybrid style with Q badge and > indicator'
   }
 };
 
@@ -172,6 +172,35 @@ export function detectUserMessageType(
     return UserMessageType.SYSTEM;
   }
   
+  // Check for empty content or placeholder messages
+  if (content === '(no content)' || content.trim() === '') {
+    return UserMessageType.SYSTEM;
+  }
+  
+  // System commands like /clear, /compact, etc.
+  // These are Claude Code commands that should be shown in gray
+  // Also check for just the command word without slash (in case it was filtered)
+  const systemCommands = ['clear', 'compact', 'help', 'status', 'quit', 'exit', 'reset'];
+  const lowerContent = content.toLowerCase().trim();
+  
+  // Check if content starts with slash command
+  if (lowerContent.startsWith('/')) {
+    const command = lowerContent.split(' ')[0].substring(1); // Remove the slash
+    if (systemCommands.includes(command)) {
+      return UserMessageType.SYSTEM;
+    }
+  }
+  
+  // Check if content is just the command word (might have been filtered)
+  // Must be exact match or with arguments
+  const firstWord = lowerContent.split(' ')[0];
+  if (systemCommands.includes(firstWord)) {
+    // Only treat as system command if it's a single word or follows command pattern
+    if (lowerContent === firstWord || lowerContent.startsWith(firstWord + ' ')) {
+      return UserMessageType.SYSTEM;
+    }
+  }
+  
   // Short messages during CONFIRMED active sessions might be interruptions
   // But be more conservative - only very short messages during active sessions
   if (sessionStatus === 'active' && content.length < 30 && isRecent) {
@@ -204,7 +233,9 @@ export function getQPrefixForType(type: UserMessageType, baseStyle: QAStyle): st
       return '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}';
       
     case UserMessageType.SYSTEM:
-      return ''; // No prefix for system messages
+      // Gray background Q badge for system commands (like ESC key style)
+      // Using #666666 for a darker gray background with white text for better contrast
+      return '{#666666-bg}{white-fg} Q {/white-fg}{/#666666-bg} {gray-fg}';
   }
 }
 
@@ -226,22 +257,26 @@ export function formatQAMessage(
       // Detect message type for intelligent Q styling
       const messageType = detectUserMessageType(content[0], sessionStatus, true);
       
+      // All user messages get Q badges, including system commands
+      const qPrefix = getQPrefixForType(messageType, style);
+      
       if (messageType === UserMessageType.SYSTEM) {
-        // System messages: no Q badge, just gray text
-        lines.push('{gray-fg}' + content[0] + '{/gray-fg}');
+        // System messages with gray Q badge and gray text
+        lines.push(qPrefix + content[0] + '{/gray-fg}');
       } else {
-        // User messages with typed Q badges
-        const qPrefix = getQPrefixForType(messageType, style);
-        // All message types now use green
+        // Normal user messages with appropriate colors
         const suffix = '{/green-fg}';
         lines.push(qPrefix + content[0] + suffix);
       }
       
       // Continuation lines for user messages
       for (let i = 1; i < content.length; i++) {
-        const messageType = detectUserMessageType(content[0], sessionStatus, true);
-        if (messageType !== UserMessageType.SYSTEM) {
-          const continuation = style.userContinuation;
+        const continuation = style.userContinuation;
+        
+        if (messageType === UserMessageType.SYSTEM) {
+          // Gray continuation for system commands
+          lines.push('     {gray-fg}' + content[i] + '{/gray-fg}');
+        } else {
           const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 
                         messageType === UserMessageType.INTERRUPTION ? '{/#d77757-fg}' : 
                         '{/yellow-fg}';

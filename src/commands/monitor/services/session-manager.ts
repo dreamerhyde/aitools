@@ -27,10 +27,13 @@ export class SessionManager {
       session.messageCount++;
       
       if (entry.role && entry.content) {
+        // Don't truncate messages here - let the view layer handle display limits
+        // Also preserve whitespace/newlines for proper paragraph formatting
         const sanitizedContent = sanitizeText(entry.content, {
           removeEmojis: true,
           convertToAscii: true,
-          maxLength: 100
+          preserveWhitespace: true  // Keep newlines and spacing
+          // Removed maxLength - don't truncate at storage level
         });
         const message: ConversationMessage = {
           timestamp: new Date(),
