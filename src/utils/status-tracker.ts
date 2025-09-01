@@ -3,7 +3,7 @@
  * Provides dynamic status updates with activeForm support
  */
 
-import { formatActionString, getActionColor } from './text-sanitizer.js';
+import { formatActionString } from './text-sanitizer.js';
 
 export interface TaskStatus {
   content: string;

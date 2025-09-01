@@ -99,7 +99,8 @@ const EMOJI_TO_PLAIN_ASCII: Record<string, string> = {
 };
 
 /**
- * Emoji to ASCII symbol mapping with color support for blessed terminal rendering
+ * DEPRECATED: Mixed ANSI and Blessed tags - causing rendering issues
+ * Should use text-formatter.ts instead
  */
 const EMOJI_TO_COLORED_ASCII: Record<string, string> = {
   // Success and failure indicators - with colors
@@ -252,7 +253,7 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
     convertToAscii = true,
     maxLength,
     preserveWhitespace = false,
-    useColors = false  // Default to false for backward compatibility
+    useColors = false  // DEPRECATED: This mixing of formats causes issues
   } = options;
 
   let result = text;
@@ -321,32 +322,7 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
   return result;
 }
 
-/**
- * Sanitizes conversation messages for display in session boxes
- * @param messages Array of conversation messages
- * @returns Sanitized messages ready for display
- */
-export function sanitizeConversationMessages(messages: Array<{
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp?: Date;
-  tokens?: number;
-}>): Array<{
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp?: Date;
-  tokens?: number;
-}> {
-  return messages.map(msg => ({
-    ...msg,
-    content: sanitizeText(msg.content, {
-      removeEmojis: true,
-      convertToAscii: true,
-      // Removed maxLength - show full content in session boxes
-      preserveWhitespace: false
-    })
-  }));
-}
+// Removed: sanitizeConversationMessages - not used anywhere
 
 /**
  * Enhanced action status mapping with progressive indicators
@@ -447,20 +423,7 @@ export function formatActionString(action: string): string {
 }
 
 /**
- * Get action color based on action type
- * @param action The action string
- * @returns Color function for the action
- */
-export function getActionColor(): 'green' | 'yellow' | 'cyan' | 'blue' | 'magenta' {
-  // Always return cyan for all actions
-  return 'cyan';
-}
-
-/**
  * Sanitizes topic/title strings for display
- * @param topic The topic string to sanitize
- * @param maxLength Maximum length for the topic
- * @returns Sanitized topic string
  */
 export function sanitizeTopic(topic: string, maxLength: number = 100): string {
   return sanitizeText(topic, {
@@ -469,33 +432,4 @@ export function sanitizeTopic(topic: string, maxLength: number = 100): string {
     maxLength,
     preserveWhitespace: false
   });
-}
-
-/**
- * Checks if a string contains emojis
- * @param text The text to check
- * @returns True if the text contains emojis
- */
-export function hasEmojis(text: string): boolean {
-  return EMOJI_REGEX.test(text);
-}
-
-/**
- * Counts the number of emojis in a string
- * @param text The text to analyze
- * @returns Number of emojis found
- */
-export function countEmojis(text: string): number {
-  const matches = text.match(EMOJI_REGEX);
-  return matches ? matches.length : 0;
-}
-
-/**
- * Extracts all emojis from a string
- * @param text The text to extract emojis from
- * @returns Array of emoji characters found
- */
-export function extractEmojis(text: string): string[] {
-  const matches = text.match(EMOJI_REGEX);
-  return matches ? [...new Set(matches)] : [];
 }
