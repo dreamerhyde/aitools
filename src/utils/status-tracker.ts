@@ -157,7 +157,7 @@ export class StatusTracker {
     if (status.currentAction) {
       return {
         text: status.currentAction,
-        color: getActionColor(),
+        color: 'cyan' as const,  // Always use cyan for actions
         isActive: status.isActive
       };
     }
