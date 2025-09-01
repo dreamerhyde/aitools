@@ -185,8 +185,10 @@ export function formatForBlessed(text: string, options: { preserveWhitespace?: b
   // Apply base filtering
   result = filterBase(result, options.preserveWhitespace);
   
-  // Escape existing curly braces to prevent them from being interpreted as tags
-  result = result.replace(/\{/g, '{open}').replace(/\}/g, '{close}');
+  // Blessed doesn't support escaping with {open}/{close}
+  // For now, just remove the escaping since we're controlling the output
+  // and not expecting user input with curly braces
+  // If needed, we could use a placeholder and restore later
   
   // Add Blessed color tags for specific patterns
   const colorMappings: Array<[RegExp, string]> = [

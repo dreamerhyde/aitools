@@ -5,7 +5,7 @@ import {
   createSeparator,
   formatStatusIndicator
 } from '../utils/text-formatter.js';
-import { sanitizeText, formatActionString } from '../../../utils/text-sanitizer.js';
+import { formatForBlessed, formatActionString as formatAction } from '../../../utils/text-formatter.js';
 import { QAStyleType, getQAStyle, formatQAMessage } from '../utils/qa-styles.js';
 import { formatActionStatus, parseMarkdown } from '../utils/style-system.js';
 
@@ -153,9 +153,9 @@ export class SessionBoxesView {
         
         // Show current action if present (like "Puttering..." when AI is working)
         if (session.currentAction && session.currentAction.trim() !== '') {
-          const sanitizedAction = formatActionString(session.currentAction);
+          const formattedAction = formatAction(session.currentAction, 'blessed');
           // Use the new formatActionStatus with code block style
-          contentLines.push(formatActionStatus(sanitizedAction));
+          contentLines.push(formatActionStatus(formattedAction));
           contentLines.push('');
         }
         
@@ -185,12 +185,9 @@ export class SessionBoxesView {
               console.log(`[EMOJI DEBUG] After markdown: "${markdownParsed}"`);
             }
             
-            // Then clean and sanitize the already-parsed content
-            const cleanContent = sanitizeText(markdownParsed, {
-              removeEmojis: true,
-              convertToAscii: true,
-              preserveWhitespace: true,  // Keep line breaks
-              useColors: true  // Enable colored emoji conversion (using ANSI codes)
+            // Then clean and format the already-parsed content for Blessed
+            const cleanContent = formatForBlessed(markdownParsed, {
+              preserveWhitespace: true  // Keep line breaks
             });
             
             // Debug logging
@@ -242,10 +239,7 @@ export class SessionBoxesView {
           contentLines.push('{cyan-fg}Topic:{/cyan-fg}');
           contentLines.push(createSeparator(boxWidth));
           
-          const sanitizedTopic = sanitizeText(session.currentTopic, {
-            removeEmojis: true,
-            convertToAscii: true,
-            useColors: true,  // Enable colored emoji conversion
+          const sanitizedTopic = formatForBlessed(session.currentTopic, {
             preserveWhitespace: false
           });
           const wrappedTopic = wrapText(sanitizedTopic, boxWidth);

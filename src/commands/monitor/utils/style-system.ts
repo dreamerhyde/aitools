@@ -307,11 +307,9 @@ export function parseMarkdown(text: string): string {
               codeContent = codeContent.replace(/^\n+/, '').replace(/\n+$/, '');
             }
             
-            // For inline code, we need to escape blessed-like tags so they display as text
-            // Convert { and } to their escaped forms so blessed doesn't interpret them
-            const escapedContent = codeContent
-              .replace(/\{/g, '\\{')  // Escape opening braces
-              .replace(/\}/g, '\\}'); // Escape closing braces
+            // For inline code, we DON'T escape braces since Blessed doesn't support \{ \} escaping
+            // Just use the content as-is - Blessed will treat content inside color tags as literal text
+            const escapedContent = codeContent;
             
             // Always add blue color to code content
             // For code blocks (triple backticks), add empty lines before and after for visual separation
