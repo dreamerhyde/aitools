@@ -113,8 +113,19 @@ export class SessionBoxesView {
       if (i < sessions.length) {
         const session = sessions[i];
         
-        // Update box label with user name and model
-        const modelBadge = session.currentModel ? ` [${session.currentModel}]` : '';
+        // Update box label with user name and model (shorten long model names)
+        let modelBadge = '';
+        if (session.currentModel) {
+          // Shorten long model names like claude-opus-4-1-20250805 to claude-opus-4.1
+          let shortModel = session.currentModel;
+          if (shortModel.includes('claude-')) {
+            // Extract key parts: claude-opus-4-1 -> claude-opus-4.1
+            shortModel = shortModel
+              .replace(/^(claude-\w+)-(\d+)-(\d+).*/, '$1-$2.$3')
+              .replace('claude-', ''); // Remove claude- prefix for brevity
+          }
+          modelBadge = ` [${shortModel}]`;
+        }
         box.setLabel(` ${session.user}${modelBadge} `);
         
         // Set border color based on status
@@ -139,42 +150,67 @@ export class SessionBoxesView {
         // Update border style
         box.style.border = { fg: borderColor };
         
-        // Calculate box width for proper text wrapping (accounting for padding)
+        // Calculate box dimensions for proper text wrapping and height management
         const boxWidth = Math.floor((box.width as number) - 4);
+        const boxHeight = Math.floor((box.height as number) - 2); // Account for borders
         
-        // Build content
+        // Build content - we'll manage Q and A separately for smart layout
         const contentLines: string[] = [];
+        const qLines: string[] = [];      // Fixed Q section
+        const aLines: string[] = [];      // Scrollable A section
         
-        // Status line
+        // Status line at top (2 lines)
         const status = formatStatusIndicator(session.lastActivity);
         const messageCountStr = formatMessageCount(session.messageCount);
         contentLines.push(`${status}  │  ${messageCountStr}`);
         contentLines.push('');
         
-        // Show current action if present (like "Puttering..." when AI is working)
+        // Store action status to show at bottom
+        let actionStatus: string | null = null;
         if (session.currentAction && session.currentAction.trim() !== '') {
           const formattedAction = formatAction(session.currentAction, 'blessed');
-          // Use the new formatActionStatus with code block style
-          contentLines.push(formatActionStatus(formattedAction));
-          contentLines.push('');
+          actionStatus = formatActionStatus(formattedAction);
         }
         
-        // Show recent Q/A messages
+        // Show recent Q/A messages with sticky Q at top
         if (session.recentMessages && session.recentMessages.length > 0) {
-          // Remove the "Recent conversation:" label and separator
-          // contentLines.push('{cyan-fg}Recent conversation:{/cyan-fg}');
-          // contentLines.push(createSeparator(boxWidth));
+          // Find the last user question and separate Q from A
+          let lastUserQuestion: typeof session.recentMessages[0] | null = null;
+          const assistantMessages: typeof session.recentMessages = [];
           
-          // Display last 3 Q/A pairs
-          const messagesToShow = session.recentMessages.slice(-6); // Last 3 Q/A pairs
+          // Debug: Log message structure
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Session Box] Total messages: ${session.recentMessages.length}`);
+            session.recentMessages.forEach((msg, i) => {
+              // Log both role and type to see which field exists
+              console.log(`  [Processing ${i}] role=${msg.role}, type=${(msg as any).type}, content length: ${msg.content.length}`);
+            });
+          }
           
-          for (let j = 0; j < messagesToShow.length; j++) {
-            const msg = messagesToShow[j];
-            
-            // Add empty line before each new question (except the first one)
-            if (msg.role === 'user' && j > 0) {
-              contentLines.push(''); // Empty line for visual separation
+          // Find last user question - check 'role' field instead of 'type'
+          for (let i = session.recentMessages.length - 1; i >= 0; i--) {
+            if (session.recentMessages[i].role === 'user') {
+              lastUserQuestion = session.recentMessages[i];
+              // Collect all assistant messages after this question
+              for (let j = i + 1; j < session.recentMessages.length; j++) {
+                if (session.recentMessages[j].role === 'assistant') {
+                  assistantMessages.push(session.recentMessages[j]);
+                }
+              }
+              break;
             }
+          }
+          
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Session Box] Found Q: ${lastUserQuestion ? 'Yes' : 'No'}`);
+            console.log(`[Session Box] Assistant messages: ${assistantMessages.length}`);
+          }
+          
+          // First, show the sticky Q at top (if exists)
+          if (lastUserQuestion) {
+            const msg = lastUserQuestion;
+            
+            // No separator line needed between Q and A
             
             // Apply Markdown parsing FIRST (before sanitization changes the structure)
             const markdownParsed = parseMarkdown(msg.content);
@@ -186,8 +222,9 @@ export class SessionBoxesView {
             }
             
             // Then clean and format the already-parsed content for Blessed
+            // For Q, we should merge multiple lines into one to avoid awkward breaks
             const cleanContent = formatForBlessed(markdownParsed, {
-              preserveWhitespace: true  // Keep line breaks
+              preserveWhitespace: false  // Don't preserve line breaks for Q
             });
             
             // Debug logging
@@ -196,48 +233,72 @@ export class SessionBoxesView {
               console.log(`[EMOJI DEBUG] Has ANSI codes: ${cleanContent.includes('\x1b[')}`);
             }
             
-            // No truncation for both user and AI messages - let wrapping handle length
-            const contentToWrap = cleanContent;
-            // Different wrap width for user (Q badge = 5 chars) vs assistant (> = 2 chars)
-            const wrapWidth = msg.role === 'user' ? boxWidth - 5 : boxWidth - 2;
-            const wrappedLines = wrapText(contentToWrap, wrapWidth);
+            // Special handling for user messages: limit to 2 lines with ellipsis
+            // Q badge is " Q " + space = 4 visible chars
+            const wrapWidth = boxWidth - 4;
+            const allWrappedLines = wrapText(cleanContent, wrapWidth);
+            
+            let wrappedLines: string[];
+            // Limit user message to max 2 lines
+            if (allWrappedLines.length > 2) {
+              wrappedLines = allWrappedLines.slice(0, 2);
+              // Add ellipsis to the second line
+              const secondLine = wrappedLines[1];
+              if (secondLine.length > 3) {
+                wrappedLines[1] = secondLine.substring(0, secondLine.length - 3) + '...';
+              } else {
+                wrappedLines[1] = '...';
+              }
+            } else {
+              wrappedLines = allWrappedLines;
+            }
+            
+            // Format the Q with proper styling and store separately
+            const formattedQ = formatQAMessage('user', wrappedLines, this.qaStyle, session.status);
+            qLines.push(...formattedQ);
+            // No extra space after Q - let A content flow naturally
+          }
+          
+          // Then show all assistant messages below
+          for (let j = 0; j < assistantMessages.length; j++) {
+            const msg = assistantMessages[j];
+            
+            // Apply Markdown parsing
+            const markdownParsed = parseMarkdown(msg.content);
+            const cleanContent = formatForBlessed(markdownParsed, {
+              preserveWhitespace: true
+            });
+            
+            // Assistant messages show full content
+            const wrapWidth = boxWidth - 2; // > = 2 chars
+            const wrappedLines = wrapText(cleanContent, wrapWidth);
             
             // Check if this is a continuation of previous assistant messages
-            // Only show > for the first assistant message after a user message
-            const isPreviousAssistant = j > 0 && messagesToShow[j - 1].role === 'assistant';
-            const isAssistantContinuation = msg.role === 'assistant' && isPreviousAssistant;
+            const isAssistantContinuation = j > 0;
             
-            // No line limit for both user and AI messages
-            const linesToShow = wrappedLines;
-            
-            // For assistant continuations, format without the > prefix
+            // Format assistant message
             let formattedLines: string[];
             if (isAssistantContinuation) {
-              // Format as continuation lines (no > prefix)
-              formattedLines = linesToShow.map(line => 
+              // Continuation lines (no > prefix)
+              formattedLines = wrappedLines.map(line => 
                 this.qaStyle.assistantContinuation + line
               );
             } else {
-              // Normal formatting with prefix
-              formattedLines = formatQAMessage(msg.role, linesToShow, this.qaStyle, session.status);
+              // First assistant message with > prefix
+              formattedLines = formatQAMessage('assistant', wrappedLines, this.qaStyle, session.status);
             }
             
-            contentLines.push(...formattedLines);
+            aLines.push(...formattedLines);
             
-            // Add empty line after each question for better spacing
-            if (msg.role === 'user') {
-              contentLines.push(''); // Empty line after question
-            }
-            
-            // Add separator between Q/A pairs (if style has one)
-            if (j < messagesToShow.length - 1 && msg.role === 'assistant' && this.qaStyle.separator) {
-              contentLines.push(this.qaStyle.separator);
+            // Add spacing between assistant messages if needed
+            if (j < assistantMessages.length - 1) {
+              aLines.push('');
             }
           }
         } else if (session.currentTopic) {
           // Fall back to showing topic if no recent messages
-          contentLines.push('{cyan-fg}Topic:{/cyan-fg}');
-          contentLines.push(createSeparator(boxWidth));
+          qLines.push('{cyan-fg}Topic:{/cyan-fg}');
+          qLines.push(createSeparator(boxWidth));
           
           const sanitizedTopic = formatForBlessed(session.currentTopic, {
             preserveWhitespace: false
@@ -245,18 +306,72 @@ export class SessionBoxesView {
           const wrappedTopic = wrapText(sanitizedTopic, boxWidth);
           // Show all lines of the topic, no limit
           for (const line of wrappedTopic) {
-            contentLines.push(line);
+            qLines.push(line);
           }
         } else {
-          contentLines.push('{gray-fg}No recent activity{/gray-fg}');
+          qLines.push('{gray-fg}No recent activity{/gray-fg}');
         }
         
+        // Note: reservedLines calculation removed as we now show all content
+        // and rely on scrolling for overflow
+        
+        // Calculate available space for scrollable content
+        const availableHeight = boxHeight - 2; // Account for borders
+        
+        // Smart content assembly to simulate sticky Q:
+        // We need to ensure Q is always visible even when scrolled to bottom
+        
+        // Calculate how much space Q needs (already in qLines)
+        const qHeight = qLines.length;
+        
+        // Calculate how much space is left for A content (account for separator line between Q and A)
+        const spaceForA = Math.max(3, availableHeight - qHeight - 1 - (actionStatus ? 2 : 0));
+        
+        // Build final content:
+        // 1. Always include Q at the top
+        if (qLines.length > 0) {
+          contentLines.push(...qLines);
+          contentLines.push(''); // Add empty line between Q and A
+        }
+        
+        // 2. Handle A content based on available space
+        if (aLines.length > 0) {
+          if (aLines.length > spaceForA) {
+            // A content exceeds available space
+            // Show indicator that there's more content above (aligned with assistant prefix)
+            contentLines.push('{gray-fg}> ...{/gray-fg}');
+            
+            // Show only the most recent A lines that fit
+            const startIdx = aLines.length - spaceForA + 1; // +1 for the indicator line
+            contentLines.push(...aLines.slice(startIdx));
+          } else {
+            // All A content fits
+            contentLines.push(...aLines);
+          }
+        }
+        
+        // 3. Add action status at the bottom if present
+        if (actionStatus) {
+          // Ensure action is at the very bottom
+          const currentLines = contentLines.length;
+          if (currentLines < availableHeight - 1) {
+            // Add spacing to push action to bottom
+            const spacingNeeded = availableHeight - currentLines - 1;
+            for (let i = 0; i < spacingNeeded; i++) {
+              contentLines.push('');
+            }
+          } else {
+            // Just add one line of spacing if we're already near capacity
+            contentLines.push('');
+          }
+          contentLines.push(actionStatus);
+        }
+        
+        // Set content - it should fit within the visible area
         box.setContent(contentLines.join('\n'));
-        // Auto-scroll to bottom to show latest messages
-        // Use nextTick to ensure content is rendered before scrolling
-        process.nextTick(() => {
-          box.setScrollPerc(100);
-        });
+        
+        // No scrolling needed - content is pre-trimmed to fit
+        box.setScrollPerc(0);
       } else {
         // Empty box
         box.setLabel(` Session ${i + 1} `);

@@ -271,18 +271,9 @@ export function formatQAMessage(
         if (hasBlessed || hasAnsi) {
           // Content already has color formatting (blessed tags or ANSI codes)
           if (hasBlessed) {
-            // For blessed tags, handle prefix color
-            // For HYBRID style, prefix is '{green-bg}{black-fg} Q {/black-fg}{/green-bg} {green-fg}'
-            // We want to keep everything except the final {green-fg}
-            if (qPrefix.endsWith(' {green-fg}')) {
-              // Remove ' {green-fg}' and add back just the space
-              lines.push(qPrefix.slice(0, -11) + ' ' + content[0]);
-            } else if (qPrefix.endsWith('{green-fg}')) {
-              // Safety fallback: remove just '{green-fg}'
-              lines.push(qPrefix.slice(0, -10) + content[0]);
-            } else {
-              lines.push(qPrefix + content[0]);
-            }
+            // For blessed tags, we still want green color
+            // The qPrefix already has {green-fg}, just close it at the end
+            lines.push(qPrefix + content[0] + '{/green-fg}');
           } else {
             // For ANSI codes, just use the Q badge without the green-fg suffix
             // Remove the trailing {green-fg} from qPrefix if present
@@ -314,17 +305,9 @@ export function formatQAMessage(
           const hasAnsi = content[i].includes('\x1b[');
           
           if (hasBlessed || hasAnsi) {
-            // Content has blessed tags, handle continuation color
-            // For HYBRID style, continuation is '     {green-fg}'
-            if (continuation.endsWith(' {green-fg}')) {
-              // Remove ' {green-fg}' and add back just the spaces
-              lines.push(continuation.slice(0, -11) + ' ' + content[i]);
-            } else if (continuation.endsWith('{green-fg}')) {
-              // Safety fallback
-              lines.push(continuation.slice(0, -10) + content[i]);
-            } else {
-              lines.push(continuation + content[i]);
-            }
+            // Content has blessed tags, but we still want green color for user messages
+            // Keep the full continuation including {green-fg}
+            lines.push(continuation + content[i] + '{/green-fg}');
           } else {
             // No blessed tags, add appropriate suffix based on message type
             const suffix = messageType === UserMessageType.NORMAL ? '{/green-fg}' : 

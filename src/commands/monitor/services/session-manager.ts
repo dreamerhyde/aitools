@@ -110,7 +110,7 @@ export class SessionManager {
         currentTopic: topic,
         currentModel: model,
         currentAction: currentAction,
-        status: 'idle' as const
+        status: (currentAction && currentAction.trim() !== '') ? 'active' : 'completed'
       });
     } else {
       // Update existing session info
@@ -121,7 +121,13 @@ export class SessionManager {
       session.currentTopic = topic;
       session.currentModel = model;
       session.currentAction = currentAction;
-      session.status = 'idle' as const;
+      
+      // Set status based on currentAction
+      if (currentAction && currentAction.trim() !== '') {
+        session.status = 'active' as const;
+      } else {
+        session.status = 'completed' as const;
+      }
       
       // Update recent messages if provided
       if (recentMessages && recentMessages.length > 0) {

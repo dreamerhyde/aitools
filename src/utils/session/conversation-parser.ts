@@ -309,11 +309,68 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     }
     
     // Determine if action should be cleared
-    // Clear action if there's a text response after the tool use
-    if (lastTextResponseTime && lastToolUseTime && lastTextResponseTime > lastToolUseTime) {
-      if (process.env.DEBUG_SESSIONS) {
-        console.log(`[Clear Action] Text response at ${lastTextResponseTime.toISOString()} > Tool use at ${lastToolUseTime.toISOString()}`);
+    // Clear action if there's a text response after the tool use or if we detect completion
+    let shouldClearAction = false;
+    
+    if (lastTextResponseTime && lastToolUseTime) {
+      // Reduced buffer time (1 second) for more responsive clearing
+      const bufferMs = 1000;
+      const timeDiff = lastTextResponseTime.getTime() - lastToolUseTime.getTime();
+      
+      if (timeDiff > bufferMs) {
+        shouldClearAction = true;
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Clear Action] Text response ${timeDiff}ms after tool use (> ${bufferMs}ms buffer)`);
+        }
       }
+    }
+    
+    // Also clear if we find explicit completion signals in recent entries
+    // Check last 5 entries for completion signals (reduced from 10 for speed)
+    for (let i = parsedEntries.length - 1; i >= Math.max(0, parsedEntries.length - 5); i--) {
+      const entry = parsedEntries[i];
+      
+      // Check for stop_reason
+      if (entry.type === 'assistant' && entry.message && entry.message.stop_reason) {
+        if (['end_turn', 'stop_sequence', 'max_tokens'].includes(entry.message.stop_reason)) {
+          shouldClearAction = true;
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Clear Action] Found stop_reason: ${entry.message.stop_reason}`);
+          }
+          break;
+        }
+      }
+      
+      // Also check if tool_result was received (indicates tool completed)
+      if (entry.type === 'user' && entry.message && entry.message.content) {
+        if (Array.isArray(entry.message.content)) {
+          const hasToolResult = entry.message.content.some((item: any) => 
+            item.type === 'tool_result'
+          );
+          if (hasToolResult) {
+            shouldClearAction = true;
+            if (process.env.DEBUG_SESSIONS) {
+              console.log(`[Clear Action] Found tool_result in user message`);
+            }
+            break;
+          }
+        }
+      }
+    }
+    
+    // Clear if current action is stale (more than 30 seconds old)
+    if (currentAction && lastToolUseTime) {
+      const now = new Date();
+      const ageMs = now.getTime() - lastToolUseTime.getTime();
+      if (ageMs > 30000) { // 30 seconds
+        shouldClearAction = true;
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Clear Action] Action is stale (${Math.round(ageMs/1000)}s old)`);
+        }
+      }
+    }
+    
+    if (shouldClearAction) {
       currentAction = '';
     }
     

@@ -246,9 +246,9 @@ export function parseMarkdown(text: string): string {
     console.log('[parseMarkdown] Input:', text);
   }
   
-  // Convert headers to bold (# ## ### ONLY at start of line)
+  // Convert headers to bold (# ## ### #### at start of line)
   // Headers must be at the beginning of a line to be considered headers
-  result = result.replace(/^(#{1,3})\s+(.+)$/gm, (match, hashes, text) => {
+  result = result.replace(/^(#{1,4})\s+(.+)$/gm, (match, hashes, text) => {
     // Remove any existing bold tags to avoid nesting
     const cleanText = text.replace(/\{bold\}|\{\/bold\}/g, '');
     return `{bold}{white-fg}${cleanText}{/white-fg}{/bold}`;  // Bold + white for better visibility

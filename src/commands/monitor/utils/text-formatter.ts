@@ -100,7 +100,43 @@ export function wrapText(text: string, maxWidth: number): string[] {
     // Check if line has spaces for word-based wrapping
     if (line.includes(' ')) {
       // Has spaces, use word-based wrapping
-      const words = line.split(/\s+/);
+      // But first check if line contains blessed tags - if so, treat tagged content as single units
+      let words: string[];
+      
+      if (line.includes('{') && line.includes('-fg}')) {
+        // Line contains blessed color tags - need special handling
+        // Strategy: Replace tagged content with placeholders, split, then restore
+        const taggedSegments: { placeholder: string; content: string }[] = [];
+        let processedLine = line;
+        let placeholderIndex = 0;
+        
+        // Find all blessed tagged segments
+        // Match pattern: {color-fg}...{/color-fg} where color part may differ
+        const tagPattern = /{[#\w-]+-fg}.*?{\/\w*-?fg}/g;
+        let match;
+        while ((match = tagPattern.exec(line)) !== null) {
+          const placeholder = `__BLESSED_${placeholderIndex}__`;
+          taggedSegments.push({ placeholder, content: match[0] });
+          processedLine = processedLine.replace(match[0], placeholder);
+          placeholderIndex++;
+        }
+        
+        // Now split the processed line normally
+        words = processedLine.split(/\s+/);
+        
+        // Restore the tagged content in the words
+        words = words.map(word => {
+          let restoredWord = word;
+          for (const segment of taggedSegments) {
+            restoredWord = restoredWord.replace(segment.placeholder, segment.content);
+          }
+          return restoredWord;
+        });
+      } else {
+        // No blessed tags, use simple split
+        words = line.split(/\s+/);
+      }
+      
       let currentLine = '';
       
       for (const word of words) {
