@@ -123,7 +123,7 @@ export class SessionManager {
       session.currentAction = currentAction;
       
       // Set status based on currentAction
-      if (currentAction && currentAction.trim() !== '') {
+      if (currentAction && currentAction.trim() !== '' && currentAction !== '(no content)') {
         session.status = 'active' as const;
       } else {
         session.status = 'completed' as const;

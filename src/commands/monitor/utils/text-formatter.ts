@@ -326,11 +326,11 @@ export function createSeparator(width: number, char: string = '─'): string {
  */
 export function formatStatusIndicator(lastActivity: Date, sessionStatus?: string, currentAction?: string): string {
   // First check session status and action to determine if truly active/inactive
-  const hasAction = currentAction && currentAction.trim() !== '';
+  const hasAction = currentAction && currentAction.trim() !== '' && currentAction !== '(no content)';
   const isActive = sessionStatus === 'active' || (sessionStatus !== 'completed' && hasAction);
   
   if (isActive) {
-    return chalk.hex('#d77757')('● Active'); // Orange to match border
+    return chalk.green('● Active'); // Green for active status
   } else {
     return chalk.gray('● Inactive'); // Gray to match border
   }
