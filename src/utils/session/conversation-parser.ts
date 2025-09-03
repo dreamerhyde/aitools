@@ -153,24 +153,45 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
               'default': 'Puttering'
             };
             
-            // Extract real dynamic action from TodoWrite's activeForm
-            let dynamicAction = toolActions[item.name] || toolActions['default'];
+            // Extract real dynamic action
+            let dynamicAction: string;
             
-            // Special handling for TodoWrite to get activeForm from in-progress tasks
+            // 1. FIRST CHECK: TodoWrite activeForm (highest priority for specific status)
             if (item.name === 'TodoWrite' && item.input && item.input.todos) {
               const inProgressTask = item.input.todos.find((todo: any) => 
                 todo.status === 'in_progress'
               );
               if (inProgressTask && inProgressTask.activeForm) {
+                // Use activeForm directly - it's already a status description
                 dynamicAction = inProgressTask.activeForm;
+              } else {
+                // No in-progress task, use default mapping
+                dynamicAction = toolActions[item.name] || 'Updating todos';
               }
             }
-            // For Edit/Write tools, try to extract filename from input
-            else if ((item.name === 'Edit' || item.name === 'Write' || item.name === 'MultiEdit') && item.input) {
-              if (item.input.file_path) {
-                const filename = item.input.file_path.split('/').pop() || 'file';
-                dynamicAction = `Editing ${filename}`;
+            // 2. Check if it's a known tool in our mapping
+            else if (toolActions[item.name]) {
+              dynamicAction = toolActions[item.name];
+            }
+            // 3. Check if it's a Claude dynamic state word
+            else {
+              // Check if it's a known Claude dynamic state word
+              const claudeStates = ['Distilling', 'Manifesting', 'Spelunking', 'Brewing', 
+                                   'Conjuring', 'Contemplating', 'Germinating', 'Percolating',
+                                   'Ruminating', 'Synthesizing', 'Transmuting'];
+              
+              if (claudeStates.some(state => item.name?.includes(state))) {
+                dynamicAction = item.name; // Use the original name
+              } else {
+                dynamicAction = toolActions['default'] || 'Processing'; // Fallback
               }
+            }
+            
+            // 4. ENHANCE: Add specific details for certain tools
+            // For Edit/Write tools, try to extract filename from input
+            if ((item.name === 'Edit' || item.name === 'Write' || item.name === 'MultiEdit') && item.input && item.input.file_path) {
+              const filename = item.input.file_path.split('/').pop() || 'file';
+              dynamicAction = `Editing ${filename}`;
             }
             // For Read tool, extract filename
             else if (item.name === 'Read' && item.input && item.input.file_path) {
@@ -235,23 +256,30 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
           preserveWhitespace: false
         });
         
-        // Skip empty or pure meta messages (but keep interrupt messages)
-        if (!content || 
-            content.includes('DO NOT respond to these messages') ||
-            content.includes('Caveat:')) {
+        // Check if this is a command structure
+        if (content.includes('<command-name>')) {
+          // Extract the command name (not command-message which doesn't have slash)
+          const commandNameMatch = content.match(/<command-name>([^<]+)<\/command-name>/);
+          
+          if (commandNameMatch && commandNameMatch[1]) {
+            const cmdName = commandNameMatch[1].trim();
+            // Ensure single slash prefix
+            content = cmdName.startsWith('/') ? cmdName : '/' + cmdName;
+          } else {
+            // No valid command name, skip this entry
+            continue;
+          }
+        } else if (content.includes('<local-command-stdout>')) {
+          // This is command output - always skip it
           continue;
         }
         
-        // Extract actual user message from command output if present
-        if (content.includes('<command-name>') || content.includes('<local-command-stdout>')) {
-          // Try to extract the actual message between tags or after them
-          const messageMatch = content.match(/(?:local-command-stdout>|command-message>)([^<]+)/);
-          if (messageMatch && messageMatch[1]) {
-            content = messageMatch[1].trim();
-          } else {
-            // If we can't extract meaningful content, skip
-            continue;
-          }
+        // Skip empty or pure meta messages (but keep slash commands and user questions)  
+        if (!content || 
+            (!content.startsWith('/') &&  // Keep slash commands
+             (content.includes('DO NOT respond to these messages') ||
+              content.includes('Caveat:')))) {
+          continue;
         }
         
         if (content.trim()) {
@@ -321,14 +349,77 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       }
     }
     
-    // Check the LAST message (user or assistant) to determine status
-    let lastMessage = null;
-    let lastMessageType = null;
+    // Track if we just saw a user command (slash command or regular message)
+    let lastUserCommandTime: Date | null = null;
+    let lastUserCommand: string | null = null;
+    let isInterrupted = false;
+    
+    // Find the last user input (check for slash commands specifically)
     for (let i = parsedEntries.length - 1; i >= 0; i--) {
       const entry = parsedEntries[i];
+      if (entry.type === 'user' && entry.message && entry.message.content) {
+        
+        // PRIORITY CHECK: User interrupted
+        if (Array.isArray(entry.message.content)) {
+          const firstItem = entry.message.content[0];
+          if (firstItem?.type === 'text' && firstItem?.text && firstItem.text.includes('[Request interrupted by user')) {
+            isInterrupted = true;
+            lastUserCommandTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+            if (process.env.DEBUG_SESSIONS) {
+              console.log(`[User Interrupt] Detected at ${lastUserCommandTime.toISOString()}`);
+            }
+            break; // Interrupt has highest priority, exit immediately
+          }
+        }
+        
+        // Check if this is a slash command
+        const contentStr = typeof entry.message.content === 'string' 
+          ? entry.message.content 
+          : JSON.stringify(entry.message.content);
+        
+        if (contentStr.includes('<command-name>') && contentStr.includes('<command-message>')) {
+          // Extract the command name
+          const cmdNameMatch = contentStr.match(/<command-name>([^<]+)<\/command-name>/);
+          if (cmdNameMatch && cmdNameMatch[1]) {
+            lastUserCommand = '/' + cmdNameMatch[1].trim().replace(/^\//, ''); // Ensure single slash
+            lastUserCommandTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+            if (process.env.DEBUG_SESSIONS) {
+              console.log(`[Found Command] ${lastUserCommand} at ${lastUserCommandTime.toISOString()}`);
+            }
+            break;
+          }
+        } else if (!contentStr.includes('tool_result')) {
+          // Regular user message (not a tool result)
+          lastUserCommand = 'user message';
+          lastUserCommandTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
+          break;
+        }
+      }
+    }
+    
+    // Check the LAST message (user or assistant) to determine status
+    // Skip messages that contain local-command-stdout as they're not real user input
+    let lastMessage = null;
+    let lastMessageType = null;
+    let lastMessageTime: Date | null = null;
+    for (let i = parsedEntries.length - 1; i >= 0; i--) {
+      const entry = parsedEntries[i];
+      
+      // Skip user messages that contain local-command-stdout
+      if (entry.type === 'user' && entry.message && entry.message.content) {
+        const contentStr = typeof entry.message.content === 'string' 
+          ? entry.message.content 
+          : JSON.stringify(entry.message.content);
+        
+        if (contentStr.includes('<local-command-stdout>')) {
+          continue; // Skip this message, it's command output not user input
+        }
+      }
+      
       if ((entry.type === 'assistant' || entry.type === 'user') && entry.message) {
         lastMessage = entry.message;
         lastMessageType = entry.type;
+        lastMessageTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
         break;
       }
     }
@@ -336,40 +427,65 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     // DEFAULT: Keep active unless we find specific INACTIVE pattern
     shouldClearAction = false;
     
-    // Check if last message indicates activity
-    if (lastMessageType === 'user') {
-      // Last message is from user = ACTIVE (waiting for response)
-      // This includes questions, commands like /compact, etc.
-      currentAction = 'Processing';  // Set explicit action for user messages
+    // PRIORITY CHECK: Handle user interrupts FIRST (highest priority)
+    if (isInterrupted) {
+      currentAction = 'Interrupted';
+      shouldClearAction = true; // This will clear the action to show INACTIVE (gray border)
       if (process.env.DEBUG_SESSIONS) {
-        console.log(`[User Message] Last message from user - ACTIVE (orange border)`);
-      }
-    } else if (lastMessageType === 'assistant' && lastMessage) {
-      // Check if assistant message is pure text (no tools)
-      const hasPureTextResponse = 
-        lastMessage.content &&
-        Array.isArray(lastMessage.content) &&
-        lastMessage.content.length > 0 &&
-        lastMessage.content.every((item: any) => item.type === 'text');
-      
-      if (hasPureTextResponse) {
-        // Pure text response = INACTIVE (conversation ended)
-        shouldClearAction = true;
-        if (process.env.DEBUG_SESSIONS) {
-          console.log(`[Clear Action] Pure text response - INACTIVE (gray border)`);
-        }
-      } else {
-        // Has tool use or other content = ACTIVE
-        if (process.env.DEBUG_SESSIONS) {
-          console.log(`[Keep Action] Not pure text - staying ACTIVE (orange border)`);
-        }
+        console.log(`[User Interrupt] Session interrupted by user - INACTIVE (gray border)`);
       }
     } else {
-      // No message = keep ACTIVE
-      if (process.env.DEBUG_SESSIONS) {
-        console.log(`[Keep Action] No message found - staying ACTIVE (orange border)`);
+      // Check if last message indicates activity (only if not interrupted)
+      if (lastMessageType === 'user') {
+        // Check if this is a slash command or regular user input
+        if (lastUserCommand) {
+          currentAction = lastUserCommand.startsWith('/') ? `Processing ${lastUserCommand}` : 'Processing';
+        } else {
+          currentAction = 'Processing';
+        }
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[User Message] Last message from user - ACTIVE (orange border): ${currentAction}`);
+        }
+      } else if (lastMessageType === 'assistant' && lastMessage) {
+        // Check if assistant message is pure text (no tools)
+        const hasPureTextResponse = 
+          lastMessage.content &&
+          Array.isArray(lastMessage.content) &&
+          lastMessage.content.length > 0 &&
+          lastMessage.content.every((item: any) => item.type === 'text');
+        
+        // Also check if there was a recent user command that hasn't been responded to
+        const timeSinceCommand = lastUserCommandTime && lastMessageTime 
+          ? lastMessageTime.getTime() - lastUserCommandTime.getTime()
+          : Infinity;
+        
+        if (hasPureTextResponse && timeSinceCommand > 500) {
+          // Pure text response after command = INACTIVE (conversation ended)
+          shouldClearAction = true;
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Clear Action] Pure text response - INACTIVE (gray border)`);
+          }
+        } else if (lastUserCommandTime && timeSinceCommand < 500) {
+          // Very recent user command, keep active
+          currentAction = lastUserCommand && lastUserCommand.startsWith('/') 
+            ? `Processing ${lastUserCommand}` 
+            : 'Processing';
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Keep Action] Recent user command - staying ACTIVE (orange border): ${currentAction}`);
+          }
+        } else {
+          // Has tool use or other content = ACTIVE
+          if (process.env.DEBUG_SESSIONS) {
+            console.log(`[Keep Action] Not pure text - staying ACTIVE (orange border)`);
+          }
+        }
+      } else {
+        // No message = keep ACTIVE
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Keep Action] No message found - staying ACTIVE (orange border)`);
+        }
       }
-    }
+    } // End of interrupt handling else block
     
     // REMOVED time-based clearing - only clear based on message content
     // This ensures sessions stay active (orange) by default

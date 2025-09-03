@@ -162,7 +162,7 @@ export class SessionBoxesView {
         const aLines: string[] = [];      // Scrollable A section
         
         // Status line at top (2 lines)
-        const status = formatStatusIndicator(session.lastActivity);
+        const status = formatStatusIndicator(session.lastActivity, session.status, session.currentAction);
         const messageCountStr = formatMessageCount(session.messageCount);
         contentLines.push(`${status}  │  ${messageCountStr}`);
         contentLines.push('');
@@ -352,20 +352,10 @@ export class SessionBoxesView {
           }
         }
         
-        // 3. Add action status at the bottom if present
+        // 3. Add action status right after the last message (not at bottom)
         if (actionStatus) {
-          // Ensure action is at the very bottom
-          const currentLines = contentLines.length;
-          if (currentLines < availableHeight - 1) {
-            // Add spacing to push action to bottom
-            const spacingNeeded = availableHeight - currentLines - 1;
-            for (let i = 0; i < spacingNeeded; i++) {
-              contentLines.push('');
-            }
-          } else {
-            // Just add one line of spacing if we're already near capacity
-            contentLines.push('');
-          }
+          // Add one blank line then the status
+          contentLines.push('');
           contentLines.push(actionStatus);
         }
         

@@ -322,16 +322,16 @@ export function createSeparator(width: number, char: string = '─'): string {
 }
 
 /**
- * Format status indicator based on activity
+ * Format status indicator based on activity and session state
  */
-export function formatStatusIndicator(lastActivity: Date): string {
-  const minutesAgo = Math.floor((Date.now() - lastActivity.getTime()) / 60000);
+export function formatStatusIndicator(lastActivity: Date, sessionStatus?: string, currentAction?: string): string {
+  // First check session status and action to determine if truly active/inactive
+  const hasAction = currentAction && currentAction.trim() !== '';
+  const isActive = sessionStatus === 'active' || (sessionStatus !== 'completed' && hasAction);
   
-  if (minutesAgo === 0) {
-    return chalk.green('● Active');
-  } else if (minutesAgo < 5) {
-    return chalk.yellow('● Recent');
+  if (isActive) {
+    return chalk.hex('#d77757')('● Active'); // Orange to match border
   } else {
-    return chalk.gray('● Idle');
+    return chalk.gray('● Inactive'); // Gray to match border
   }
 }
