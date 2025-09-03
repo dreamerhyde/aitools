@@ -306,11 +306,11 @@ export function formatElapsedTime(date: Date): string {
  */
 export function formatMessageCount(count: number): string {
   if (count === 0) {
-    return 'No messages';
+    return 'No asks';
   } else if (count === 1) {
-    return '1 message';
+    return '1 ask';
   } else {
-    return `${count} messages`;
+    return `${count} asks`;
   }
 }
 
