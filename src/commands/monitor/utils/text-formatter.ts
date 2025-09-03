@@ -133,8 +133,32 @@ export function wrapText(text: string, maxWidth: number): string[] {
           return restoredWord;
         });
       } else {
-        // No blessed tags, use simple split
-        words = line.split(/\s+/);
+        // No blessed tags, but handle special patterns that shouldn't be split
+        // First, preserve [Image #N] patterns as single units
+        let processedLine = line;
+        const imagePatterns: { placeholder: string; content: string }[] = [];
+        const imagePattern = /\[Image\s+#\d+\]/g;
+        let imageMatch;
+        let imageIndex = 0;
+        
+        while ((imageMatch = imagePattern.exec(line)) !== null) {
+          const placeholder = `__IMAGE_${imageIndex}__`;
+          imagePatterns.push({ placeholder, content: imageMatch[0] });
+          processedLine = processedLine.replace(imageMatch[0], placeholder);
+          imageIndex++;
+        }
+        
+        // Split the processed line
+        words = processedLine.split(/\s+/);
+        
+        // Restore the image patterns
+        words = words.map(word => {
+          let restoredWord = word;
+          for (const pattern of imagePatterns) {
+            restoredWord = restoredWord.replace(pattern.placeholder, pattern.content);
+          }
+          return restoredWord;
+        });
       }
       
       let currentLine = '';
