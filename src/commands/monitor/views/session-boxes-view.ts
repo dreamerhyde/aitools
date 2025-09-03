@@ -129,7 +129,7 @@ export class SessionBoxesView {
         box.setLabel(` ${session.user}${modelBadge} `);
         
         // Set border color based on status
-        let borderColor = 'gray';
+        let borderColor = 'gray'; // Default to gray (inactive)
         
         // Debug logging for status
         if (process.env.DEBUG_SESSIONS) {
@@ -137,13 +137,15 @@ export class SessionBoxesView {
         }
         
         if (session.status === 'active') {
-          borderColor = '#d77757'; // Orange for active
+          borderColor = '#d77757'; // Orange for active (processing)
         } else if (session.status === 'completed') {
-          borderColor = 'green'; // Green for completed
+          borderColor = 'gray'; // Gray for completed (inactive)
         } else {
-          // Fallback: if no current action, assume completed
+          // Fallback based on currentAction
           if (!session.currentAction || session.currentAction.trim() === '') {
-            borderColor = 'green';
+            borderColor = 'gray'; // No action = inactive
+          } else {
+            borderColor = '#d77757'; // Has action = active (orange)
           }
         }
         

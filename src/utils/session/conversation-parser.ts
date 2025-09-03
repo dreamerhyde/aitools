@@ -56,7 +56,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     // Collect recent messages
     const recentMessages: RecentMessage[] = [];
     let modelName = '';
-    let currentAction = '';
+    let currentAction = 'Active';  // DEFAULT to Active (will show orange border)
     let lastToolUseTime: Date | null = null;
     let lastTextResponseTime: Date | null = null;
     const parsedEntries: { type: string; message?: any; content?: string; timestamp?: string }[] = [];
@@ -96,16 +96,12 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
         modelName = entry.message.model;
       }
       
-      // Check if this is a completed assistant response
+      // Track assistant messages for later analysis
       if (entry.type === 'assistant' && entry.message) {
-        // Check for completion indicators (not null means completed)
-        if (entry.message.stop_reason && entry.message.stop_reason !== null) {
-          lastTextResponseTime = entry.timestamp ? new Date(entry.timestamp) : new Date();
-          if (process.env.DEBUG_SESSIONS) {
-            console.log(`[Assistant Complete] stop_reason: ${entry.message.stop_reason}`);
-          }
-        } else if (process.env.DEBUG_SESSIONS && entry.message.stop_reason === null) {
-          console.log(`[Assistant Streaming] stop_reason is null - still active`);
+        // We'll check completion status later based on the LAST assistant message
+        // This avoids premature status decisions during parsing
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Assistant Entry] Processing assistant message`);
         }
       }
       
@@ -325,50 +321,58 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
       }
     }
     
-    // Also clear if we find explicit completion signals in recent entries
-    // Check last 5 entries for completion signals (reduced from 10 for speed)
-    for (let i = parsedEntries.length - 1; i >= Math.max(0, parsedEntries.length - 5); i--) {
+    // Check the LAST message (user or assistant) to determine status
+    let lastMessage = null;
+    let lastMessageType = null;
+    for (let i = parsedEntries.length - 1; i >= 0; i--) {
       const entry = parsedEntries[i];
-      
-      // Check for stop_reason
-      if (entry.type === 'assistant' && entry.message && entry.message.stop_reason) {
-        if (['end_turn', 'stop_sequence', 'max_tokens'].includes(entry.message.stop_reason)) {
-          shouldClearAction = true;
-          if (process.env.DEBUG_SESSIONS) {
-            console.log(`[Clear Action] Found stop_reason: ${entry.message.stop_reason}`);
-          }
-          break;
-        }
-      }
-      
-      // Also check if tool_result was received (indicates tool completed)
-      if (entry.type === 'user' && entry.message && entry.message.content) {
-        if (Array.isArray(entry.message.content)) {
-          const hasToolResult = entry.message.content.some((item: any) => 
-            item.type === 'tool_result'
-          );
-          if (hasToolResult) {
-            shouldClearAction = true;
-            if (process.env.DEBUG_SESSIONS) {
-              console.log(`[Clear Action] Found tool_result in user message`);
-            }
-            break;
-          }
-        }
+      if ((entry.type === 'assistant' || entry.type === 'user') && entry.message) {
+        lastMessage = entry.message;
+        lastMessageType = entry.type;
+        break;
       }
     }
     
-    // Clear if current action is stale (more than 30 seconds old)
-    if (currentAction && lastToolUseTime) {
-      const now = new Date();
-      const ageMs = now.getTime() - lastToolUseTime.getTime();
-      if (ageMs > 30000) { // 30 seconds
+    // DEFAULT: Keep active unless we find specific INACTIVE pattern
+    shouldClearAction = false;
+    
+    // Check if last message indicates activity
+    if (lastMessageType === 'user') {
+      // Last message is from user = ACTIVE (waiting for response)
+      // This includes questions, commands like /compact, etc.
+      currentAction = 'Processing';  // Set explicit action for user messages
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[User Message] Last message from user - ACTIVE (orange border)`);
+      }
+    } else if (lastMessageType === 'assistant' && lastMessage) {
+      // Check if assistant message is pure text (no tools)
+      const hasPureTextResponse = 
+        lastMessage.content &&
+        Array.isArray(lastMessage.content) &&
+        lastMessage.content.length > 0 &&
+        lastMessage.content.every((item: any) => item.type === 'text');
+      
+      if (hasPureTextResponse) {
+        // Pure text response = INACTIVE (conversation ended)
         shouldClearAction = true;
         if (process.env.DEBUG_SESSIONS) {
-          console.log(`[Clear Action] Action is stale (${Math.round(ageMs/1000)}s old)`);
+          console.log(`[Clear Action] Pure text response - INACTIVE (gray border)`);
+        }
+      } else {
+        // Has tool use or other content = ACTIVE
+        if (process.env.DEBUG_SESSIONS) {
+          console.log(`[Keep Action] Not pure text - staying ACTIVE (orange border)`);
         }
       }
+    } else {
+      // No message = keep ACTIVE
+      if (process.env.DEBUG_SESSIONS) {
+        console.log(`[Keep Action] No message found - staying ACTIVE (orange border)`);
+      }
     }
+    
+    // REMOVED time-based clearing - only clear based on message content
+    // This ensures sessions stay active (orange) by default
     
     if (shouldClearAction) {
       currentAction = '';

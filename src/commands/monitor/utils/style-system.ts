@@ -190,11 +190,11 @@ export function formatActionStatus(action: string, interrupt: boolean = true): s
   
   // Format with orange action and gray interrupt text
   if (interrupt) {
-    return `{#FFA500-fg}${action}{/#FFA500-fg} {gray-fg}(esc to interrupt){/gray-fg}`;
+    return `{#d77757-fg}${action}{/#d77757-fg} {gray-fg}(esc to interrupt){/gray-fg}`;
   }
   
   // Just orange for the action without interrupt text
-  return `{#FFA500-fg}${action}{/#FFA500-fg}`;
+  return `{#d77757-fg}${action}{/#d77757-fg}`;
 }
 
 /**
