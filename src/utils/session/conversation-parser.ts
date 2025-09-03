@@ -265,10 +265,15 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
             const cmdName = commandNameMatch[1].trim();
             // Ensure single slash prefix
             content = cmdName.startsWith('/') ? cmdName : '/' + cmdName;
+            // Remove any command-message content if present
+            // This ensures we only show the command name, not the full message
           } else {
             // No valid command name, skip this entry
             continue;
           }
+        } else if (content.includes('<command-message>') && !content.includes('<command-name>')) {
+          // This is just command message content without a command name, skip it
+          continue;
         } else if (content.includes('<local-command-stdout>')) {
           // This is command output - always skip it
           continue;
