@@ -66,7 +66,7 @@ export class ProcessMonitor {
         'ps -Ao pid,ppid,pcpu,pmem,etime,stat,command | tail -n +2'
       );
       
-      return stdout.trim().split('\n').map(line => {
+      const processes = stdout.trim().split('\n').map(line => {
         const parts = line.trim().split(/\s+/);
         if (parts.length < 7) return null;
         
@@ -84,6 +84,42 @@ export class ProcessMonitor {
           status: this.parseStatus(stat)
         };
       }).filter((proc): proc is ProcessInfo => proc !== null);
+      
+      // Transform next-server commands to node format for consistent display
+      // This allows the existing node pattern in extractSmartProcessName to handle it
+      const processMap = new Map<number, ProcessInfo>();
+      processes.forEach(proc => processMap.set(proc.pid, proc));
+      
+      // Handle next-server processes - attach project name
+      for (const proc of processes) {
+        if (proc.command.startsWith('next-server')) {
+          const parentProc = processMap.get(proc.ppid);
+          if (parentProc && parentProc.command.includes('/node_modules/')) {
+            const projectMatch = parentProc.command.match(/\/([^\/]+)\/node_modules\//);
+            if (projectMatch && projectMatch[1]) {
+              // Simply append project name for pattern matching
+              proc.command = `next-server [${projectMatch[1]}]`;
+            }
+          } else if (proc.ppid > 0) {
+            // Parent not in list, try to fetch it
+            try {
+              const { stdout: parentStdout } = await execAsync(
+                `ps -p ${proc.ppid} -o command 2>/dev/null | tail -n 1`
+              );
+              if (parentStdout && parentStdout.includes('/node_modules/')) {
+                const projectMatch = parentStdout.match(/\/([^\/]+)\/node_modules\//);
+                if (projectMatch && projectMatch[1]) {
+                  proc.command = `next-server [${projectMatch[1]}]`;
+                }
+              }
+            } catch (e) {
+              // Parent process might have ended, keep original command
+            }
+          }
+        }
+      }
+      
+      return processes;
     } catch (error) {
       throw new Error(`Failed to get process list: ${error}`);
     }

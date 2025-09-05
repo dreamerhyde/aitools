@@ -104,6 +104,13 @@ export function extractSmartProcessName(command: string): string {
       }
     },
     
+    // Next.js server process with project name
+    {
+      regex: /^next-server\s*\[([^\]]+)\]/,
+      group: 1,
+      prefix: 'next:'
+    },
+    
     // Apple System Drivers (DriverKit)
     {
       regex: /\/System\/Library\/DriverExtensions\/([^\/]+)\.dext\/([^\s]+)/,
