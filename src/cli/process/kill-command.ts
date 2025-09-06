@@ -72,7 +72,12 @@ export function setupKillCommand(processCommand: Command): void {
         // Regular PID selection mode
         await selectAndKillProcesses(targetProcesses, processMonitor);
         
-      } catch (error) {
+      } catch (error: any) {
+        // Handle user cancellation gracefully
+        if (error.name === 'ExitPromptError' || error.message?.includes('SIGINT')) {
+          console.log(chalk.gray('\nOperation cancelled'));
+          return;
+        }
         UIHelper.showError(`Kill command failed: ${error}`);
         process.exit(1);
       }
@@ -80,52 +85,62 @@ export function setupKillCommand(processCommand: Command): void {
 }
 
 async function killByPort(port: string, processMonitor: ProcessMonitor): Promise<void> {
-  // Get processes on the specified port
-  const lsofCmd = `lsof -i :${port} -t`;
-  const { stdout } = await execAsync(lsofCmd).catch(() => ({ stdout: '' }));
-  
-  if (!stdout) {
-    console.log(chalk.gray(`No processes found on port ${port}`));
-    return;
-  }
-  
-  const pids = stdout.split('\n').filter(pid => pid.trim()).map(pid => parseInt(pid));
-  const uniquePids = [...new Set(pids)]; // Remove duplicates
-  
-  // Get process details for confirmation
-  const processes = await processMonitor.getAllProcesses();
-  const portProcesses = processes.filter(p => uniquePids.includes(p.pid));
-  
-  if (portProcesses.length === 0) {
-    console.log(chalk.gray(`No processes found on port ${port}`));
-    return;
-  }
-  
-  // Show what will be killed
-  console.log(chalk.cyan(`Processes on port ${port}:\n`));
-  portProcesses.forEach(proc => {
-    const smartName = extractSmartProcessName(proc.command);
-    console.log(`  PID ${chalk.cyan(proc.pid.toString().padStart(7))} - ${smartName}`);
-  });
-  
-  // Confirm termination
-  const { confirm } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'confirm',
-    message: `Terminate ${portProcesses.length} process(es) on port ${port}?`,
-    default: false
-  }]);
-  
-  if (confirm) {
-    await killProcesses(portProcesses.map(p => p.pid), processMonitor);
-  } else {
-    console.log(chalk.gray('Operation cancelled'));
+  try {
+    // Get processes on the specified port
+    const lsofCmd = `lsof -i :${port} -t`;
+    const { stdout } = await execAsync(lsofCmd).catch(() => ({ stdout: '' }));
+    
+    if (!stdout) {
+      console.log(chalk.gray(`No processes found on port ${port}`));
+      return;
+    }
+    
+    const pids = stdout.split('\n').filter(pid => pid.trim()).map(pid => parseInt(pid));
+    const uniquePids = [...new Set(pids)]; // Remove duplicates
+    
+    // Get process details for confirmation
+    const processes = await processMonitor.getAllProcesses();
+    const portProcesses = processes.filter(p => uniquePids.includes(p.pid));
+    
+    if (portProcesses.length === 0) {
+      console.log(chalk.gray(`No processes found on port ${port}`));
+      return;
+    }
+    
+    // Show what will be killed
+    console.log(chalk.cyan(`Processes on port ${port}:\n`));
+    portProcesses.forEach(proc => {
+      const smartName = extractSmartProcessName(proc.command);
+      console.log(`  PID ${chalk.cyan(proc.pid.toString().padStart(7))} - ${smartName}`);
+    });
+    
+    // Confirm termination
+    const { confirm } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirm',
+      message: `Terminate ${portProcesses.length} process(es) on port ${port}?`,
+      default: true
+    }]);
+    
+    if (confirm) {
+      await killProcesses(portProcesses.map(p => p.pid), processMonitor);
+    } else {
+      console.log(chalk.gray('Operation cancelled'));
+    }
+  } catch (error: any) {
+    // Handle user cancellation gracefully
+    if (error.name === 'ExitPromptError' || error.message?.includes('SIGINT')) {
+      console.log(chalk.gray('\nOperation cancelled'));
+      return;
+    }
+    throw error; // Re-throw for parent handler
   }
 }
 
 async function offerPortMode(processes: any[], portCheck: string, processMonitor: ProcessMonitor): Promise<boolean> {
-  // Offer choice between process selection and port selection
-  const { mode } = await inquirer.prompt([{
+  try {
+    // Offer choice between process selection and port selection
+    const { mode } = await inquirer.prompt([{
     type: 'list',
     name: 'mode',
     message: 'Select termination mode:',
@@ -161,31 +176,61 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
     );
     
     const portChoices = sortedPorts.map(([port, pids]) => {
-      // Get process names for this port
+      // Get detailed process info for this port
       const portProcesses = processes.filter(p => pids.has(p.pid));
-      const processNames = [...new Set(portProcesses.map(p => 
-        extractSmartProcessName(p.command).split('/').pop()
-      ))].join(', ');
       
-      // Color code common ports
-      let portDisplay = port;
-      if (['80', '443', '8080', '8000', '3000', '5173'].includes(port)) {
-        portDisplay = chalk.yellow(port);
+      // Get the main process (highest CPU usage)
+      const mainProcess = portProcesses.sort((a, b) => b.cpu - a.cpu)[0];
+      if (!mainProcess) return null;
+      
+      // Use shared extractSmartProcessName for consistency
+      const smartName = extractSmartProcessName(mainProcess.command);
+      
+      // Calculate total resource usage
+      const totalCpu = portProcesses.reduce((sum, p) => sum + p.cpu, 0);
+      const totalMem = portProcesses.reduce((sum, p) => sum + p.memory, 0);
+      
+      // Format port with color coding
+      const portStr = port.padStart(5);
+      let portDisplay = portStr;
+      if (['80', '443', '8080', '8000', '3000', '5173', '5432', '3306'].includes(port)) {
+        portDisplay = chalk.yellow(portStr);
       } else if (parseInt(port) < 1024) {
-        portDisplay = chalk.red(port);
+        portDisplay = chalk.red(portStr);
+      } else {
+        portDisplay = chalk.cyan(portStr);
       }
       
+      // Format CPU and memory with color coding
+      const cpuVal = totalCpu.toFixed(1).padStart(5);
+      const memVal = totalMem.toFixed(1).padStart(5);
+      
+      const cpuStr = totalCpu > 20 ? chalk.red(cpuVal + '%') : 
+                     totalCpu > 10 ? chalk.yellow(cpuVal + '%') : 
+                     chalk.white(cpuVal + '%');
+      const memStr = totalMem > 20 ? chalk.red(memVal + '%') : 
+                     totalMem > 10 ? chalk.yellow(memVal + '%') : 
+                     chalk.white(memVal + '%');
+      
+      // Format PID list
+      const pidList = Array.from(pids).sort((a, b) => a - b);
+      const pidStr = pidList.length <= 3 
+        ? chalk.gray(`PID:[${pidList.join(',')}]`)
+        : chalk.gray(`PID:[${pidList.slice(0, 2).join(',')},..+${pidList.length - 2}]`);
+      
       return {
-        name: `Port ${portDisplay} - ${processNames} (${pids.size} process${pids.size > 1 ? 'es' : ''})`,
-        value: port
+        name: `Port ${portDisplay} CPU ${cpuStr} MEM ${memStr} ${chalk.gray('│')} ${smartName} ${pidStr}`,
+        value: port,
+        short: `Port ${port} PIDs:${pidList.join(',')} - ${smartName}`
       };
-    });
+    }).filter(Boolean);
     
     const { selectedPorts } = await inquirer.prompt([{
       type: 'checkbox',
       name: 'selectedPorts',
       message: 'Select ports to terminate processes on:',
-      choices: portChoices
+      choices: portChoices,
+      loop: false
     }]);
     
     if (selectedPorts && selectedPorts.length > 0) {
@@ -202,7 +247,7 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
         type: 'confirm',
         name: 'confirm',
         message: `Terminate ${allPids.size} process(es) on ${selectedPorts.length} port(s)?`,
-        default: false
+        default: true
       }]);
       
       if (confirm) {
@@ -219,6 +264,14 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
   }
   
   return false; // Continue with PID mode
+  } catch (error: any) {
+    // Handle user cancellation gracefully
+    if (error.name === 'ExitPromptError' || error.message?.includes('SIGINT')) {
+      console.log(chalk.gray('\nOperation cancelled'));
+      return true; // Exit without error
+    }
+    throw error; // Re-throw for parent handler
+  }
 }
 
 async function selectAndKillProcesses(targetProcesses: any[], processMonitor: ProcessMonitor): Promise<void> {
@@ -248,8 +301,8 @@ async function selectAndKillProcesses(targetProcesses: any[], processMonitor: Pr
     return {
       name: `PID ${chalk.cyan(pidStr)} CPU ${cpuStr} MEM ${memStr} ${chalk.gray('│')} ${shortCmd}`,
       value: proc.pid,
-      short: `PID ${proc.pid}`,
-      checked: proc.cpu > 20 // Pre-select very high CPU processes
+      short: `PID ${proc.pid} - ${shortCmd}`,
+      checked: false // Don't pre-select any processes
     };
   });
   
@@ -267,7 +320,7 @@ async function selectAndKillProcesses(targetProcesses: any[], processMonitor: Pr
         type: 'confirm',
         name: 'confirm',
         message: `Terminate ${selectedPids.length} process(es)?`,
-        default: false
+        default: true
       }]);
       
       if (confirm) {
@@ -292,26 +345,33 @@ async function killProcesses(pids: number[], processMonitor: ProcessMonitor): Pr
   let killed = 0;
   let permissionDenied = 0;
   
+  // Get process details for better display
+  const processes = await processMonitor.getAllProcesses();
+  const processMap = new Map(processes.map(p => [p.pid, p]));
+  
   for (const pid of pids) {
+    const proc = processMap.get(pid);
+    const processName = proc ? extractSmartProcessName(proc.command) : 'Unknown';
+    
     try {
       const success = await processMonitor.killProcess(pid);
       if (success) {
-        console.log(chalk.green(`✓ Terminated PID ${pid}`));
+        console.log(chalk.green(`✓ Terminated PID ${pid} - ${processName}`));
         killed++;
       } else {
         // Check if it's a permission error
         try {
           await execAsync(`kill -0 ${pid}`);
           // Process exists but couldn't be killed
-          console.log(chalk.red(`✗ Failed to terminate PID ${pid} - Operation not permitted`));
+          console.log(chalk.red(`✗ Failed to terminate PID ${pid} - ${processName} - Operation not permitted`));
           permissionDenied++;
         } catch {
           // Process doesn't exist or already terminated
-          console.log(chalk.gray(`○ PID ${pid} no longer exists`));
+          console.log(chalk.gray(`○ PID ${pid} - ${processName} no longer exists`));
         }
       }
     } catch (error: any) {
-      console.log(chalk.red(`✗ Failed to terminate PID ${pid}`));
+      console.log(chalk.red(`✗ Failed to terminate PID ${pid} - ${processName}`));
     }
   }
   
