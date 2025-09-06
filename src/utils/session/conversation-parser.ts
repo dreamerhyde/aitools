@@ -56,7 +56,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     // Collect recent messages
     const recentMessages: RecentMessage[] = [];
     let modelName = '';
-    let currentAction = 'Active';  // DEFAULT to Active (will show orange border)
+    let currentAction = '';  // Default to empty, only set when there's actual activity
     let lastToolUseTime: Date | null = null;
     let lastTextResponseTime: Date | null = null;
     const parsedEntries: { type: string; message?: any; content?: string; timestamp?: string }[] = [];

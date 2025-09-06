@@ -168,8 +168,9 @@ export class SessionBoxesView {
         contentLines.push('');
         
         // Store action status to show at bottom
+        // Only show action status if session is active
         let actionStatus: string | null = null;
-        if (session.currentAction && session.currentAction.trim() !== '') {
+        if (session.status === 'active' && session.currentAction && session.currentAction.trim() !== '') {
           const formattedAction = formatAction(session.currentAction, 'blessed');
           actionStatus = formatActionStatus(formattedAction);
         }
@@ -297,8 +298,8 @@ export class SessionBoxesView {
               aLines.push('');
             }
           }
-        } else if (session.currentTopic) {
-          // Fall back to showing topic if no recent messages
+        } else if (session.status === 'active' && session.currentTopic) {
+          // Only show topic for active sessions
           qLines.push('{cyan-fg}Topic:{/cyan-fg}');
           qLines.push(createSeparator(boxWidth));
           
@@ -310,6 +311,9 @@ export class SessionBoxesView {
           for (const line of wrappedTopic) {
             qLines.push(line);
           }
+        } else if (session.status !== 'active') {
+          // For inactive/completed sessions, show minimal info
+          qLines.push('{gray-fg}Session ended{/gray-fg}');
         } else {
           qLines.push('{gray-fg}No recent activity{/gray-fg}');
         }
