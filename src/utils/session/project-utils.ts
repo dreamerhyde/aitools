@@ -26,23 +26,53 @@ export async function getActiveProjects(): Promise<{
     
     const allActiveLogs = [...new Set([...todayLogs, ...recentLogs])];
     
+    // Read .claude.json once at the beginning
+    const configPath = path.join(os.homedir(), '.claude.json');
+    let configData: any = null;
+    if (fs.existsSync(configPath)) {
+      try {
+        configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (e) {
+        console.error('Failed to read .claude.json:', e);
+        return { activeProjectPaths: new Set(), activeProjects: [] };
+      }
+    }
+    
     // Extract project paths from log file paths
     const activeProjectPaths = new Set<string>();
     allActiveLogs.forEach((logPath: string) => {
       const match = logPath.match(/\/projects\/(.+?)\//);
       if (match) {
-        const projectPath = '/' + match[1].replace(/-/g, '/').substring(1);
-        activeProjectPaths.add(projectPath);
+        // Convert from "-Users-albertliu-repos-proj" to "/Users/albertliu/repos/proj"
+        const safePath = match[1].startsWith('-') ? match[1].substring(1) : match[1];
+        
+        // Simple conversion first (all dashes to slashes)
+        const simplePath = '/' + safePath.replace(/-/g, '/');
+        
+        // Check if this path exists
+        if (fs.existsSync(simplePath)) {
+          activeProjectPaths.add(simplePath);
+        } else if (configData && configData.projects) {
+          // Try to find the correct path from already loaded config
+          // This handles cases where dashes are part of the directory name
+          for (const projectPath of Object.keys(configData.projects)) {
+            const testSafePath = projectPath.replace(/\//g, '-').substring(1);
+            if (testSafePath === safePath) {
+              activeProjectPaths.add(projectPath);
+              break;
+            }
+          }
+        } else {
+          // If no config available, fall back to simple path
+          activeProjectPaths.add(simplePath);
+        }
       }
     });
     
-    // Read from .claude.json
-    const configPath = path.join(os.homedir(), '.claude.json');
-    if (!fs.existsSync(configPath)) {
+    // Return early if no config data
+    if (!configData || !configData.projects) {
       return { activeProjectPaths, activeProjects: [] };
     }
-    
-    const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     
     // Only show projects that have recent log activity
     const activeProjects = configData.projects 

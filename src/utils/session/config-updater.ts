@@ -4,6 +4,7 @@
 import { getActiveProjects } from './project-utils.js';
 import { getLatestConversationInfo } from './conversation-parser.js';
 import { SessionUpdateCallback } from './types.js';
+import { generateSessionId } from './session-id-helper.js';
 
 /**
  * Update active sessions based on Claude configuration
@@ -16,7 +17,8 @@ export async function updateActiveSessionsFromConfig(
   
   const currentTime = new Date();
   for (const [projectPath] of activeProjects) {
-    const sessionId = `claude-${projectPath.slice(-8)}`;
+    // Use consistent session ID generation
+    const sessionId = generateSessionId(projectPath);
     const displayName = projectPath.split('/').pop() || projectPath;
     
     const conversationInfo = await getLatestConversationInfo(projectPath);

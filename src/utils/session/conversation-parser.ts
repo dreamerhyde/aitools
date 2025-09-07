@@ -10,6 +10,7 @@ import { ConversationInfo, RecentMessage } from './types.js';
 import { sanitizeText, sanitizeTopic, formatActionString } from '../text-sanitizer.js';
 import { statusTracker } from '../status-tracker.js';
 import { extractToolNameFromAction } from './tool-mapping.js';
+import { generateSessionId, getSessionDirectory } from './session-id-helper.js';
 
 /**
  * Get the latest conversation information for a project
@@ -18,8 +19,7 @@ import { extractToolNameFromAction } from './tool-mapping.js';
  */
 export async function getLatestConversationInfo(projectPath: string): Promise<ConversationInfo> {
   try {
-    const safePath = projectPath.replace(/\//g, '-').substring(1);
-    const projectLogDir = path.join(os.homedir(), '.claude', 'projects', `-${safePath}`);
+    const projectLogDir = getSessionDirectory(projectPath);
     
     if (!fs.existsSync(projectLogDir)) {
       return { topic: 'No activity', messageCount: 0, model: undefined, currentAction: '', recentMessages: [] };
@@ -41,17 +41,35 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     
     const latestLog = logFiles[0].path;
     
+    // Check if file exists before reading
+    if (!fs.existsSync(latestLog)) {
+      console.warn(`Session file no longer exists: ${latestLog}`);
+      return { topic: 'No activity', messageCount: 0, model: undefined, currentAction: '', recentMessages: [] };
+    }
+    
     // Count user messages
-    const messageCount = parseInt(execSync(
-      `grep '"type":"user"' "${latestLog}" | grep '"content":' | grep -v '"type":"tool_result"' | wc -l`,
-      { maxBuffer: 1024 * 1024 * 10 }
-    ).toString().trim()) || 0;
+    let messageCount = 0;
+    try {
+      messageCount = parseInt(execSync(
+        `grep '"type":"user"' "${latestLog}" | grep '"content":' | grep -v '"type":"tool_result"' | wc -l`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      ).toString().trim()) || 0;
+    } catch (error) {
+      console.warn(`Error counting messages in ${latestLog}:`, error.message);
+      return { topic: 'No activity', messageCount: 0, model: undefined, currentAction: '', recentMessages: [] };
+    }
     
     // Get the last few entries to find the latest Q/A pair
-    const recentEntries = execSync(
-      `tail -100 "${latestLog}" 2>/dev/null`,
-      { maxBuffer: 1024 * 1024 * 10 }
-    ).toString().trim().split('\n');
+    let recentEntries: string[] = [];
+    try {
+      recentEntries = execSync(
+        `tail -100 "${latestLog}" 2>/dev/null`,
+        { maxBuffer: 1024 * 1024 * 10 }
+      ).toString().trim().split('\n');
+    } catch (error) {
+      console.warn(`Error reading recent entries from ${latestLog}:`, error.message);
+      return { topic: 'No activity', messageCount, model: undefined, currentAction: '', recentMessages: [] };
+    }
     
     // Collect recent messages
     const recentMessages: RecentMessage[] = [];
@@ -520,7 +538,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
     }
     
     // Update status tracker with current session info
-    const sessionId = `claude-${safePath}`;
+    const sessionId = generateSessionId(projectPath);
     if (currentAction) {
       const toolName = extractToolNameFromAction(currentAction);
       statusTracker.updateSessionStatus(sessionId, toolName, messageCount);
