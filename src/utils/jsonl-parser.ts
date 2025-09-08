@@ -118,7 +118,10 @@ export class JSONLParser {
         });
 
         rl.on('error', (error) => {
-          console.warn(`Error reading file ${filePath}:`, error.message);
+          // Silently handle file not found errors (common due to Claude's cleanup)
+          if (error.code !== 'ENOENT') {
+            console.warn(`Error reading file ${filePath}:`, error.message);
+          }
           reject(error);
         });
 
@@ -133,8 +136,11 @@ export class JSONLParser {
           resolve();
         });
       });
-    } catch (error) {
-      console.warn(`Failed to read file ${filePath}:`, error);
+    } catch (error: any) {
+      // Only warn about non-ENOENT errors
+      if (error.code !== 'ENOENT') {
+        console.warn(`Failed to read file ${filePath}:`, error);
+      }
       return messages; // Return empty array instead of failing
     }
 
