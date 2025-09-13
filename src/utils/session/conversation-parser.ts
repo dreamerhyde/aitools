@@ -55,7 +55,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
         { maxBuffer: 1024 * 1024 * 10 }
       ).toString().trim()) || 0;
     } catch (error) {
-      console.warn(`Error counting messages in ${latestLog}:`, error.message);
+      console.warn(`Error counting messages in ${latestLog}:`, error instanceof Error ? error.message : String(error));
       return { topic: 'No activity', messageCount: 0, model: undefined, currentAction: '', recentMessages: [] };
     }
     
@@ -67,7 +67,7 @@ export async function getLatestConversationInfo(projectPath: string): Promise<Co
         { maxBuffer: 1024 * 1024 * 10 }
       ).toString().trim().split('\n');
     } catch (error) {
-      console.warn(`Error reading recent entries from ${latestLog}:`, error.message);
+      console.warn(`Error reading recent entries from ${latestLog}:`, error instanceof Error ? error.message : String(error));
       return { topic: 'No activity', messageCount, model: undefined, currentAction: '', recentMessages: [] };
     }
     

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../../utils/process-monitor.js';
 import { UIHelper } from '../../utils/ui.js';
-import { ProcessIdentifier, type IdentifiedProcess } from '../../utils/process-identifier.js';
+import { ProcessIdentifier } from '../../utils/process-identifier.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { exec } from 'child_process';
