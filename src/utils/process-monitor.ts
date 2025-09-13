@@ -1,8 +1,13 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ProcessInfo, SystemStats, HookDetectionResult, MonitorOptions } from '../types/index.js';
+import { ProcessIdentifier, type IdentifiedProcess } from './process-identifier.js';
 
 const execAsync = promisify(exec);
+
+export interface EnhancedProcessInfo extends ProcessInfo {
+  identity: IdentifiedProcess;
+}
 
 export class ProcessMonitor {
   private options: MonitorOptions;
@@ -123,6 +128,30 @@ export class ProcessMonitor {
     } catch (error) {
       throw new Error(`Failed to get process list: ${error}`);
     }
+  }
+
+  /**
+   * Get all processes with enhanced identity information
+   * Uses batch identification for optimal performance
+   */
+  async getAllProcessesWithIdentity(): Promise<EnhancedProcessInfo[]> {
+    // Get basic process information
+    const processes = await this.getAllProcesses();
+
+    // Prepare process info for identification
+    const processInfos = processes.map(p => ({
+      pid: p.pid,
+      command: p.command
+    }));
+
+    // Batch identify all processes
+    const identified = await ProcessIdentifier.identifyBatch(processInfos);
+
+    // Combine results
+    return processes.map(p => ({
+      ...p,
+      identity: identified.get(p.pid)!
+    }));
   }
 
   async findSuspiciousProcesses(): Promise<ProcessInfo[]> {

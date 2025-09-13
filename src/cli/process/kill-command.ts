@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../../utils/process-monitor.js';
 import { UIHelper } from '../../utils/ui.js';
-import { extractSmartProcessName } from '../../commands/monitor/utils/sanitizers.js';
+import { ProcessIdentifier, type IdentifiedProcess } from '../../utils/process-identifier.js';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { exec } from 'child_process';
@@ -109,9 +109,14 @@ async function killByPort(port: string, processMonitor: ProcessMonitor): Promise
     
     // Show what will be killed
     console.log(chalk.cyan(`Processes on port ${port}:\n`));
+    // Batch identify processes for display
+    const identifiedMap = await ProcessIdentifier.identifyBatch(
+      portProcesses.map(p => ({ pid: p.pid, command: p.command, port: parseInt(port) }))
+    );
     portProcesses.forEach(proc => {
-      const smartName = extractSmartProcessName(proc.command);
-      console.log(`  PID ${chalk.cyan(proc.pid.toString().padStart(7))} - ${smartName}`);
+      const identity = identifiedMap.get(proc.pid);
+      const displayName = identity ? identity.displayName : proc.command.substring(0, 50);
+      console.log(`  PID ${chalk.cyan(proc.pid.toString().padStart(7))} - ${displayName}`);
     });
     
     // Confirm termination
@@ -175,16 +180,21 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
       parseInt(a[0]) - parseInt(b[0])
     );
     
-    const portChoices = sortedPorts.map(([port, pids]) => {
+    const portChoices = await Promise.all(sortedPorts.map(async ([port, pids]) => {
       // Get detailed process info for this port
       const portProcesses = processes.filter(p => pids.has(p.pid));
       
       // Get the main process (highest CPU usage)
       const mainProcess = portProcesses.sort((a, b) => b.cpu - a.cpu)[0];
       if (!mainProcess) return null;
-      
-      // Use shared extractSmartProcessName for consistency
-      const smartName = extractSmartProcessName(mainProcess.command);
+
+      // Use ProcessIdentifier for better accuracy
+      const identified = await ProcessIdentifier.identify({
+        pid: mainProcess.pid,
+        command: mainProcess.command,
+        port: parseInt(port)
+      });
+      const smartName = identified.displayName;
       
       // Calculate total resource usage
       const totalCpu = portProcesses.reduce((sum, p) => sum + p.cpu, 0);
@@ -223,13 +233,13 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
         value: port,
         short: `Port ${port} PIDs:${pidList.join(',')} - ${smartName}`
       };
-    }).filter(Boolean);
+    })).then(choices => choices.filter(Boolean));
     
     const { selectedPorts } = await inquirer.prompt([{
       type: 'checkbox',
       name: 'selectedPorts',
       message: 'Select ports to terminate processes on:',
-      choices: portChoices,
+      choices: portChoices.filter(choice => choice !== null) as any[],
       loop: false
     }]);
     
@@ -277,12 +287,18 @@ async function offerPortMode(processes: any[], portCheck: string, processMonitor
 async function selectAndKillProcesses(targetProcesses: any[], processMonitor: ProcessMonitor): Promise<void> {
   const termWidth = process.stdout.columns || 120;
   const commandWidth = Math.max(50, termWidth - 40);
-  
+
+  // Batch identify all processes for efficiency
+  const identifiedMap = await ProcessIdentifier.identifyBatch(
+    targetProcesses.slice(0, 30).map(p => ({ pid: p.pid, command: p.command }))
+  );
+
   const processOptions = targetProcesses.slice(0, 30).map((proc) => {
-    // Use smart process name extraction
-    const smartName = extractSmartProcessName(proc.command);
-    const shortCmd = smartName.length > commandWidth ? 
-      smartName.substring(0, commandWidth - 3) + '...' : 
+    // Use identified name or fallback
+    const identity = identifiedMap.get(proc.pid);
+    const smartName = identity ? identity.displayName : proc.command.substring(0, 50);
+    const shortCmd = smartName.length > commandWidth ?
+      smartName.substring(0, commandWidth - 3) + '...' :
       smartName;
     
     // Format with fixed widths for consistency
@@ -344,14 +360,21 @@ async function selectAndKillProcesses(targetProcesses: any[], processMonitor: Pr
 async function killProcesses(pids: number[], processMonitor: ProcessMonitor): Promise<void> {
   let killed = 0;
   let permissionDenied = 0;
-  
+
   // Get process details for better display
   const processes = await processMonitor.getAllProcesses();
   const processMap = new Map(processes.map(p => [p.pid, p]));
-  
-  for (const pid of pids) {
+
+  // Batch identify processes for display
+  const processesToIdentify = pids.map(pid => {
     const proc = processMap.get(pid);
-    const processName = proc ? extractSmartProcessName(proc.command) : 'Unknown';
+    return proc ? { pid, command: proc.command } : { pid, command: 'Unknown' };
+  });
+  const identifiedMap = await ProcessIdentifier.identifyBatch(processesToIdentify);
+
+  for (const pid of pids) {
+    const identity = identifiedMap.get(pid);
+    const processName = identity ? identity.displayName : 'Unknown';
     
     try {
       const success = await processMonitor.killProcess(pid);

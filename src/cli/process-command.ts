@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../utils/process-monitor.js';
 import { UIHelper } from '../utils/ui.js';
-import { extractSmartProcessName, getCacheStats } from '../commands/monitor/utils/sanitizers.js';
+import { ProcessIdentifier } from '../utils/process-identifier.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { setupPortCommand } from './process/port-command.js';
@@ -50,8 +50,8 @@ export function setupProcessCommand(program: Command): void {
         }
         
         // Display the process table
-        displayProcessTable(filtered);
-        
+        await displayProcessTable(filtered);
+
         // Show cache stats if requested
         if (options.showCacheStats) {
           displayCacheStats();
@@ -72,7 +72,7 @@ export function setupProcessCommand(program: Command): void {
   setupHooksCommand(processCommand);
 }
 
-function displayProcessTable(processes: any[]): void {
+async function displayProcessTable(processes: any[]): Promise<void> {
   // Get terminal width
   const termWidth = process.stdout.columns || 120;
   const commandWidth = Math.max(50, termWidth - 40);
@@ -87,11 +87,17 @@ function displayProcessTable(processes: any[]): void {
     colAligns: ['right', 'right', 'right', 'center', 'left']
   });
   
+  // Batch identify processes for better performance
+  const identifiedMap = await ProcessIdentifier.identifyBatch(
+    processes.slice(0, 30).map(p => ({ pid: p.pid, command: p.command }))
+  );
+
   processes.slice(0, 30).forEach(proc => {
-    // Use smart process name extraction
-    const smartName = extractSmartProcessName(proc.command);
-    const shortCmd = smartName.length > commandWidth ? 
-      smartName.substring(0, commandWidth - 3) + '...' : 
+    // Use identified name
+    const identity = identifiedMap.get(proc.pid);
+    const smartName = identity ? identity.displayName : proc.command.substring(0, 50);
+    const shortCmd = smartName.length > commandWidth ?
+      smartName.substring(0, commandWidth - 3) + '...' :
       smartName;
     
     // Color code based on CPU usage
@@ -136,21 +142,13 @@ function displayProcessTable(processes: any[]): void {
 }
 
 function displayCacheStats(): void {
-  const stats = getCacheStats();
+  const stats = ProcessIdentifier.getCacheStats();
   console.log(chalk.cyan('\nCache Statistics:'));
-  console.log(chalk.gray('Process Cache:'));
-  console.log(chalk.gray(`  Size: ${stats.size}/${1000} entries`));
-  console.log(chalk.gray(`  Hits: ${stats.hits}`));
-  console.log(chalk.gray(`  Misses: ${stats.misses}`));
-  console.log(chalk.gray(`  Hit Rate: ${stats.hitRate}`));
-  
-  if (stats.appCache) {
-    console.log(chalk.gray('\nApplication Cache:'));
-    console.log(chalk.gray(`  Cached Apps: ${stats.appCache.entries}`));
-    console.log(chalk.gray(`  Cache Age: ${stats.appCache.age}`));
-    console.log(chalk.gray(`  TTL: ${stats.appCache.ttl}`));
-    console.log(chalk.gray(`  Remaining: ${stats.appCache.remaining}`));
-  }
+  console.log(chalk.gray('Identification Cache:'));
+  console.log(chalk.gray(`  L1 Cache Size: ${stats.l1Size} entries`));
+  console.log(chalk.gray(`  L2 Cache Size: ${stats.l2Size} active`));
+  console.log(chalk.gray(`  CWD Cache: ${stats.cwdSize} entries`));
+  console.log(chalk.gray(`  Docker Cache: ${stats.dockerSize} entries`));
 }
 
 function displayStatusLegend(): void {

@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../../utils/process-monitor.js';
 import { UIHelper } from '../../utils/ui.js';
-import { extractSmartProcessName } from '../../commands/monitor/utils/sanitizers.js';
 import { identifyProcess, type IdentifiedProcess } from '../../utils/process-identifier.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -118,12 +117,8 @@ export function setupPortCommand(processCommand: Command): void {
           const key = `${proc.pid}:${portNum}`;
           const identifiedInfo = identifiedMap.get(key);
           
-          // For fallback, try to use full command from processMap
-          let displayName = identifiedInfo ? identifiedInfo.displayName : null;
-          if (!displayName) {
-            const fullProcess = processMap.get(proc.pid);
-            displayName = fullProcess ? extractSmartProcessName(fullProcess.command) : extractSmartProcessName(proc.command);
-          }
+          // For fallback, use identified info or command substring
+          let displayName = identifiedInfo ? identifiedInfo.displayName : proc.command.substring(0, 50);
           
           if (!ports.has(proc.port)) {
             ports.set(proc.port, []);

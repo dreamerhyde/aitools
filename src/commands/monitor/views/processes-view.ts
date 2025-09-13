@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { ProcessInfo } from '../types.js';
-import { extractSmartProcessName } from '../utils/sanitizers.js';
+import { ProcessIdentifier } from '../../../utils/process-identifier.js';
 // import { createMiniBar } from '../utils/formatters.js';
 
 export class ProcessesView {
@@ -54,6 +54,11 @@ export class ProcessesView {
         .filter((p: ProcessInfo) => p && p.cpu >= 0)
         .sort((a: ProcessInfo, b: ProcessInfo) => b.cpu - a.cpu)
         .slice(0, 8);
+
+      // Batch identify processes for display
+      const identifiedMap = await ProcessIdentifier.identifyBatch(
+        topProcesses.map((p: ProcessInfo) => ({ pid: p.pid, command: p.command }))
+      );
       
       const processInfo = [];
       
@@ -71,8 +76,9 @@ export class ProcessesView {
         if (i < topProcesses.length) {
           const proc = topProcesses[i];
           
-          // Smart process name extraction
-          const smartName = extractSmartProcessName(proc.command);
+          // Use identified process name
+          const identity = identifiedMap.get(proc.pid);
+          const smartName = identity ? identity.displayName : proc.command.substring(0, 30);
           
           // Format CPU percentage (centered in 6 char field)
           const cpuValue = proc.cpu.toFixed(1);

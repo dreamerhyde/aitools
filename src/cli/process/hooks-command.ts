@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { ProcessMonitor } from '../../utils/process-monitor.js';
 import { UIHelper } from '../../utils/ui.js';
-import { extractSmartProcessName } from '../../commands/monitor/utils/sanitizers.js';
+import { ProcessIdentifier } from '../../utils/process-identifier.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 
@@ -38,12 +38,18 @@ export function setupHooksCommand(processCommand: Command): void {
         
         // Sort by CPU usage
         hookProcesses.sort((a, b) => b.cpu - a.cpu);
-        
+
+        // Batch identify all hook processes
+        const identifiedMap = await ProcessIdentifier.identifyBatch(
+          hookProcesses.map(p => ({ pid: p.pid, command: p.command }))
+        );
+
         hookProcesses.forEach(proc => {
-          // Use smart process name extraction
-          const smartName = extractSmartProcessName(proc.command);
-          const shortCmd = smartName.length > commandWidth ? 
-            smartName.substring(0, commandWidth - 3) + '...' : 
+          // Use identified process name
+          const identity = identifiedMap.get(proc.pid);
+          const smartName = identity ? identity.displayName : proc.command.substring(0, 50);
+          const shortCmd = smartName.length > commandWidth ?
+            smartName.substring(0, commandWidth - 3) + '...' :
             smartName;
           
           // Color code based on CPU usage
