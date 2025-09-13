@@ -100,7 +100,7 @@ export class ProcessMonitor {
         if (proc.command.startsWith('next-server')) {
           const parentProc = processMap.get(proc.ppid);
           if (parentProc && parentProc.command.includes('/node_modules/')) {
-            const projectMatch = parentProc.command.match(/\/([^\/]+)\/node_modules\//);
+            const projectMatch = parentProc.command.match(/\/([^/]+)\/node_modules\//);
             if (projectMatch && projectMatch[1]) {
               // Simply append project name for pattern matching
               proc.command = `next-server [${projectMatch[1]}]`;
@@ -112,7 +112,7 @@ export class ProcessMonitor {
                 `ps -p ${proc.ppid} -o command 2>/dev/null | tail -n 1`
               );
               if (parentStdout && parentStdout.includes('/node_modules/')) {
-                const projectMatch = parentStdout.match(/\/([^\/]+)\/node_modules\//);
+                const projectMatch = parentStdout.match(/\/([^/]+)\/node_modules\//);
                 if (projectMatch && projectMatch[1]) {
                   proc.command = `next-server [${projectMatch[1]}]`;
                 }

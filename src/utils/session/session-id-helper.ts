@@ -3,6 +3,9 @@
  * Ensures consistent session ID generation across the application
  */
 
+import * as path from 'path';
+import * as os from 'os';
+
 /**
  * Generate a consistent session ID from a project path
  * @param projectPath The absolute path to the project
@@ -35,8 +38,6 @@ export function extractProjectPath(sessionId: string): string | null {
  * @returns The path to the session files directory
  */
 export function getSessionDirectory(projectPath: string): string {
-  const path = require('path');
-  const os = require('os');
   const safePath = projectPath.replace(/\//g, '-').substring(1);
   return path.join(os.homedir(), '.claude', 'projects', `-${safePath}`);
 }

@@ -111,7 +111,7 @@ export class ProcessPatterns {
       {
         pattern: /node.*\/(next|nuxt|vite|webpack-dev-server|react-scripts)\s*(.*)/i,
         handler: (match, ctx) => ({
-          displayName: ctx.projectName ? `${match[1]}:${ctx.projectName}` : match[1],
+          displayName: ctx.projectName ? `${match[1]} [${ctx.projectName}]` : match[1],
           category: 'web',
           project: ctx.projectName || undefined
         })
@@ -145,7 +145,7 @@ export class ProcessPatterns {
             // Common entry points
             if (['index.js', 'main.js', 'app.js', 'server.js', 'main.py', 'app.py'].includes(scriptName) && ctx.projectName) {
               return {
-                displayName: `${runtime}:${ctx.projectName}`,
+                displayName: `${runtime} [${ctx.projectName}]`,
                 category: 'script',
                 project: ctx.projectName
               };
@@ -172,16 +172,74 @@ export class ProcessPatterns {
           };
         }
       },
-      // macOS Applications
+      // macOS Applications - Smart multi-layer parsing
       {
-        pattern: /\/Applications\/([^/]+)\.app\/.*\/([^/\s]+)$/i,
+        pattern: /\/Applications\//i,
         handler: (match) => {
-          const appName = match[1];
-          const binary = match[2];
-          if (binary.toLowerCase().replace(/[\s-]/g, '') === appName.toLowerCase().replace(/[\s-]/g, '')) {
-            return { displayName: appName, category: 'app' };
+          const fullCommand = match.input || '';
+
+          // Step 1: Separate executable path from arguments
+          const argsIndex = fullCommand.search(/\s+--?\w/);
+          const execPath = argsIndex > -1 ? fullCommand.substring(0, argsIndex).trim() : fullCommand.trim();
+
+          // Step 2: Find all .app occurrences
+          const appMatches = [...execPath.matchAll(/\/([^/]+)\.app/gi)];
+          if (appMatches.length === 0) {
+            // Not a macOS app, return generic system process
+            return { displayName: path.basename(fullCommand.split(' ')[0]), category: 'system' as const };
           }
-          return { displayName: `${appName}:${binary}`, category: 'app' };
+
+          // Step 3: Extract app names and executable
+          const primaryApp = appMatches[0][1]; // First .app (main application)
+          const lastApp = appMatches[appMatches.length - 1][1]; // Last .app (might be Helper)
+          const execName = path.basename(execPath);
+
+          // Step 4: Apply intelligent naming rules
+
+          // Rule 1: Version markers
+          const versionMarkers = ['stable', 'beta', 'canary', 'alpha', 'dev', 'nightly'];
+          if (versionMarkers.includes(execName.toLowerCase())) {
+            return { displayName: primaryApp, category: 'app' };
+          }
+
+          // Rule 2: Helper applications
+          if (lastApp !== primaryApp && lastApp.includes('Helper')) {
+            // Simplify helper names
+            let helperType = execName;
+
+            // Common helper patterns
+            if (execName.includes('Browser Helper')) {
+              // Extract type from parentheses if present
+              const typeMatch = execName.match(/\(([^)]+)\)/);
+              if (typeMatch) {
+                helperType = `Helper:${typeMatch[1]}`;
+              } else {
+                helperType = 'Helper';
+              }
+            } else if (execName.includes('Code Helper')) {
+              helperType = 'Code Helper';
+            } else {
+              helperType = lastApp.replace(/\s*\([^)]+\)/, '');
+            }
+
+            return { displayName: `${primaryApp}:${helperType}`, category: 'app' };
+          }
+
+          // Rule 3: Executable same as app name
+          const cleanExecName = execName.replace(/[\s-]/g, '').toLowerCase();
+          const cleanAppName = primaryApp.replace(/[\s-]/g, '').toLowerCase();
+          if (cleanExecName === cleanAppName) {
+            return { displayName: primaryApp, category: 'app' };
+          }
+
+          // Rule 4: Meaningful differences
+          const meaningfulBinaries = ['com.docker.backend', 'com.docker.supervisor', 'com.docker.admin'];
+          if (meaningfulBinaries.some(bin => execName.includes(bin))) {
+            return { displayName: `${primaryApp}:${execName}`, category: 'app' };
+          }
+
+          // Rule 5: Default - show app:binary for clarity
+          return { displayName: `${primaryApp}:${execName}`, category: 'app' };
         }
       }
     ];

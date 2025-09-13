@@ -118,7 +118,7 @@ export function setupPortCommand(processCommand: Command): void {
           const identifiedInfo = identifiedMap.get(key);
           
           // For fallback, use identified info or command substring
-          let displayName = identifiedInfo ? identifiedInfo.displayName : proc.command.substring(0, 50);
+          const displayName = identifiedInfo ? identifiedInfo.displayName : proc.command.substring(0, 50);
           
           if (!ports.has(proc.port)) {
             ports.set(proc.port, []);

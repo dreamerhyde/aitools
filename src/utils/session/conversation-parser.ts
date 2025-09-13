@@ -4,7 +4,6 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { execSync } from 'child_process';
 import { ConversationInfo, RecentMessage } from './types.js';
 import { sanitizeText, sanitizeTopic, formatActionString } from '../text-sanitizer.js';
