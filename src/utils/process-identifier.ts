@@ -10,6 +10,7 @@ const execAsync = promisify(exec);
 
 export interface ProcessInfo {
   pid: number;
+  ppid?: number;
   command: string;
   cwd?: string;
   name?: string;
@@ -22,6 +23,167 @@ export interface IdentifiedProcess {
   project?: string;
   port?: number;
   containerInfo?: { name: string; image: string };
+}
+
+/**
+ * Process tree for managing parent-child relationships
+ */
+class ProcessTree {
+  private processes: Map<number, ProcessInfo>;
+  private childrenMap: Map<number, Set<number>>;
+  private parentMap: Map<number, number>;
+
+  constructor(processes: ProcessInfo[]) {
+    this.processes = new Map(processes.map(p => [p.pid, p]));
+    this.childrenMap = new Map();
+    this.parentMap = new Map();
+
+    // Build parent-child relationships
+    for (const process of processes) {
+      if (process.ppid) {
+        // Map child to parent
+        this.parentMap.set(process.pid, process.ppid);
+
+        // Map parent to children
+        if (!this.childrenMap.has(process.ppid)) {
+          this.childrenMap.set(process.ppid, new Set());
+        }
+        this.childrenMap.get(process.ppid)!.add(process.pid);
+      }
+    }
+  }
+
+  getParent(pid: number): ProcessInfo | null {
+    const ppid = this.parentMap.get(pid);
+    return ppid ? this.processes.get(ppid) || null : null;
+  }
+
+  getChildren(pid: number): ProcessInfo[] {
+    const childPids = this.childrenMap.get(pid) || new Set();
+    return Array.from(childPids)
+      .map(childPid => this.processes.get(childPid))
+      .filter((p): p is ProcessInfo => p !== undefined);
+  }
+
+  isDescendantOf(childPid: number, ancestorPid: number): boolean {
+    let currentPid = childPid;
+    const visited = new Set<number>();
+
+    while (currentPid && !visited.has(currentPid)) {
+      visited.add(currentPid);
+      const parentPid = this.parentMap.get(currentPid);
+
+      if (parentPid === ancestorPid) {
+        return true;
+      }
+
+      currentPid = parentPid || 0;
+    }
+
+    return false;
+  }
+}
+
+/**
+ * Intelligent process relationship detection
+ */
+class ProcessRelationship {
+  /**
+   * Check if child process should inherit parent's identity
+   */
+  static shouldInherit(
+    child: ProcessInfo,
+    parent: ProcessInfo,
+    parentIdentity: IdentifiedProcess
+  ): boolean {
+    const parentCmd = parent.command.toLowerCase();
+    const childCmd = child.command.toLowerCase();
+
+    // Rule 1: Development tool chains
+    if (this.isDevelopmentToolChain(parentCmd, childCmd)) {
+      return true;
+    }
+
+    // Rule 2: Same project directory
+    if (parentIdentity.project && this.isSameProject(parent.command, child.command, parentIdentity.project)) {
+      return true;
+    }
+
+    // Rule 3: Script execution chain
+    if (this.isScriptExecutionChain(parentCmd, childCmd)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Detect development tool chains (npm -> next-server, vercel -> webpack, etc.)
+   */
+  private static isDevelopmentToolChain(parentCmd: string, childCmd: string): boolean {
+    const devTools = /\b(npm|yarn|pnpm|bun|vercel|nx|turbo|next|vite|webpack)/;
+    const devServers = /\b(next-server|webpack|vite|nodemon|ts-node|dev-server|serve)/;
+
+    return devTools.test(parentCmd) && devServers.test(childCmd);
+  }
+
+  /**
+   * Check if processes belong to the same project
+   */
+  private static isSameProject(parentCmd: string, childCmd: string, parentProject: string): boolean {
+    // Extract project name from child command
+    const childProjectMatch = childCmd.match(/\/([^\/]+)\/(dist|src|bin|lib|build|out)\//);
+    if (childProjectMatch && childProjectMatch[1] === parentProject) {
+      return true;
+    }
+
+    // Check if both commands reference the same project directory
+    const parentProjectPattern = new RegExp(`/${parentProject}/`, 'i');
+    return parentProjectPattern.test(childCmd);
+  }
+
+  /**
+   * Detect script execution chains (shell -> script -> tool)
+   */
+  private static isScriptExecutionChain(parentCmd: string, childCmd: string): boolean {
+    const shells = /\b(sh|bash|zsh|fish|csh|tcsh)$/;
+    const runtimes = /\b(node|bun|python|python3|ruby|php|deno)/;
+
+    // Shell -> Runtime/Script
+    if (shells.test(parentCmd) && (runtimes.test(childCmd) || childCmd.includes('/'))) {
+      return true;
+    }
+
+    // Runtime -> Script (when script path is clear)
+    if (runtimes.test(parentCmd) && childCmd.includes('/') && childCmd.includes('.')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Create inherited identity from parent
+   */
+  static inheritIdentity(parentIdentity: IdentifiedProcess, child: ProcessInfo): IdentifiedProcess {
+    // Keep the parent's main identity but add child-specific info if needed
+    const childName = path.basename(child.command.split(/\s+/)[0]);
+
+    // For development servers, we usually want to keep the parent's name
+    const devServers = ['next-server', 'webpack', 'vite', 'nodemon'];
+    if (devServers.some(server => child.command.toLowerCase().includes(server))) {
+      return {
+        ...parentIdentity,
+        // Keep parent's displayName - this ensures consistency
+      };
+    }
+
+    // For other cases, might want to show relationship
+    return {
+      ...parentIdentity,
+      displayName: `${parentIdentity.displayName}→${childName}`
+    };
+  }
 }
 
 /**
@@ -148,9 +310,12 @@ export class ProcessIdentifier {
   }
 
   /**
-   * Batch identify processes with shared system calls
+   * Batch identify processes with shared system calls and intelligent parent-child relationships
    */
   static async identifyBatch(processes: ProcessInfo[]): Promise<Map<number, IdentifiedProcess>> {
+    // Build process tree to understand relationships
+    const processTree = new ProcessTree(processes);
+
     // Pre-fetch all CWDs in a single batch
     const pids = processes.map(p => p.pid);
     const cwds = await this.batchGetCwd(pids);
@@ -162,46 +327,64 @@ export class ProcessIdentifier {
       dockerPorts = await this.batchGetDockerPorts(portsToCheck);
     }
 
-    // Identify all processes with pre-fetched data
-    const identifyPromises = processes.map(async (p) => {
-      const enhancedInfo: ProcessInfo = {
-        ...p,
-        cwd: cwds.get(p.pid) || p.cwd
-      };
+    const identified = new Map<number, IdentifiedProcess>();
 
+    // Sort processes to identify parents before children
+    const sortedProcesses = [...processes].sort((a, b) => {
+      // If A is parent of B, A should come first
+      if (processTree.isDescendantOf(b.pid, a.pid)) return -1;
+      if (processTree.isDescendantOf(a.pid, b.pid)) return 1;
+      return a.pid - b.pid;
+    });
+
+    // Identify processes considering parent-child relationships
+    for (const process of sortedProcesses) {
       // Check cache first
-      const cacheKey = `${p.pid}:${p.port || ''}:${p.command.substring(0, 50)}`;
+      const cacheKey = `${process.pid}:${process.port || ''}:${process.command.substring(0, 50)}`;
       const cached = this.l1Cache.get(cacheKey);
       if (cached) {
-        return cached;
+        identified.set(process.pid, cached);
+        continue;
       }
 
-      // Use pre-fetched Docker info if available
-      if (p.port && dockerPorts.has(p.port)) {
-        const dockerInfo = dockerPorts.get(p.port)!;
+      // Handle Docker containers first (highest priority)
+      if (process.port && dockerPorts.has(process.port)) {
+        const dockerInfo = dockerPorts.get(process.port)!;
         const result: IdentifiedProcess = {
           displayName: `docker:${dockerInfo.name}`,
           category: 'container',
           project: dockerInfo.name,
-          port: p.port,
+          port: process.port,
           containerInfo: dockerInfo
         };
         this.l1Cache.set(cacheKey, result);
-        return result;
+        identified.set(process.pid, result);
+        continue;
       }
 
-      return this.identify(enhancedInfo);
-    });
+      // Get parent info and check if we should inherit
+      const parent = processTree.getParent(process.pid);
+      const parentIdentity = parent ? identified.get(parent.pid) : null;
 
-    const identified = await Promise.all(identifyPromises);
+      let result: IdentifiedProcess;
 
-    // Return as map for easy lookup
-    const result = new Map<number, IdentifiedProcess>();
-    processes.forEach((p, i) => {
-      result.set(p.pid, identified[i]);
-    });
+      if (parentIdentity && ProcessRelationship.shouldInherit(process, parent!, parentIdentity)) {
+        // Inherit from parent for consistency
+        result = ProcessRelationship.inheritIdentity(parentIdentity, process);
+      } else {
+        // Regular identification
+        const enhancedInfo: ProcessInfo = {
+          ...process,
+          cwd: cwds.get(process.pid) || process.cwd
+        };
+        result = await this.identify(enhancedInfo);
+      }
 
-    return result;
+      this.l1Cache.set(cacheKey, result);
+      identified.set(process.pid, result);
+    }
+
+    return identified;
   }
 
   /**
@@ -328,9 +511,9 @@ export class ProcessIdentifier {
       }
     }
 
-    // 2. Get working directory for context
+    // 2. Get working directory for context and extract project name intelligently
     const cwd = info.cwd || await this.getProcessCwd(pid);
-    const projectName = cwd ? path.basename(cwd) : null;
+    const projectName = this.extractProjectName(cwd, command);
 
     // 3. Special case: Docker Desktop process
     if (command.match(/com\.docker/i) && port) {
@@ -347,8 +530,42 @@ export class ProcessIdentifier {
       return identified;
     }
 
-    // 5. Fallback
-    const basename = path.basename(command.split(/\s+/)[0]);
+    // 5. Improved fallback - detect runtime-executed tools
+    const firstPart = command.split(/\s+/)[0];
+    const basename = path.basename(firstPart);
+
+    // Common runtimes that might execute CLI tools
+    const runtimes = ['node', 'bun', 'python', 'python3', 'ruby', 'php', 'deno'];
+
+    if (runtimes.includes(basename)) {
+      // Try to extract tool name from the command
+      const toolMatch = command.match(/\/([\w-]+)\.(?:js|ts|py|rb|php|mjs)\s*(\w*)/);
+      if (toolMatch) {
+        const scriptName = toolMatch[1];
+        const subcommand = toolMatch[2];
+
+        // If script is generic and we have project name, use project name
+        const genericScripts = ['cli', 'index', 'main', 'app', 'server', 'run'];
+        const toolName = (genericScripts.includes(scriptName) && projectName) ? projectName : scriptName;
+
+        return {
+          displayName: subcommand ? `${toolName}:${subcommand}` : toolName,
+          category: 'tool',
+          project: projectName || undefined
+        };
+      }
+
+      // If we have a project name but couldn't extract tool name, show project name
+      if (projectName) {
+        return {
+          displayName: projectName,
+          category: 'tool',
+          project: projectName
+        };
+      }
+    }
+
+    // Final fallback - show basename with project if available
     return {
       displayName: projectName ? `${basename} [${projectName}]` : basename,
       category: 'system',
@@ -411,6 +628,53 @@ export class ProcessIdentifier {
   }
 
   /**
+   * Extract project name intelligently from cwd and command
+   */
+  private static extractProjectName(cwd: string | null, command: string): string | null {
+    // Common container directories that should not be treated as project names
+    const containerDirs = ['repositories', 'projects', 'code', 'workspace', 'dev', 'src', 'work', 'git'];
+
+    if (cwd) {
+      const basename = path.basename(cwd);
+
+      // Check if current directory is a container directory
+      if (containerDirs.includes(basename.toLowerCase())) {
+        // Try to extract project name from command path
+        // Look for patterns like /repositories/PROJECT_NAME/...
+        const pathPattern = new RegExp(`/${basename}/([^/]+)/`);
+        const match = command.match(pathPattern);
+        if (match && match[1]) {
+          // Avoid common subdirectories
+          const commonSubdirs = ['node_modules', 'dist', 'src', 'bin', 'lib', 'build', '.git'];
+          if (!commonSubdirs.includes(match[1])) {
+            return match[1];
+          }
+        }
+
+        // Try to extract from deeper paths like /repositories/aitools/dist/cli.js
+        const deepMatch = command.match(/\/(repositories|projects|code|workspace|dev|src|work|git)\/([^/]+)\/(dist|src|bin|lib|build|out)\//);
+        if (deepMatch && deepMatch[2]) {
+          return deepMatch[2];
+        }
+
+        // If we can't extract from command, return null to avoid showing container name
+        return null;
+      }
+
+      // If not a container directory, use it as project name
+      return basename;
+    }
+
+    // If no cwd, try to extract from command path
+    const commandMatch = command.match(/\/(repositories|projects|code|workspace|dev)\/([^/]+)\//);
+    if (commandMatch && commandMatch[2]) {
+      return commandMatch[2];
+    }
+
+    return null;
+  }
+
+  /**
    * Apply pattern matching for process identification
    */
   private static applyPatterns(
@@ -421,6 +685,47 @@ export class ProcessIdentifier {
       pattern: RegExp;
       handler: (match: RegExpMatchArray, ctx: typeof context) => IdentifiedProcess;
     }> = [
+      // aitools specific pattern (highest priority)
+      {
+        pattern: /(?:bun|node|npm|yarn|pnpm|npx)\s+(?:run\s+)?(?:.*\/)?(?:dist\/)?cli\.js\s+(\w+)/i,
+        handler: (match) => {
+          const subcommand = match[1];
+          // Map short aliases to full names
+          const commandMap: { [key: string]: string } = {
+            'm': 'monitor',
+            'ps': 'process',
+            'k': 'kill',
+            'c': 'cost',
+            'h': 'hooks',
+            't': 'tree'
+          };
+          const displayCmd = commandMap[subcommand] || subcommand;
+          return {
+            displayName: `aitools:${displayCmd}`,
+            category: 'tool',
+            project: 'aitools'
+          };
+        }
+      },
+      // Generic CLI tools pattern
+      {
+        pattern: /^(?:bun|node)\s+(?:.*\/)([^\/]+)\/(dist|bin|lib|build)\/([^\/\s]+?)(?:\.(?:js|ts|mjs))?\s*(\w*)/i,
+        handler: (match, ctx) => {
+          const projectName = match[1];
+          const scriptName = match[3];
+          const subcommand = match[4];
+
+          // If script name is generic (cli, index, main), use project name
+          const genericScripts = ['cli', 'index', 'main', 'app', 'server'];
+          const toolName = genericScripts.includes(scriptName) ? projectName : scriptName;
+
+          return {
+            displayName: subcommand ? `${toolName}:${subcommand}` : toolName,
+            category: 'tool',
+            project: projectName
+          };
+        }
+      },
       // Web development servers
       {
         pattern: /node.*\/(vc|vercel)\s+(\w+)/i,
@@ -480,6 +785,17 @@ export class ProcessIdentifier {
             displayName: ctx.projectName ? `${runtime}:${scriptName} [${ctx.projectName}]` : `${runtime}:${scriptName}`,
             category: 'script',
             project: ctx.projectName || undefined
+          };
+        }
+      },
+      // Shell processes - don't show project context for interactive shells
+      {
+        pattern: /^(-?(?:.*\/)?(sh|bash|zsh|fish|csh|tcsh))\s*(-.*)?$/i,
+        handler: (match) => {
+          const shell = match[2]; // Extract shell name
+          return {
+            displayName: shell,
+            category: 'system'
           };
         }
       },

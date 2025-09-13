@@ -29,11 +29,53 @@ export function setupProcessCommand(program: Command): void {
         let filtered = processes;
         if (!options.all) {
           const cpuThreshold = parseFloat(options.cpu);
-          filtered = processes.filter(p => p.cpu >= cpuThreshold);
+
+          // Development tools whitelist - these should always be shown regardless of CPU usage
+          const isDevelopmentTool = (command: string): boolean => {
+            const devToolPatterns = [
+              /\b(vercel|vc)\s+dev/i,
+              /\b(next|nuxt|vite)\s+dev/i,
+              /\b(npm|yarn|pnpm|bun)\s+(run\s+)?(dev|start|serve)/i,
+              /node.*webpack-dev-server/i,
+              /node.*react-scripts.*start/i,
+              /\btailwindcss.*--watch/i,
+              /\bturbo.*dev/i,
+              /\bnx.*serve/i
+            ];
+            return devToolPatterns.some(pattern => pattern.test(command));
+          };
+
+          filtered = processes.filter(p => {
+            const passesCpu = p.cpu >= cpuThreshold;
+            const isDevTool = isDevelopmentTool(p.command);
+            return passesCpu || isDevTool;
+          });
         }
         
-        // Sort processes
+        // Sort processes with development tools priority
         filtered.sort((a, b) => {
+          const isDevelopmentTool = (command: string): boolean => {
+            const devToolPatterns = [
+              /\b(vercel|vc)\s+dev/i,
+              /\b(next|nuxt|vite)\s+dev/i,
+              /\b(npm|yarn|pnpm|bun)\s+(run\s+)?(dev|start|serve)/i,
+              /node.*webpack-dev-server/i,
+              /node.*react-scripts.*start/i,
+              /\btailwindcss.*--watch/i,
+              /\bturbo.*dev/i,
+              /\bnx.*serve/i
+            ];
+            return devToolPatterns.some(pattern => pattern.test(command));
+          };
+
+          const aIsDevTool = isDevelopmentTool(a.command);
+          const bIsDevTool = isDevelopmentTool(b.command);
+
+          // Development tools get priority (shown first)
+          if (aIsDevTool && !bIsDevTool) return -1;
+          if (!aIsDevTool && bIsDevTool) return 1;
+
+          // Within same category, sort by specified field
           switch (options.sort) {
             case 'mem':
               return b.memory - a.memory;
