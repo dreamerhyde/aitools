@@ -116,11 +116,26 @@ export class LinesCommand {
       for (const file of exceededFiles) {
         const excess = file.lines - this.lineLimit;
         const percentage = ((excess / this.lineLimit) * 100).toFixed(1);
-        
+        const percentageNum = parseFloat(percentage);
+
+        // Color coding: red (>40%), yellow (10-40%), gray (<=10%)
+        let statusColor;
+        let icon;
+        if (percentageNum > 40) {
+          statusColor = chalk.red;
+          icon = '✗';
+        } else if (percentageNum > 10) {
+          statusColor = chalk.yellow;
+          icon = '▪';
+        } else {
+          statusColor = chalk.gray;
+          icon = '○';
+        }
+
         console.log(
-          `  ${chalk.yellow('▪')} ${chalk.cyan(file.path)} - ` +
+          `  ${statusColor(icon)} ${chalk.cyan(file.path)} - ` +
           `${chalk.bold(file.lines)} lines ` +
-          chalk.yellow(`(+${excess} lines, ${percentage}% over)`)
+          statusColor(`(+${excess} lines, ${percentage}% over)`)
         );
       }
 
