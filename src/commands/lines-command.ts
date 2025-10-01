@@ -4,7 +4,7 @@ import path from 'path';
 import { UIHelper } from '../utils/ui.js';
 import chalk from 'chalk';
 import { Separator } from '../utils/separator.js';
-import { GitignoreParser } from '../utils/gitignore-parser.js';
+import { IgnoreManager } from '../utils/ignore-manager.js';
 import { ConfigManager } from '../utils/config-manager.js';
 import { SuggestionFormatter } from '../utils/suggestion-formatter.js';
 
@@ -15,24 +15,25 @@ interface FileInfo {
 }
 
 export class LinesCommand {
-  private gitignoreParser: GitignoreParser;
+  private ignoreManager: IgnoreManager;
   private configManager: ConfigManager;
   private lineLimit: number = 500;
 
   constructor() {
-    this.gitignoreParser = new GitignoreParser(process.cwd());
+    this.ignoreManager = new IgnoreManager(process.cwd(), 'lines');
     this.configManager = new ConfigManager();
   }
 
   async executeWithResults(): Promise<any> {
     try {
-      // Load config to get line limit
+      // Load config to get line limit and ignore patterns
       const config = await this.configManager.load();
       this.lineLimit = config.line_limit || 500;
-      
-      // Load gitignore
-      await this.gitignoreParser.load();
-      
+
+      // Load ignore patterns (.gitignore + config)
+      await this.ignoreManager.loadGitignore();
+      this.ignoreManager.setConfig(config);
+
       // Scan files
       const files = await this.scanFiles(process.cwd());
       
@@ -57,22 +58,23 @@ export class LinesCommand {
     }
   }
 
-  async execute(options: { 
-    limit?: number; 
-    all?: boolean; 
+  async execute(options: {
+    limit?: number;
+    all?: boolean;
     json?: boolean;
     path?: string;
     fail?: boolean;
   } = {}): Promise<void> {
     try {
-      // Load config to get line limit
+      // Load config to get line limit and ignore patterns
       const config = await this.configManager.load();
       this.lineLimit = options.limit || config.line_limit || 500;
 
       const targetPath = path.resolve(options.path || '.');
-      
-      // Load gitignore
-      await this.gitignoreParser.load();
+
+      // Load ignore patterns (.gitignore + config)
+      await this.ignoreManager.loadGitignore();
+      this.ignoreManager.setConfig(config);
 
       // Scan files
       const spinner = UIHelper.showSpinner('Scanning files...');
@@ -150,8 +152,8 @@ export class LinesCommand {
         const fullPath = path.join(dirPath, entry.name);
         const relativePath = path.relative(basePath, fullPath);
 
-        // Skip if gitignored
-        if (this.gitignoreParser.shouldIgnore(fullPath, entry.isDirectory())) {
+        // Skip if ignored (includes .gitignore + config patterns)
+        if (this.ignoreManager.shouldIgnore(fullPath, entry.isDirectory())) {
           continue;
         }
 
@@ -232,9 +234,11 @@ export class LinesCommand {
       }
       
       // Default behavior: scan all files
-      // Load gitignore
-      await this.gitignoreParser.load();
-      
+      // Load ignore patterns (.gitignore + config)
+      const config = await this.configManager.load();
+      await this.ignoreManager.loadGitignore();
+      this.ignoreManager.setConfig(config);
+
       // Scan files
       const files = await this.scanFiles(process.cwd());
       

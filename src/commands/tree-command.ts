@@ -1,7 +1,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { UIHelper } from '../utils/ui.js';
-import { GitignoreParser } from '../utils/gitignore-parser.js';
+import { IgnoreManager } from '../utils/ignore-manager.js';
+import { ConfigManager } from '../utils/config-manager.js';
 import chalk from 'chalk';
 
 export interface TreeOptions {
@@ -20,7 +21,7 @@ interface TreeStats {
 export class TreeCommand {
   private ignorePatterns: Set<string>;
   private stats: TreeStats;
-  private gitignoreParser?: GitignoreParser;
+  private ignoreManager?: IgnoreManager;
 
   constructor() {
     this.ignorePatterns = new Set();
@@ -39,12 +40,22 @@ export class TreeCommand {
         process.exit(1);
       }
 
-      // Always load gitignore by default (unless explicitly disabled)
+      // Initialize ignore manager (combines .gitignore + config + CLI patterns)
       if (options.respectGitignore !== false) {
-        this.gitignoreParser = new GitignoreParser(targetPath);
-        await this.gitignoreParser.load();
+        this.ignoreManager = new IgnoreManager(targetPath, 'tree');
+        await this.ignoreManager.loadGitignore();
+
+        // Load config patterns
+        const configManager = new ConfigManager();
+        const config = await configManager.load();
+        this.ignoreManager.setConfig(config);
+
+        // Set CLI patterns
+        if (options.addIgnore) {
+          this.ignoreManager.setCliPatterns(options.addIgnore);
+        }
       }
-      
+
       // Initialize minimal ignore patterns (only truly essential ones)
       this.initializeIgnorePatterns(options);
 
@@ -142,15 +153,15 @@ export class TreeCommand {
       const filteredEntries = entries
         .filter(entry => {
           // Don't filter hidden directories/files - let other filters handle them
-          
-          // Check gitignore patterns if enabled
-          if (this.gitignoreParser) {
+
+          // Check ignore patterns if enabled (includes .gitignore + config + CLI)
+          if (this.ignoreManager) {
             const entryPath = path.join(dirPath, entry.name);
-            if (this.gitignoreParser.shouldIgnore(entryPath, entry.isDirectory())) {
+            if (this.ignoreManager.shouldIgnore(entryPath, entry.isDirectory())) {
               return false;
             }
           }
-          
+
           return !this.shouldIgnore(entry.name, showFiles, entry.isDirectory());
         })
         .sort((a, b) => {

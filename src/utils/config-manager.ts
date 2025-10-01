@@ -257,7 +257,12 @@ ${tomlContent}`;
     if (config.notifications) {
       organized.notifications = config.notifications;
     }
-    
+
+    // [ignore] section
+    if (config.ignore) {
+      organized.ignore = config.ignore;
+    }
+
     return organized;
   }
 
@@ -308,7 +313,7 @@ ${tomlContent}`;
     }
     
     // Other sections - use standard TOML stringify with spacing
-    const remainingSections = ['hooks', 'readme', 'notifications'];
+    const remainingSections = ['hooks', 'readme', 'notifications', 'ignore'];
     for (const section of remainingSections) {
       if (organized[section]) {
         const sectionToml = stringify({ [section]: organized[section] });

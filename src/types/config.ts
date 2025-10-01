@@ -34,6 +34,14 @@ export interface AiToolsConfig {
     include_changes?: boolean;
     include_summary?: boolean;
   };
+
+  // File Ignore Patterns
+  ignore?: {
+    all?: string[];      // Global ignore patterns (applies to all commands)
+    tree?: string[];     // Tree/files command specific
+    lines?: string[];    // Lines check specific
+    lint?: string[];     // Lint specific
+  };
 }
 
 export const defaultConfig: AiToolsConfig = {
@@ -58,5 +66,11 @@ export const defaultConfig: AiToolsConfig = {
     on_error: true,
     include_changes: true,
     include_summary: true
+  },
+  ignore: {
+    all: ['node_modules/', '.git/', '*.log', '.DS_Store'],
+    tree: ['dist/', 'build/', 'coverage/', '.next/'],
+    lines: [],
+    lint: []
   }
 };
