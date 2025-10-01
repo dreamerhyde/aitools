@@ -7,25 +7,35 @@ import * as path from 'path';
 import * as os from 'os';
 
 /**
- * Get active project paths from Claude's project logs
- * @returns Object containing active project paths and the projects that should be displayed
+ * Information about an active session
  */
-export async function getActiveProjects(): Promise<{
-  activeProjectPaths: Set<string>;
-  activeProjects: Array<[string, any]>;
+export interface SessionFileInfo {
+  projectPath: string;
+  sessionId: string;
+  logFilePath: string;
+  mtime: number;
+}
+
+/**
+ * Get all active sessions from Claude's project logs
+ * Returns individual session files instead of aggregating by project
+ * @returns Object containing active session files
+ */
+export async function getActiveSessions(): Promise<{
+  activeSessions: SessionFileInfo[];
 }> {
   try {
     // Get projects with both today's activity and recent activity (10 min)
     const todayLogs = execSync(
       'find ~/.claude/projects -name "*.jsonl" -mmin -1440 2>/dev/null'
     ).toString().trim().split('\n').filter(Boolean);
-    
+
     const recentLogs = execSync(
       'find ~/.claude/projects -name "*.jsonl" -mmin -10 2>/dev/null'
     ).toString().trim().split('\n').filter(Boolean);
-    
+
     const allActiveLogs = [...new Set([...todayLogs, ...recentLogs])];
-    
+
     // Read .claude.json once at the beginning
     const configPath = path.join(os.homedir(), '.claude.json');
     let configData: any = null;
@@ -34,58 +44,101 @@ export async function getActiveProjects(): Promise<{
         configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       } catch (e) {
         console.error('Failed to read .claude.json:', e);
-        return { activeProjectPaths: new Set(), activeProjects: [] };
+        return { activeSessions: [] };
       }
     }
-    
-    // Extract project paths from log file paths
-    const activeProjectPaths = new Set<string>();
-    allActiveLogs.forEach((logPath: string) => {
-      const match = logPath.match(/\/projects\/(.+?)\//);
-      if (match) {
-        // Convert from "-Users-albertliu-repos-proj" to "/Users/albertliu/repos/proj"
-        const safePath = match[1].startsWith('-') ? match[1].substring(1) : match[1];
-        
-        // Simple conversion first (all dashes to slashes)
-        const simplePath = '/' + safePath.replace(/-/g, '/');
-        
-        // Check if this path exists
-        if (fs.existsSync(simplePath)) {
-          activeProjectPaths.add(simplePath);
-        } else if (configData && configData.projects) {
-          // Try to find the correct path from already loaded config
-          // This handles cases where dashes are part of the directory name
-          for (const projectPath of Object.keys(configData.projects)) {
-            const testSafePath = projectPath.replace(/\//g, '-').substring(1);
-            if (testSafePath === safePath) {
-              activeProjectPaths.add(projectPath);
+
+    // Build session info for each log file
+    const activeSessions: SessionFileInfo[] = [];
+
+    for (const logPath of allActiveLogs) {
+      // Extract project directory and session ID from path
+      // Format: ~/.claude/projects/-Users-albertliu-repos-proj/session-id.jsonl
+      const match = logPath.match(/\/projects\/(.+?)\/([a-f0-9-]+)\.jsonl$/);
+      if (!match) continue;
+
+      const [, safePath, sessionId] = match;
+
+      // Convert from "-Users-albertliu-repos-proj" to "/Users/albertliu/repos/proj"
+      const cleanSafePath = safePath.startsWith('-') ? safePath.substring(1) : safePath;
+
+      // Simple conversion first (all dashes to slashes)
+      let projectPath = '/' + cleanSafePath.replace(/-/g, '/');
+
+      // Verify path exists
+      if (!fs.existsSync(projectPath)) {
+        // Try to find correct path from config
+        if (configData && configData.projects) {
+          let found = false;
+          for (const configPath of Object.keys(configData.projects)) {
+            const testSafePath = configPath.replace(/\//g, '-').substring(1);
+            if (testSafePath === cleanSafePath) {
+              projectPath = configPath;
+              found = true;
               break;
             }
           }
+          if (!found) continue; // Skip if path not found
         } else {
-          // If no config available, fall back to simple path
-          activeProjectPaths.add(simplePath);
+          continue; // Skip if path doesn't exist and no config
         }
       }
-    });
-    
-    // Return early if no config data
-    if (!configData || !configData.projects) {
+
+      // Get file modification time
+      const stats = fs.statSync(logPath);
+
+      activeSessions.push({
+        projectPath,
+        sessionId,
+        logFilePath: logPath,
+        mtime: stats.mtime.getTime()
+      });
+    }
+
+    // Sort by modification time (newest first)
+    activeSessions.sort((a, b) => b.mtime - a.mtime);
+
+    return { activeSessions };
+  } catch (error) {
+    console.error(`Failed to get active sessions: ${error}`);
+    return { activeSessions: [] };
+  }
+}
+
+/**
+ * Get active project paths from Claude's project logs (legacy compatibility)
+ * @returns Object containing active project paths and the projects that should be displayed
+ * @deprecated Use getActiveSessions() instead for multi-session support
+ */
+export async function getActiveProjects(): Promise<{
+  activeProjectPaths: Set<string>;
+  activeProjects: Array<[string, any]>;
+}> {
+  const { activeSessions } = await getActiveSessions();
+
+  // Extract unique project paths
+  const activeProjectPaths = new Set<string>();
+  activeSessions.forEach(session => {
+    activeProjectPaths.add(session.projectPath);
+  });
+
+  // Read config for project metadata
+  const configPath = path.join(os.homedir(), '.claude.json');
+  let configData: any = null;
+  if (fs.existsSync(configPath)) {
+    try {
+      configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } catch (e) {
       return { activeProjectPaths, activeProjects: [] };
     }
-    
-    // Only show projects that have recent log activity
-    const activeProjects = configData.projects 
-      ? Object.entries(configData.projects).filter(
-          ([projectPath]: [string, any]) => {
-            return activeProjectPaths.has(projectPath);
-          }
-        )
-      : [];
-    
-    return { activeProjectPaths, activeProjects };
-  } catch (error) {
-    console.error(`Failed to get active projects: ${error}`);
-    return { activeProjectPaths: new Set(), activeProjects: [] };
   }
+
+  // Filter projects that have active sessions
+  const activeProjects = configData && configData.projects
+    ? Object.entries(configData.projects).filter(
+        ([projectPath]: [string, any]) => activeProjectPaths.has(projectPath)
+      )
+    : [];
+
+  return { activeProjectPaths, activeProjects };
 }
