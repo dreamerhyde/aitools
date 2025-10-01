@@ -1,6 +1,6 @@
 {
     "name": "@dreamerhyde/aitools",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "description": "Essential CLI toolkit for Vibe Coding - keep your AI-assisted development flow smooth by managing processes and optimizing your coding environment",
     "type": "module",
     "main": "./dist/cli.js",
