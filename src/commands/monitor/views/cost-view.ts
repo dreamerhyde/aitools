@@ -91,11 +91,8 @@ export class CostView {
         // Priority 1: Use today's model from metrics if available
         if (metrics.todayModel) {
             const cleanModel = metrics.todayModel
-                .replace('claude-', '')
-                .replace('-20', '-')
-                .replace('241022', '')
-                .replace('240805', '') // Remove date stamps
-                .replace('20240805', ''); // Remove full date format
+                .replace('claude-', '')       // Remove "claude-" prefix
+                .replace(/-\d{8}$/, '');      // Remove date stamp (e.g., -20250929)
             currentModel = sanitizeText(cleanModel, {
                 removeEmojis: true,
                 convertToAscii: true,
@@ -112,11 +109,8 @@ export class CostView {
 
             if (recentSession && recentSession.currentModel) {
                 const cleanModel = recentSession.currentModel
-                    .replace('claude-', '')
-                    .replace('-20', '-')
-                    .replace('241022', '')
-                    .replace('240805', '')
-                    .replace('20240805', '');
+                    .replace('claude-', '')       // Remove "claude-" prefix
+                    .replace(/-\d{8}$/, '');      // Remove date stamp (e.g., -20250929)
                 currentModel = sanitizeText(cleanModel, {
                     removeEmojis: true,
                     convertToAscii: true,

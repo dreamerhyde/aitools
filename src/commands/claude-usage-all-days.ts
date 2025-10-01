@@ -197,15 +197,12 @@ export class AllDaysUsageDisplay {
   private static formatModelNameShort(model: string): string {
     // Filter out synthetic models
     if (model === '<synthetic>') return '<synthetic>';
-    
-    const modelLower = model.toLowerCase();
-    if (modelLower.includes('opus-4') || modelLower.includes('opus_4')) return 'opus-4';
-    if (modelLower.includes('sonnet-4') || modelLower.includes('sonnet_4')) return 'sonnet-4';
-    if (modelLower.includes('claude-3-5-sonnet')) return 'sonnet-4';
-    if (modelLower.includes('haiku') && modelLower.includes('3-5')) return 'haiku-3.5';
-    if (modelLower.includes('opus') && !modelLower.includes('4')) return 'opus-3';
-    if (modelLower.includes('sonnet') && !modelLower.includes('4')) return 'sonnet-3';
-    return model;
+
+    // Use same logic as monitor: remove "claude-" prefix and date stamp
+    // This preserves version numbers like -4-5, -4-1, -3-5, etc.
+    return model
+      .replace('claude-', '')       // Remove "claude-" prefix
+      .replace(/-\d{8}$/, '');      // Remove date stamp (e.g., -20250929)
   }
 
   private static formatNumber(num: number): string {

@@ -341,25 +341,11 @@ export class ClaudeUsageCommand {
   }
 
   private formatModelName(model: string): string {
-    // Format model names like ccusage - Prioritize Claude 4 models
-    const modelLower = model.toLowerCase();
-    
-    // Claude 4 models (highest priority) - including new format like claude-opus-4-1-20250805
-    if (modelLower.includes('opus-4') || modelLower.includes('opus_4') || 
-        modelLower.includes('claude-opus-4') || modelLower.includes('opus-4-1')) return 'opus-4';
-    if (modelLower.includes('sonnet-4') || modelLower.includes('sonnet_4') || 
-        modelLower.includes('claude-sonnet-4') || modelLower.includes('sonnet-4-1')) return 'sonnet-4';
-    
-    // Claude 3.5 models
-    if (modelLower.includes('claude-3-5-sonnet') || modelLower.includes('claude-3.5-sonnet')) return 'sonnet-3.5';
-    if (modelLower.includes('claude-3-5-haiku') || modelLower.includes('haiku-3.5')) return 'haiku-3.5';
-    
-    // Legacy Claude 3 models
-    if (modelLower.includes('opus') && !modelLower.includes('4')) return 'opus-3';
-    if (modelLower.includes('sonnet') && !modelLower.includes('4') && !modelLower.includes('3-5') && !modelLower.includes('3.5')) return 'sonnet-3';
-    if (modelLower.includes('haiku') && !modelLower.includes('3.5') && !modelLower.includes('3-5')) return 'haiku-3';
-    
-    return model;
+    // Use same logic as monitor: remove "claude-" prefix and date stamp
+    // This preserves version numbers like -4-5, -4-1, -3-5, etc.
+    return model
+      .replace('claude-', '')       // Remove "claude-" prefix
+      .replace(/-\d{8}$/, '');      // Remove date stamp (e.g., -20250929)
   }
 
   private formatDuration(ms: number): string {
