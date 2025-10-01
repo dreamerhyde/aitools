@@ -15,6 +15,7 @@ export class SessionBoxesView {
   private grid: any;
   private blessed: any;
   private qaStyle = getQAStyle(QAStyleType.HYBRID); // Default to hybrid style (Q badge, A arrow)
+  private sessionSlots: (string | null)[] = [null, null, null, null]; // Track session IDs in each position
 
   constructor(screenManager: any, grid: any, blessed: any) {
     this.screenManager = screenManager;
@@ -92,12 +93,9 @@ export class SessionBoxesView {
     if (this.sessionBoxes.length === 0) {
       return;
     }
-    
+
     const now = new Date();
-    const sessions = Array.from(activeSessions.values())
-      .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())
-      .slice(0, 4); // Take first 4 most recent sessions
-    
+
     // Clean up inactive sessions (older than 30 minutes)
     for (const [id, session] of activeSessions) {
       const minutesInactive = (now.getTime() - session.lastActivity.getTime()) / 60000;
@@ -105,13 +103,35 @@ export class SessionBoxesView {
         activeSessions.delete(id);
       }
     }
-    
-    // Update each of the 4 boxes
+
+    // Step 1: Remove sessions that no longer exist (filter out missing sessions)
+    this.sessionSlots = this.sessionSlots.map(id =>
+      id && activeSessions.has(id) ? id : null
+    );
+
+    // Step 2: Compact - move all non-null values to the front, nulls to the back
+    const compactedSlots = this.sessionSlots.filter(id => id !== null);
+    const nullCount = 4 - compactedSlots.length;
+    this.sessionSlots = [...compactedSlots, ...Array(nullCount).fill(null)];
+
+    // Step 3: Fill empty slots with new sessions (sorted by activity time)
+    const newSessions = Array.from(activeSessions.values())
+      .filter(session => !this.sessionSlots.includes(session.sessionId))
+      .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+
+    for (let i = 0; i < 4 && newSessions.length > 0; i++) {
+      if (this.sessionSlots[i] === null) {
+        this.sessionSlots[i] = newSessions.shift()!.sessionId;
+      }
+    }
+
+    // Step 4: Render boxes based on sessionSlots
     for (let i = 0; i < 4; i++) {
       const box = this.sessionBoxes[i];
-      
-      if (i < sessions.length) {
-        const session = sessions[i];
+      const sessionId = this.sessionSlots[i];
+      const session = sessionId ? activeSessions.get(sessionId) : null;
+
+      if (session) {
         
         // Update box label with user name and model (shorten long model names)
         let modelBadge = '';
