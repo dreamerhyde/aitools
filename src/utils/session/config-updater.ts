@@ -2,7 +2,7 @@
  * Session configuration update utilities
  */
 import { getActiveProjects } from './project-utils.js';
-import { getLatestConversationInfo } from './conversation-parser.js';
+import { getLatestConversationInfo } from './conversation-parser/index.js';
 import { SessionUpdateCallback } from './types.js';
 import { generateSessionId } from './session-id-helper.js';
 

@@ -7,5 +7,5 @@
 export * from './types.js';
 export * from './tool-mapping.js';
 export * from './project-utils.js';
-export * from './conversation-parser.js';
+export * from './conversation-parser/index.js';
 export * from './config-updater.js';
