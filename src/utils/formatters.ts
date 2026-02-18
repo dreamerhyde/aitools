@@ -3,7 +3,7 @@
  */
 import chalk from 'chalk';
 
-// Session info interface - compatible with monitor implementations
+// Session info interface
 export interface SessionInfo {
   sessionId: string;
   user: string;

@@ -16,7 +16,7 @@ export class HelpFormatter {
     
     // Header
     output.push('');
-    output.push(chalk.bold.cyan('AI Tools CLI') + chalk.gray(' - Vibe Coding Toolkit'));
+    output.push(chalk.bold.cyan('AI Tools CLI') + chalk.gray(' - Claude Code Developer Toolkit'));
     output.push('');
     
     if (program) {
@@ -90,9 +90,7 @@ export class HelpFormatter {
         // Add important options with alignment
         const importantOptions = cmd.options.filter(opt => {
           const flags = opt.flags;
-          return flags.includes('-i') || flags.includes('-k') || flags.includes('-w') || 
-                 flags.includes('--aggressive') || flags.includes('--hooks') ||
-                 flags.includes('--ignore');
+          return flags.includes('--ignore');
         });
         
         if (importantOptions.length > 0 && subcommands.length === 0) {
@@ -165,9 +163,9 @@ export class HelpFormatter {
     output.push('');
     output.push('  ' + chalk.green('ai cost') + '           ' + chalk.gray('# Check Claude Code usage costs'));
     output.push('  ' + chalk.green('ai lint') + '           ' + chalk.gray('# Run code quality checks'));
-    output.push('  ' + chalk.green('ai changes') + '        ' + chalk.gray('# View git change statistics'));
+    output.push('  ' + chalk.green('ai lines') + '          ' + chalk.gray('# Check files exceeding line limit'));
     output.push('  ' + chalk.green('ai hooks init') + '     ' + chalk.gray('# Setup Claude Code hooks'));
-    output.push('  ' + chalk.green('ai process hooks') + '  ' + chalk.gray('# Check hook-related processes'));
+    output.push('  ' + chalk.green('ai ps hooks') + '       ' + chalk.gray('# Check hook-related processes'));
     output.push('');
     
     return output.join('\n');

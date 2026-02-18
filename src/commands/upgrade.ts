@@ -236,7 +236,7 @@ export class UpgradeCommand {
         console.log();
         console.log(chalk.green(`✓ Successfully upgraded from ${this.currentVersion} to ${newVersion}`));
         console.log();
-        console.log(chalk.cyan(' Your vibe coding toolkit is now up to date!'));
+        console.log(chalk.cyan(' Your CLI toolkit is now up to date!'));
       }
     } catch {
       // Version check failed, but upgrade might still be successful

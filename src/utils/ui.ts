@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { table } from 'table';
 import ora from 'ora';
-import { ProcessInfo, SystemStats, HookDetectionResult } from '../types/index.js';
+import { ProcessInfo } from '../types/index.js';
 import { TABLE_CHARS } from './table-config.js';
 import { Separator } from './separator.js';
 
@@ -23,35 +23,8 @@ export class UIHelper {
   static showHeader() {
     console.log();
     console.log(chalk.bold.cyan('▪ AI Tools CLI'));
-    console.log(chalk.gray('Process Monitor & Management'));
+    console.log(chalk.gray('Claude Code Developer Toolkit'));
     console.log(Separator.short());
-  }
-
-  static showSystemStats(stats: SystemStats) {
-    console.log(chalk.bold.yellow('\n▪ System Status'));
-    console.log(Separator.short());
-    
-    const data = [
-      ['Metric', 'Value'],
-      ['CPU Usage', `${stats.cpuUsage.toFixed(1)}%`],
-      ['Load Average', `${stats.loadAverage.map(l => l.toFixed(2)).join(', ')}`],
-      ['Total Memory', stats.totalMemory],
-      ['Free Memory', stats.freeMemory],
-      ['Active Memory', stats.activeMemory]
-    ];
-
-    const config = {
-      columnDefault: {
-        paddingLeft: 1,
-        paddingRight: 1
-      },
-      columns: {
-        0: { alignment: 'left' as const },
-        1: { alignment: 'right' as const }
-      }
-    };
-
-    console.log(table(data, config));
   }
 
   static showProcessTable(processes: ProcessInfo[], title: string, limit = 10) {
@@ -189,52 +162,6 @@ export class UIHelper {
     if (processes.length > limit) {
       console.log(chalk.gray(`   ... ${processes.length - limit} more processes not shown`));
     }
-  }
-
-  static showDetectionResult(result: HookDetectionResult) {
-    this.showHeader();
-    this.showSystemStats(result.systemStats);
-    
-    this.showProcessTable(result.suspiciousProcesses, 'Suspicious Hook Processes');
-    this.showProcessTable(result.longRunningBash, 'Long-running Bash Processes');
-    this.showProcessTable(result.highCpuProcesses, 'High CPU Usage Processes');
-  }
-
-  static async showKillConfirmation(processes: ProcessInfo[]): Promise<number[]> {
-    if (processes.length === 0) {
-      console.log(chalk.yellow('\nNo processes found to handle'));
-      return [];
-    }
-
-    console.log(chalk.bold.red('\n⚠ Found the following suspicious processes:'));
-    
-    const data = [
-      ['Option', 'PID', 'CPU%', 'Command']
-    ];
-
-    processes.forEach((proc, index) => {
-      data.push([
-        `[${index + 1}]`,
-        proc.pid.toString(),
-        proc.cpu.toFixed(1),
-        this.truncateCommand(proc.command, 50)
-      ]);
-    });
-
-    const config = {
-      columnDefault: {
-        paddingLeft: 1,
-        paddingRight: 1
-      }
-    };
-
-    console.log(table(data, config));
-    console.log(chalk.gray('\nOptions:'));
-    console.log(chalk.white('  • Enter numbers to select processes to kill (e.g., 1,2,3)'));
-    console.log(chalk.white('  • Enter "all" to kill all processes'));
-    console.log(chalk.white('  • Press Enter to skip'));
-    
-    return [];
   }
 
   static showSuccess(message: string) {

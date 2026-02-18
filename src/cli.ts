@@ -4,16 +4,11 @@ import { Command } from 'commander';
 import { setupBasicCommands } from './cli/basic-commands.js';
 import { setupHooksCommand } from './cli/hooks-command.js';
 import { setupCostCommand } from './cli/cost-command.js';
-import { setupCompletionCommand } from './cli/completion-command.js';
 import { setupTreeCommand } from './cli/tree-command.js';
 import { setupInitCommand } from './cli/init-command.js';
-import { setupChangesCommand } from './cli/changes-command.js';
 import { setupLintCommand } from './cli/lint-command.js';
 import { setupLinesCommand } from './cli/lines-command.js';
 import { setupProcessCommand } from './cli/process-command.js';
-import { setupPricingCommand } from './cli/pricing-command.js';
-import { setupMonitorCommand } from './cli/monitor-command.js';
-import { setupSupabaseCommand } from './cli/supabase-command.js';
 import { AutoUpdateChecker } from './utils/auto-update.js';
 import { UIHelper } from './utils/ui.js';
 import { HelpFormatter } from './utils/help-formatter.js';
@@ -42,7 +37,7 @@ AutoUpdateChecker.checkInBackground();
 
 program
   .name('aitools')
-  .description('Vibe Coding Toolkit - Keep your AI-assisted development flow smooth')
+  .description('CLI toolkit for Claude Code developers - code quality, process management, and usage analytics')
   .version(version)
   .configureHelp({
     formatHelp: () => HelpFormatter.formatRootHelpAligned(program)
@@ -52,18 +47,13 @@ program
 // Core commands
 setupInitCommand(program);
 setupCostCommand(program);
-setupMonitorCommand(program);  // real-time monitor
 setupTreeCommand(program);    // tree + files
-setupChangesCommand(program); // git changes
 setupLintCommand(program);    // quality checks
 setupLinesCommand(program);   // line limit checks
 
 // Supporting commands
 setupHooksCommand(program);
 setupProcessCommand(program);
-setupPricingCommand(program);
-setupSupabaseCommand(program);
-setupCompletionCommand(program);
 
 // Basic commands
 setupBasicCommands(program);

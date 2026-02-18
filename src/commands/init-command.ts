@@ -199,7 +199,7 @@ export class InitCommand {
       }
       
       console.log(`\n${stepNum}. Check your setup:`);
-      console.log(chalk.gray('   ai status'));
+      console.log(chalk.gray('   ai lines'));
       
       console.log('');
 

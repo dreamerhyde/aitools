@@ -82,7 +82,7 @@ export class ApplicationCache {
    * Scan CLI tools in common directories
    */
   private scanCLITools(): void {
-    // Remove console.log - it interferes with monitor TUI
+    // Scan silently - no console output
     const cliDirs = [
       '/usr/local/bin',
       '/opt/homebrew/bin',
@@ -114,7 +114,7 @@ export class ApplicationCache {
       this.cliCache.set(`node ${toolPath}`, 'aitools');
       
       // With subcommands (these appear in ps output)
-      const subcommands = ['m', 'monitor', 'ps', 'kill', 'cost', 'hooks', 'tree', 'lint'];
+      const subcommands = ['ps', 'kill', 'cost', 'hooks', 'tree', 'lint', 'lines', 'init'];
       for (const cmd of subcommands) {
         // Direct invocation
         this.cliCache.set(`${toolPath} ${cmd}`, `aitools ${cmd}`);
@@ -166,14 +166,14 @@ export class ApplicationCache {
       }
     }
     
-    // Removed console.log - it interferes with monitor TUI
+    // Silent operation
   }
   
   /**
    * Scan /Applications folder and build cache
    */
   private scanApplications(): void {
-    // Removed console.log - it interferes with monitor TUI
+    // Silent operation
     // const startTime = Date.now(); // Currently unused
     
     try {
@@ -226,10 +226,10 @@ export class ApplicationCache {
       this.saveCache();
       
       // const scanTime = Date.now() - startTime; // Currently unused
-      // Removed console.log - it interferes with monitor TUI
+      // Silent operation
       
     } catch (error) {
-      // Silent fail - don't log in monitor mode
+      // Silent fail
     }
   }
   
@@ -282,7 +282,7 @@ export class ApplicationCache {
           this.cache = new Map(Object.entries(parsed.entries));
           this.cliCache = new Map(Object.entries(parsed.cliEntries || {}));
           this.lastUpdate = parsed.timestamp;
-          // Silent load - don't log in monitor mode
+          // Silent load
           return;
         }
       }
@@ -314,7 +314,7 @@ export class ApplicationCache {
       
       fs.writeFileSync(this.cacheFile, JSON.stringify(data, null, 2));
     } catch (e) {
-      // Silent fail - don't log in monitor mode
+      // Silent fail
     }
   }
   

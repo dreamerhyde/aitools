@@ -32,6 +32,6 @@ export class SuggestionFormatter {
   }
 
   // Common suggestions
-  static readonly LINT_FIX = 'Run `aitools lint --fix` to auto-fix ESLint issues, then manually fix remaining TypeScript errors.';
+  static readonly LINT_FIX = 'Run `ai lint --fix` to auto-fix ESLint issues, then manually fix remaining TypeScript errors.';
   static readonly REFACTOR_LINES = 'Consider extracting utility functions, splitting into modules, or refactoring these files to improve maintainability.';
 }

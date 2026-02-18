@@ -311,7 +311,7 @@ export function sanitizeText(text: string, options: SanitizeOptions = {}): strin
   }
 
   // Apply length limit if specified (AFTER restoring blessed tags)
-  // Note: For monitor view, we should avoid using maxLength to prevent truncation
+  // Note: Avoid using maxLength to prevent truncation in table views
   if (maxLength && result.length > maxLength) {
     // Try to find a good break point (space or newline) near the limit
     const cutPoint = result.lastIndexOf(' ', maxLength);

@@ -4,47 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 專案概述
 
-這是 `aitools` - 專門針對 AI 開發環境設計的 CLI 工具，用於監控和管理 hook 進程，特別是解決 Claude Code hook 卡關等問題。工具提供智能進程檢測、互動式管理和自動化修復功能。
+這是 `aitools` - Claude Code Developer Toolkit，提供程式碼品質檢查、進程管理和使用量分析功能的 CLI 工具。
 
 ## 核心命令
 
 ### 開發命令
 ```bash
-# 開發和測試
-bun run dev [command]         # 開發模式執行 CLI
-bun run build                 # 使用 bun bundler 建置正式版
+# 三階段開發流程
+aid [command]                # 開發版：直接跑 src/cli.ts
+aib [command]                # 建構版：跑 dist/cli.js
+ai [command]                 # 正式版：npm 全域安裝
+
+# 建置與檢查
+bun run build                # 使用 bun bundler 建置正式版
 bun run typecheck            # TypeScript 型別檢查
 bun run lint                 # ESLint 代碼檢查
-
-# 建置版本執行
-./dist/cli.js [command]      # 直接執行建置版本
 ```
 
 ### CLI 使用
 ```bash
-# 核心功能
-aitools monitor              # 檢測可疑的 hook 進程
-aitools list --hooks         # 列出 hook 相關進程  
-aitools kill --hooks -i      # 互動式終止 hook 進程
-aitools quick               # 一鍵問題解決
-aitools stats               # 系統概覽
+# 程式碼品質
+ai lines                     # 檔案行數檢查（預設 500 行）
+ai lint                      # TypeScript + ESLint 檢查
+
+# 進程管理
+ai ps                        # 列出進程
+ai ps hooks                  # hook 相關進程
+ai ps kill                   # 互動式終止進程
+ai ps port                   # 監聽端口的進程
+
+# Claude Code
+ai hooks                     # 查看 hook 設定
+ai hooks init                # 初始化 hooks
+ai cost                      # 30 天費用趨勢
+
+# 工具
+ai tree                      # 目錄結構
+ai init                      # 初始化設定
+ai upgrade                   # 自我更新
 ```
 
 ## 架構設計
 
 ### 命令模式結構
-CLI 使用 Commander.js 搭配命令模式，每個主要功能都實作為獨立的命令類別：
+CLI 使用 Commander.js 搭配命令模式：
 
-- `src/cli.ts` - 主要進入點，定義所有命令和選項
-- `src/commands/` - 命令實作 (MonitorCommand, ListCommand, KillCommand)
+- `src/cli.ts` - 主要進入點，註冊所有命令
+- `src/cli/` - 命令設定模組（每個命令一個檔案）
+- `src/commands/` - 命令實作邏輯
 - `src/utils/process-monitor.ts` - 核心進程檢測和管理邏輯
-- `src/utils/ui.ts` - 使用 chalk, table, ora 的 CLI 介面組件
+- `src/utils/ui.ts` - 使用 chalk, cli-table3, ora 的 CLI 介面組件
 
 ### 關鍵組件
 
-**ProcessMonitor 類別**: 系統監控的核心邏輯，使用 macOS 特定命令 (`ps`, `vm_stat`, `top`) 來收集進程和系統資訊。包含智能 hook 檢測邏輯，透過 "hook", "claude", "git hook" 等模式識別進程。
-
-**Command 類別**: 每個命令 (monitor, list, kill) 都實作為獨立類別，擁有自己的選項和執行邏輯。都依賴 ProcessMonitor 提供核心功能。
+**ProcessMonitor 類別**: 使用 macOS 特定命令 (`ps`, `vm_stat`) 來收集進程資訊。包含智能 hook 檢測邏輯，透過 "hook", "claude", "git hook" 等模式識別進程。被 `ps`、`kill`、`port`、`hooks` 子命令使用。
 
 **UI 系統**: 集中化的 UI 助手，在所有命令中提供一致的格式化、彩色表格、載入動畫和狀態圖示。
 
@@ -129,43 +142,11 @@ bun run release:major
 - [ ] CHANGELOG 或 commit messages 清楚描述變更
 - [ ] 本地測試新功能正常運作
 
-### 資源監控顏色編碼系統
-
-`aitools monitor` 命令使用智能顏色編碼來快速識別系統健康狀態：
-
-#### 標準三階顏色系統 (CPU/MEM/GPU 進度條)
-| 使用率範圍 | 顏色 | 狀態 | 描述 |
-|------------|------|------|------|
-| 0-60% | 🟢 綠色 | 正常 | 系統運行正常 |
-| 60-80% | 🟡 黃色 | 警告 | 中等負載，需密切監控 |
-| 80-100% | 🔴 紅色 | 危險 | 高負載，可能影響性能 |
-
-#### VRAM 四階顏色系統 (更細緻的記憶體監控)
-| 使用率範圍 | 顏色 | 狀態 | 描述 |
-|------------|------|------|------|
-| 0-40% | 🟢 綠色 | 最佳 | 充足的 VRAM 可用 |
-| 40-60% | 🔵 青色 | 中等 | 活躍工作流程的正常使用 |
-| 60-80% | 🟡 黃色 | 警告 | 高 VRAM 使用率 |
-| 80-100% | 🔴 紅色 | 危險 | VRAM 耗盡，性能受影響 |
-
-#### 顯示格式
-- **CPU**: `M4 Max (16 cores)` - 顯示處理器型號和核心數
-- **GPU**: `40 cores • 8% VRAM` - 只顯示核心數避免重複，VRAM 使用彩色顯示
-- **MEM**: `19.3/128.0 GB` - 已使用/總計記憶體
-
-#### Apple Silicon 支援的 GPU 核心數
-- **M1**: 7-8 (基本), 14-16 (Pro), 24-32 (Max), 48-64 (Ultra)
-- **M2**: 8-10 (基本), 16-19 (Pro), 30-38 (Max), 60-76 (Ultra) 
-- **M3**: 8-10 (基本), 14-18 (Pro), 30-40 (Max)
-- **M4**: 10 (基本), 16-20 (Pro), 32-40 (Max)
-
-系統會自動從 `system_profiler SPDisplaysDataType` 偵測實際核心數和晶片型號。
-
 ## 程式碼重構規範
 
 ### 檔案大小限制
 - **500 行規則**：任何檔案超過 500 行時必須進行重構
-- **檢測工具**：使用 `aitools lines` 檢測超標檔案
+- **檢測工具**：使用 `ai lines` 檢測超標檔案
 - **配置排除**：可在 `.aitools/config.toml` 中設定例外：
   ```toml
   [ignore]
@@ -211,10 +192,10 @@ group-card/
 
 ```bash
 # 搜尋舊類別/函數名稱
-aitools grep "OldClassName" --output content
+grep -r "OldClassName" src/
 
 # 檢查所有 import 語句
-aitools grep "from.*old-file" --output content
+grep -r "from.*old-file" src/
 ```
 
 **檢查清單**：

@@ -17,24 +17,48 @@ export interface SessionFileInfo {
 }
 
 /**
+ * Get the timestamp of the last entry in a JSONL log file
+ * Handles special cases like file-history-snapshot entries that don't have timestamps
+ */
+function getLastEntryTimestamp(logPath: string): number | null {
+  try {
+    // Get last 5 lines to handle entries without timestamps (like file-history-snapshot)
+    const lastLines = execSync(`tail -5 "${logPath}" 2>/dev/null`, {
+      maxBuffer: 1024 * 1024
+    }).toString().trim().split('\n');
+
+    // Find the most recent entry with a valid timestamp
+    for (let i = lastLines.length - 1; i >= 0; i--) {
+      try {
+        const entry = JSON.parse(lastLines[i]);
+        if (entry.timestamp) {
+          return new Date(entry.timestamp).getTime();
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
  * Get all active sessions from Claude's project logs
  * Returns individual session files instead of aggregating by project
+ * @param maxInactiveMinutes Maximum minutes of inactivity to consider session active (default: 5)
  * @returns Object containing active session files
  */
-export async function getActiveSessions(): Promise<{
+export async function getActiveSessions(maxInactiveMinutes: number = 5): Promise<{
   activeSessions: SessionFileInfo[];
 }> {
   try {
-    // Get projects with both today's activity and recent activity (10 min)
-    const todayLogs = execSync(
-      'find ~/.claude/projects -name "*.jsonl" -mmin -1440 2>/dev/null'
-    ).toString().trim().split('\n').filter(Boolean);
-
+    // Get projects with recent activity (within 30 minutes for initial filtering)
     const recentLogs = execSync(
-      'find ~/.claude/projects -name "*.jsonl" -mmin -10 2>/dev/null'
+      'find ~/.claude/projects -name "*.jsonl" -mmin -30 2>/dev/null'
     ).toString().trim().split('\n').filter(Boolean);
-
-    const allActiveLogs = [...new Set([...todayLogs, ...recentLogs])];
 
     // Read .claude.json once at the beginning
     const configPath = path.join(os.homedir(), '.claude.json');
@@ -50,8 +74,10 @@ export async function getActiveSessions(): Promise<{
 
     // Build session info for each log file
     const activeSessions: SessionFileInfo[] = [];
+    const now = Date.now();
+    const maxInactiveMs = maxInactiveMinutes * 60 * 1000;
 
-    for (const logPath of allActiveLogs) {
+    for (const logPath of recentLogs) {
       // Extract project directory and session ID from path
       // Format: ~/.claude/projects/-Users-albertliu-repos-proj/session-id.jsonl
       const match = logPath.match(/\/projects\/(.+?)\/([a-f0-9-]+)\.jsonl$/);
@@ -82,6 +108,12 @@ export async function getActiveSessions(): Promise<{
         } else {
           continue; // Skip if path doesn't exist and no config
         }
+      }
+
+      // Check last entry timestamp to determine if session is truly active
+      const lastEntryTime = getLastEntryTimestamp(logPath);
+      if (!lastEntryTime || (now - lastEntryTime) > maxInactiveMs) {
+        continue; // Skip sessions with no recent activity
       }
 
       // Get file modification time
