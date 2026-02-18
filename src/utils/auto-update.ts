@@ -52,7 +52,7 @@ export class AutoUpdateChecker {
       const currentVersion = packageJson.version;
       
       // Check latest version from npm
-      const { stdout } = await execAsync('npm view aitools version 2>/dev/null', {
+      const { stdout } = await execAsync('npm view @dreamerhyde/aitools version 2>/dev/null', {
         timeout: 5000 // 5 second timeout
       });
       
