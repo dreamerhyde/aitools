@@ -1,6 +1,6 @@
 {
     "name": "@dreamerhyde/aitools",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "description": "CLI toolkit for Claude Code developers - code quality, process management, and usage analytics",
     "type": "module",
     "main": "./dist/cli.js",
