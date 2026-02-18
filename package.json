@@ -32,6 +32,10 @@
     ],
     "author": "Albert Liu",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/dreamerhyde/aitools"
+    },
     "dependencies": {
         "@clack/prompts": "^0.7.0",
         "@types/glob": "^9.0.0",
