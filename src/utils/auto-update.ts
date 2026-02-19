@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_NAME = '@dreamerhyde/aitools';
 const CONFIG_DIR = join(homedir(), '.aitools');
 const CONFIG_PATH = join(CONFIG_DIR, 'update.json');
-const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 interface UpdateConfig {
   lastCheck: string;
