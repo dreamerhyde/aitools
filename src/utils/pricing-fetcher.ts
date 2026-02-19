@@ -10,6 +10,74 @@ export interface ModelPricing {
   max_tokens?: number;
 }
 
+/**
+ * Normalize model names by removing only date stamps (8 digits at end)
+ * Preserves version numbers like -4-5 or -4-1
+ */
+export function normalizeModelName(modelName: string): string {
+  return modelName.replace(/-\d{8}$/, '');
+}
+
+/**
+ * Generate common model name variations for LiteLLM
+ */
+export function generateModelVariations(modelName: string): string[] {
+  const lowerModel = modelName.toLowerCase();
+  const variations: string[] = [];
+
+  // Add anthropic prefix variations
+  variations.push(`anthropic/${modelName}`);
+
+  // Handle Claude 4 Sonnet variations (should try exact match first via normalize)
+  // Only add Sonnet 4.5 if it's actually a Sonnet 4.5 model
+  if (lowerModel.includes('claude-sonnet-4-5')) {
+    variations.push(
+      'claude-sonnet-4-5',
+      'anthropic/claude-sonnet-4-5'
+    );
+  }
+
+  // Handle Claude 4 Sonnet (non-4.5 versions)
+  if (lowerModel.includes('claude-sonnet-4') && !lowerModel.includes('4-5')) {
+    variations.push(
+      'claude-sonnet-4-20250514',
+      'anthropic/claude-sonnet-4-20250514'
+    );
+  }
+
+  // Handle new Claude 4 Opus format: claude-opus-4-1-20250805
+  if (lowerModel.includes('claude-opus-4')) {
+    variations.push(
+      'claude-opus-4-1-20250805',
+      'anthropic/claude-opus-4-1-20250805'
+    );
+  }
+
+  // Legacy Claude 3 fallbacks - only as last resort
+  if (lowerModel.includes('opus') && !lowerModel.includes('4')) {
+    variations.push(
+      'claude-3-opus-20240229',
+      'anthropic/claude-3-opus-20240229'
+    );
+  }
+
+  if (lowerModel.includes('sonnet') && !lowerModel.includes('4')) {
+    variations.push(
+      'claude-3-5-sonnet-20241022',
+      'anthropic/claude-3-5-sonnet-20241022'
+    );
+  }
+
+  if (lowerModel.includes('haiku')) {
+    variations.push(
+      'claude-3-5-haiku-20241022',
+      'anthropic/claude-3-5-haiku-20241022'
+    );
+  }
+
+  return variations;
+}
+
 export class PricingFetcher {
   private cachedPricing: Map<string, ModelPricing> | null = null;
   private readonly offline: boolean;
@@ -95,14 +163,14 @@ export class PricingFetcher {
     }
 
     // Normalize the model name by removing date stamps and version suffixes
-    const normalizedModel = this.normalizeModelName(modelName);
+    const normalizedModel = normalizeModelName(modelName);
     const normalizedMatch = pricing.get(normalizedModel);
     if (normalizedMatch) {
       return normalizedMatch;
     }
 
     // Try common LiteLLM variations
-    const variations = this.generateModelVariations(modelName);
+    const variations = generateModelVariations(modelName);
     for (const variant of variations) {
       const match = pricing.get(variant);
       if (match) {
@@ -112,74 +180,6 @@ export class PricingFetcher {
 
     // Intelligent fuzzy matching for Claude models
     return this.findBestFuzzyMatch(modelName, pricing);
-  }
-
-  /**
-   * Normalize model names by removing only date stamps (8 digits at end)
-   * Preserves version numbers like -4-5 or -4-1
-   */
-  private normalizeModelName(modelName: string): string {
-    return modelName.replace(/-\d{8}$/, ''); // Remove only date stamps like -20250805
-  }
-
-  /**
-   * Generate common model name variations for LiteLLM
-   */
-  private generateModelVariations(modelName: string): string[] {
-    const lowerModel = modelName.toLowerCase();
-    const variations: string[] = [];
-
-    // Add anthropic prefix variations
-    variations.push(`anthropic/${modelName}`);
-
-    // Handle Claude 4 Sonnet variations (should try exact match first via normalize)
-    // Only add Sonnet 4.5 if it's actually a Sonnet 4.5 model
-    if (lowerModel.includes('claude-sonnet-4-5')) {
-      variations.push(
-        'claude-sonnet-4-5',  // Try without date stamp
-        'anthropic/claude-sonnet-4-5'
-      );
-    }
-
-    // Handle Claude 4 Sonnet (non-4.5 versions)
-    if (lowerModel.includes('claude-sonnet-4') && !lowerModel.includes('4-5')) {
-      variations.push(
-        'claude-sonnet-4-20250514',   // Common Sonnet 4 version
-        'anthropic/claude-sonnet-4-20250514'
-      );
-    }
-
-    // Handle new Claude 4 Opus format: claude-opus-4-1-20250805
-    if (lowerModel.includes('claude-opus-4')) {
-      variations.push(
-        'claude-opus-4-1-20250805',   // Try common Opus 4.1 version
-        'anthropic/claude-opus-4-1-20250805'
-      );
-    }
-
-    // Legacy Claude 3 fallbacks - only as last resort
-    if (lowerModel.includes('opus') && !lowerModel.includes('4')) {
-      variations.push(
-        'claude-3-opus-20240229',
-        'anthropic/claude-3-opus-20240229'
-      );
-    }
-
-    if (lowerModel.includes('sonnet') && !lowerModel.includes('4')) {
-      variations.push(
-        'claude-3-5-sonnet-20241022',
-        'anthropic/claude-3-5-sonnet-20241022'
-      );
-    }
-
-    if (lowerModel.includes('haiku')) {
-      variations.push(
-        'claude-3-5-haiku-20241022',
-        'anthropic/claude-3-5-haiku-20241022'
-      );
-    }
-
-    return variations;
   }
 
   /**

@@ -5,6 +5,60 @@ import * as dotenv from 'dotenv';
 import { AiToolsConfig, defaultConfig } from '../types/config.js';
 import { UIHelper } from './ui.js';
 
+/**
+ * Deep merge two objects, with source overriding target
+ */
+export function deepMerge(target: any, source: any): any {
+  const result = { ...target };
+
+  for (const key in source) {
+    if (source[key] !== undefined && source[key] !== null) {
+      if (typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        result[key] = deepMerge(result[key] || {}, source[key]);
+      } else {
+        result[key] = source[key];
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Process environment variable references in config values
+ * Supports syntax: "env(VAR_NAME)" or "env(VAR_NAME, default_value)"
+ */
+export function processEnvVars(config: any): any {
+  const envPattern = /^env\(([^,)]+)(?:,\s*(.+))?\)$/;
+
+  const processValue = (value: any): any => {
+    if (typeof value === 'string') {
+      const match = value.match(envPattern);
+      if (match) {
+        const [, envVar, defaultValue] = match;
+        const envValue = process.env[envVar.trim()];
+        if (envValue !== undefined) {
+          return envValue;
+        }
+        if (defaultValue !== undefined) {
+          // Remove quotes if present
+          return defaultValue.trim().replace(/^["']|["']$/g, '');
+        }
+        return undefined; // No env var and no default
+      }
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const processed: any = {};
+      for (const key in value) {
+        processed[key] = processValue(value[key]);
+      }
+      return processed;
+    }
+    return value;
+  };
+
+  return processValue(config);
+}
+
 export class ConfigManager {
   private static CONFIG_DIR = '.aitools';
   private static CONFIG_FILENAME = 'config.toml';
@@ -31,14 +85,14 @@ export class ConfigManager {
     // First, load global config if exists
     if (await this.fileExists(ConfigManager.GLOBAL_CONFIG_PATH)) {
       const globalConfig = await this.loadConfigFile(ConfigManager.GLOBAL_CONFIG_PATH);
-      mergedConfig = this.deepMerge(mergedConfig, globalConfig);
+      mergedConfig = deepMerge(mergedConfig, globalConfig);
     }
 
     // Then, load project config if exists (overrides global)
     const projectConfigPath = await this.findProjectConfig();
     if (projectConfigPath) {
       const projectConfig = await this.loadConfigFile(projectConfigPath);
-      mergedConfig = this.deepMerge(mergedConfig, projectConfig);
+      mergedConfig = deepMerge(mergedConfig, projectConfig);
       this.configPath = projectConfigPath; // Set path to project config
     } else if (await this.fileExists(ConfigManager.GLOBAL_CONFIG_PATH)) {
       this.configPath = ConfigManager.GLOBAL_CONFIG_PATH; // Fall back to global path
@@ -48,24 +102,6 @@ export class ConfigManager {
     return this.config;
   }
 
-  /**
-   * Deep merge two objects, with source overriding target
-   */
-  private deepMerge(target: any, source: any): any {
-    const result = { ...target };
-    
-    for (const key in source) {
-      if (source[key] !== undefined && source[key] !== null) {
-        if (typeof source[key] === 'object' && !Array.isArray(source[key])) {
-          result[key] = this.deepMerge(result[key] || {}, source[key]);
-        } else {
-          result[key] = source[key];
-        }
-      }
-    }
-    
-    return result;
-  }
 
   /**
    * Save configuration to file
@@ -204,7 +240,7 @@ ${tomlContent}`;
       const config = parse(content) as AiToolsConfig;
       
       // Process environment variable references
-      const processedConfig = this.processEnvVars(config);
+      const processedConfig = processEnvVars(config);
       
       // Merge with default config to ensure all fields exist
       return { ...defaultConfig, ...processedConfig };
@@ -328,41 +364,6 @@ ${tomlContent}`;
     
     // Remove trailing blank lines but keep spacing between sections
     return toml.replace(/\n\n+$/, '\n');
-  }
-
-  /**
-   * Process environment variable references in config values
-   * Supports syntax: "env(VAR_NAME)" or "env(VAR_NAME, default_value)"
-   */
-  private processEnvVars(config: any): any {
-    const envPattern = /^env\(([^,)]+)(?:,\s*(.+))?\)$/;
-    
-    const processValue = (value: any): any => {
-      if (typeof value === 'string') {
-        const match = value.match(envPattern);
-        if (match) {
-          const [, envVar, defaultValue] = match;
-          const envValue = process.env[envVar.trim()];
-          if (envValue !== undefined) {
-            return envValue;
-          }
-          if (defaultValue !== undefined) {
-            // Remove quotes if present
-            return defaultValue.trim().replace(/^["']|["']$/g, '');
-          }
-          return undefined; // No env var and no default
-        }
-      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        const processed: any = {};
-        for (const key in value) {
-          processed[key] = processValue(value[key]);
-        }
-        return processed;
-      }
-      return value;
-    };
-    
-    return processValue(config);
   }
 
   /**

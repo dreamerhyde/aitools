@@ -5,6 +5,67 @@ import { ProcessIdentifier, type IdentifiedProcess } from './process-identifier.
 
 const execAsync = promisify(exec);
 
+/**
+ * Check if a command string is likely a hook process
+ */
+export function isLikelyHook(command: string): boolean {
+  // Exclude aitools itself from hook detection
+  if (command.includes('aitools/dist/cli.js') ||
+      command.includes('ai ps hooks') ||
+      command.includes('ai process hooks')) {
+    return false;
+  }
+
+  const hookPatterns = [
+    /hook/i,
+    /claude.*code/i,
+    /git.*hook/i,
+    /pre-commit/i,
+    /post-commit/i,
+    /husky/i,
+    /lint-staged/i
+  ];
+
+  return hookPatterns.some(pattern => pattern.test(command));
+}
+
+/**
+ * Parse ps stat field to human-readable status
+ */
+export function parseProcessStatus(stat: string): ProcessInfo['status'] {
+  const firstChar = stat.charAt(0).toUpperCase();
+  switch (firstChar) {
+    case 'R': return 'running';
+    case 'S': return 'sleeping';
+    case 'Z': return 'zombie';
+    case 'T': return 'stopped';
+    default: return 'running';
+  }
+}
+
+/**
+ * Parse ps elapsed time format to seconds
+ * Supports: MM:SS, HH:MM:SS, DD-HH:MM:SS
+ */
+export function parseElapsedSeconds(etime: string): number {
+  const parts = etime.split(/[-:]/);
+  let totalSeconds = 0;
+
+  if (parts.length === 2) {
+    // MM:SS
+    totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  } else if (parts.length === 3) {
+    // HH:MM:SS
+    totalSeconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+  } else if (parts.length === 4) {
+    // DD-HH:MM:SS
+    totalSeconds = parseInt(parts[0]) * 86400 + parseInt(parts[1]) * 3600 +
+                  parseInt(parts[2]) * 60 + parseInt(parts[3]);
+  }
+
+  return totalSeconds;
+}
+
 export interface EnhancedProcessInfo extends ProcessInfo {
   identity: IdentifiedProcess;
 }
@@ -85,8 +146,8 @@ export class ProcessMonitor {
           cpu: parseFloat(cpu),
           memory: parseFloat(memory),
           startTime: etime,
-          isHook: this.isLikelyHook(command),
-          status: this.parseStatus(stat)
+          isHook: isLikelyHook(command),
+          status: parseProcessStatus(stat)
         };
       }).filter((proc): proc is ProcessInfo => proc !== null);
       
@@ -196,7 +257,7 @@ export class ProcessMonitor {
         }
         
         // Restart scripts running for more than 1 minute
-        if (isRestartScript && this.parseElapsedSeconds(proc.startTime) > 60) {
+        if (isRestartScript && parseElapsedSeconds(proc.startTime) > 60) {
           return true;
         }
         
@@ -282,60 +343,8 @@ export class ProcessMonitor {
     }
   }
 
-  private isLikelyHook(command: string): boolean {
-    // Exclude aitools itself from hook detection
-    if (command.includes('aitools/dist/cli.js') || 
-        command.includes('ai ps hooks') ||
-        command.includes('ai process hooks')) {
-      return false;
-    }
-    
-    const hookPatterns = [
-      /hook/i,
-      /claude.*code/i,
-      /git.*hook/i,
-      /pre-commit/i,
-      /post-commit/i,
-      /husky/i,
-      /lint-staged/i
-    ];
-    
-    return hookPatterns.some(pattern => pattern.test(command));
-  }
-
-  private parseStatus(stat: string): ProcessInfo['status'] {
-    const firstChar = stat.charAt(0).toUpperCase();
-    switch (firstChar) {
-      case 'R': return 'running';
-      case 'S': return 'sleeping';
-      case 'Z': return 'zombie';
-      case 'T': return 'stopped';
-      default: return 'running';
-    }
-  }
-
   private isLongRunning(etime: string): boolean {
-    return this.parseElapsedSeconds(etime) > this.options.timeThreshold;
-  }
-  
-  private parseElapsedSeconds(etime: string): number {
-    // Parse etime format (could be MM:SS or HH:MM:SS or DD-HH:MM:SS)
-    const parts = etime.split(/[-:]/);
-    let totalSeconds = 0;
-    
-    if (parts.length === 2) {
-      // MM:SS
-      totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    } else if (parts.length === 3) {
-      // HH:MM:SS
-      totalSeconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    } else if (parts.length === 4) {
-      // DD-HH:MM:SS
-      totalSeconds = parseInt(parts[0]) * 86400 + parseInt(parts[1]) * 3600 + 
-                    parseInt(parts[2]) * 60 + parseInt(parts[3]);
-    }
-    
-    return totalSeconds;
+    return parseElapsedSeconds(etime) > this.options.timeThreshold;
   }
 
   private parseMemoryInfo(vmStat: string, physicalMemoryBytes?: number): { total: string; free: string; active: string; usedBytes: number; totalBytes: number } {

@@ -11,7 +11,6 @@ export function setupBasicCommands(program: Command): void {
     .description('Upgrade AI Tools to the latest version')
     .option('--check', 'Only check for updates without installing')
     .option('--force', 'Force upgrade even if on latest version')
-    .option('--channel <channel>', 'Update channel (stable|beta|canary)', 'stable')
     .action(async (options) => {
       try {
         const upgrade = new UpgradeCommand();
