@@ -47,7 +47,7 @@ program
 // Core commands
 setupInitCommand(program);
 setupCostCommand(program);
-setupTreeCommand(program);    // tree + files
+setupTreeCommand(program);    // files + folders (tree = alias)
 setupLintCommand(program);    // quality checks
 setupLinesCommand(program);   // line limit checks
 
