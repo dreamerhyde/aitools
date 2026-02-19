@@ -12,7 +12,7 @@
 
 // Re-export everything from the new modular structure
 export type { ProcessInfo, IdentifiedProcess } from './process/types.js';
-export { ProcessIdentifier, identifyProcess, identifyProcessBatch, formatProcessDisplay } from './process/identifier.js';
+export { ProcessIdentifier, identifyProcess, identifyProcessBatch } from './process/identifier.js';
 
 // For direct imports of the old class names
 export { ProcessTree } from './process/tree.js';

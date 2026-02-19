@@ -47,7 +47,8 @@ export class SystemInfo {
       // Use single lsof call for all PIDs
       const pidList = missingPids.join(',');
       const { stdout } = await execAsync(
-        `lsof -p ${pidList} -a -d cwd -F pn 2>/dev/null`
+        `lsof -p ${pidList} -a -d cwd -F pn 2>/dev/null`,
+        { timeout: 5000 }
       ).catch(() => ({ stdout: '' }));
 
       if (stdout) {
@@ -85,7 +86,8 @@ export class SystemInfo {
 
     try {
       const { stdout } = await execAsync(
-        `lsof -p ${pid} -a -d cwd -F n 2>/dev/null | grep '^n' | head -1`
+        `lsof -p ${pid} -a -d cwd -F n 2>/dev/null | grep '^n' | head -1`,
+        { timeout: 5000 }
       );
       if (stdout) {
         const cwd = stdout.replace(/^n/, '').trim();
@@ -121,7 +123,8 @@ export class SystemInfo {
     try {
       // Get all running containers with port mappings
       const { stdout } = await execAsync(
-        `docker ps --format "{{.Names}}|{{.Image}}|{{.Ports}}" 2>/dev/null`
+        `docker ps --format "{{.Names}}|{{.Image}}|{{.Ports}}" 2>/dev/null`,
+        { timeout: 5000 }
       ).catch(() => ({ stdout: '' }));
 
       if (stdout) {
@@ -159,7 +162,8 @@ export class SystemInfo {
 
     try {
       const { stdout } = await execAsync(
-        `docker ps --format "{{.Names}}|{{.Image}}|{{.Ports}}" 2>/dev/null | grep ":${port}->"`
+        `docker ps --format "{{.Names}}|{{.Image}}|{{.Ports}}" 2>/dev/null | grep ":${port}->"`,
+        { timeout: 5000 }
       ).catch(() => ({ stdout: '' }));
 
       if (stdout) {

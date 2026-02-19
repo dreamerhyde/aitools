@@ -233,9 +233,3 @@ export class ProcessIdentifier {
 // Export convenience functions for backward compatibility
 export const identifyProcess = (info: ProcessInfo) => ProcessIdentifier.identify(info);
 export const identifyProcessBatch = (processes: ProcessInfo[]) => ProcessIdentifier.identifyBatch(processes);
-export const formatProcessDisplay = (identified: IdentifiedProcess, port?: number): string => {
-  if (port) {
-    return `${identified.displayName}:${port}`;
-  }
-  return identified.displayName;
-};

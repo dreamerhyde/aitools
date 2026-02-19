@@ -90,9 +90,9 @@ export class UIHelper {
         cpuColor = chalk.red.bold(proc.cpu.toFixed(1)); // Critical: sleeping but high CPU
       } else if (isAbnormal) {
         cpuColor = chalk.yellow(proc.cpu.toFixed(1)); // Warning: sleeping but moderate CPU
-      } else if (proc.cpu >= 50) {
+      } else if (proc.cpu > 20) {
         cpuColor = chalk.red(proc.cpu.toFixed(1));
-      } else if (proc.cpu >= 20) {
+      } else if (proc.cpu > 10) {
         cpuColor = chalk.yellow(proc.cpu.toFixed(1));
       } else {
         cpuColor = chalk.green(proc.cpu.toFixed(1));
@@ -109,8 +109,8 @@ export class UIHelper {
       data.push([
         chalk.white(proc.pid.toString()),
         cpuColor,
-        proc.memory >= 50 ? chalk.red(proc.memory.toFixed(1)) :
-          proc.memory >= 20 ? chalk.yellow(proc.memory.toFixed(1)) :
+        proc.memory > 20 ? chalk.red(proc.memory.toFixed(1)) :
+          proc.memory > 10 ? chalk.yellow(proc.memory.toFixed(1)) :
           chalk.green(proc.memory.toFixed(1)),
         chalk.gray(proc.formattedTime),
         statusIcon,
@@ -185,7 +185,7 @@ export class UIHelper {
       case 'zombie':
         return chalk.red('●');    // Red solid - Zombie process (critical)
       case 'stopped':
-        return chalk.yellow('○'); // Yellow hollow - Stopped (paused)
+        return chalk.yellow('●'); // Yellow solid - Stopped (paused)
       default:
         return chalk.gray('?');
     }

@@ -86,18 +86,18 @@ export class ProcessMonitor {
   async getSystemStats(): Promise<SystemStats> {
     try {
       // Get memory stats
-      const { stdout: vmStat } = await execAsync('vm_stat');
-      const { stdout: physicalMemory } = await execAsync('sysctl -n hw.memsize');
-      
+      const { stdout: vmStat } = await execAsync('vm_stat', { timeout: 10000 });
+      const { stdout: physicalMemory } = await execAsync('sysctl -n hw.memsize', { timeout: 10000 });
+
       // Get load average using sysctl (much faster than top)
-      const { stdout: loadAvgOutput } = await execAsync('sysctl -n vm.loadavg');
-      
+      const { stdout: loadAvgOutput } = await execAsync('sysctl -n vm.loadavg', { timeout: 10000 });
+
       // Get CPU core count for proper percentage calculation
-      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.logicalcpu');
+      const { stdout: cpuCountOutput } = await execAsync('sysctl -n hw.logicalcpu', { timeout: 10000 });
       const cpuCount = parseInt(cpuCountOutput.trim()) || 1;
-      
+
       // Get CPU usage from ps (already being called anyway)
-      const { stdout: cpuOutput } = await execAsync("ps aux | awk 'NR>1{sum+=$3} END {print sum}'");
+      const { stdout: cpuOutput } = await execAsync("ps aux | awk 'NR>1{sum+=$3} END {print sum}'", { timeout: 10000 });
       
       const memoryInfo = this.parseMemoryInfo(vmStat, parseInt(physicalMemory.trim()));
       
@@ -129,7 +129,8 @@ export class ProcessMonitor {
     try {
       // Use more efficient ps command - avoid 'aux' which includes unnecessary info
       const { stdout } = await execAsync(
-        'ps -Ao pid,ppid,pcpu,pmem,etime,stat,command | tail -n +2'
+        'ps -Ao pid,ppid,pcpu,pmem,etime,stat,command | tail -n +2',
+        { timeout: 10000 }
       );
       
       const processes = stdout.trim().split('\n').map(line => {
@@ -170,7 +171,8 @@ export class ProcessMonitor {
             // Parent not in list, try to fetch it
             try {
               const { stdout: parentStdout } = await execAsync(
-                `ps -p ${proc.ppid} -o command 2>/dev/null | tail -n 1`
+                `ps -p ${proc.ppid} -o command 2>/dev/null | tail -n 1`,
+                { timeout: 3000 }
               );
               if (parentStdout && parentStdout.includes('/node_modules/')) {
                 const projectMatch = parentStdout.match(/\/([^/]+)\/node_modules\//);
@@ -311,13 +313,13 @@ export class ProcessMonitor {
 
   async killProcess(pid: number): Promise<boolean> {
     try {
-      await execAsync(`kill -TERM ${pid}`);
+      await execAsync(`kill -TERM ${pid}`, { timeout: 5000 });
       // Wait 2 seconds, force kill if still alive
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       try {
-        await execAsync(`kill -0 ${pid}`);
-        await execAsync(`kill -KILL ${pid}`);
+        await execAsync(`kill -0 ${pid}`, { timeout: 5000 });
+        await execAsync(`kill -KILL ${pid}`, { timeout: 5000 });
       } catch {
         // Process already terminated
       }
